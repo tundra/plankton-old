@@ -1,0 +1,16 @@
+# Copyright 2014 the Neutrino authors (see AUTHORS).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+filenames = [
+  "plankton.cc",
+]
+
+objects = get_group("objects")
+for filename in filenames:
+  source = c.get_source_file(filename)
+  source.add_include(get_dep("tclib").get_child("src", "c"))
+  object = source.get_object()
+  objects.add_member(object)
+
+all = get_group("all")
+all.add_member(objects)
