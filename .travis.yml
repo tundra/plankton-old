@@ -1,0 +1,4 @@
+language: c
+compiler: gcc
+script: mkmk init --config plankton.mkmk && ./build.sh all run-tests
+install: source ./tools/enter-devenv.sh
