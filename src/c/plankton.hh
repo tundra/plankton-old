@@ -64,6 +64,10 @@ public:
   // 'false' is a keyword.
   static inline variant_t no() { return variant_t(rtFalse); }
 
+  // Returns a variant representing a bool, false if the value is 0, true
+  // otherwise.
+  static inline variant_t boolean(int value) { return variant_t(value ? rtTrue : rtFalse); }
+
   // Initializes a variant representing an integer with the given value. Note
   // that this is funky when used with a literal 0 because it also matches the
   // pointer constructors.

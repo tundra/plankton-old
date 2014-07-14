@@ -701,13 +701,10 @@ bool AsciiEncoder::is_unquoted_string_part(char c) {
 }
 
 bool AsciiEncoder::is_unescaped_char(char c) {
-  if (is_unquoted_string_part(c))
-    return true;
-  switch (c) {
-  case ' ':
-    return true;
-  default:
+  if (c < ' ' || c > '~') {
     return false;
+  } else {
+    return (c != '"' && c != '\\');
   }
 }
 
@@ -1066,18 +1063,14 @@ bool AsciiDecoder::decode_unquoted_string(variant_t *out) {
 
 bool AsciiEncoder::encode_short_escape(char c, char *out) {
   switch (c) {
-    case '\n':
-      *out = 'n';
-      break;
-    case '\f':
-      *out = 'f';
-      break;
-    case '\r':
-      *out = 'r';
-      break;
-    case '\0':
-      *out = 'r';
-      break;
+    case '\a': *out = 'a'; break;
+    case '\b': *out = 'b'; break;
+    case '\f': *out = 'f'; break;
+    case '\n': *out = 'n'; break;
+    case '\t': *out = 't'; break;
+    case '\r': *out = 'r'; break;
+    case '\v': *out = 'v'; break;
+    case '\0': *out = '0'; break;
     case '\\':
     case '\"':
       *out = c;
@@ -1090,18 +1083,14 @@ bool AsciiEncoder::encode_short_escape(char c, char *out) {
 
 bool AsciiDecoder::decode_short_escape(char c, char *out) {
   switch (c) {
-    case 'n':
-      *out = '\n';
-      break;
-    case 'f':
-      *out = '\f';
-      break;
-    case 'r':
-      *out = '\r';
-      break;
-    case '0':
-      *out = '\0';
-      break;
+    case 'a': *out = '\a'; break;
+    case 'b': *out = '\b'; break;
+    case 'f': *out = '\f'; break;
+    case 'n': *out = '\n'; break;
+    case 't': *out = '\t'; break;
+    case 'r': *out = '\r'; break;
+    case 'v': *out = '\v'; break;
+    case '0': *out = '\0'; break;
     case '\\':
     case '\"':
       *out = c;
