@@ -782,6 +782,21 @@ public:
   }
 };
 
+class BinaryWriter {
+public:
+  BinaryWriter();
+  ~BinaryWriter();
+
+  void write(variant_t value);
+
+  uint8_t *operator*() { return bytes_; }
+
+  size_t size() { return size_; }
+private:
+  uint8_t *bytes_;
+  size_t size_;
+};
+
 // An object that holds the representation of a variant as a 7-bit ascii string.
 class TextWriter {
 public:
@@ -799,16 +814,16 @@ public:
   size_t length() { return length_; }
 
 private:
-  friend class AsciiEncoder;
+  friend class TextWriterImpl;
   char *chars_;
   size_t length_;
 };
 
 // Utility for converting a plankton variant to a 7-bit ascii string.
-class TextParser {
+class TextReader {
 public:
   // Creates a new parser which uses the given arena for allocation.
-  TextParser(arena_t *arena);
+  TextReader(arena_t *arena);
 
   // Parse the given input, returning the value. If any errors occur the
   // has_failed() and offender() methods can be used to identify what the
@@ -823,7 +838,7 @@ public:
   char offender() { return offender_; }
 
 private:
-  friend class AsciiDecoder;
+  friend class TextReaderImpl;
   arena_t *arena_;
   bool has_failed_;
   char offender_;

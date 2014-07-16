@@ -12,7 +12,7 @@ using namespace plankton;
   writer.write(VAR);                                                           \
   ASSERT_EQ(0, strcmp(EXP, *writer));                                          \
   arena_t decoder;                                                             \
-  TextParser parser(&decoder);                                                 \
+  TextReader parser(&decoder);                                                 \
   variant_t decoded = parser.parse(*writer, writer.length());                  \
   TextWriter rewriter;                                                         \
   rewriter.write(decoded);                                                     \
@@ -114,7 +114,7 @@ TEST(text, maps) {
 
 #define CHECK_REWRITE(IN, OUT) do {                                            \
   arena_t decoder;                                                             \
-  TextParser parser(&decoder);                                                 \
+  TextReader parser(&decoder);                                                 \
   variant_t decoded = parser.parse(IN, strlen(IN));                            \
   TextWriter writer;                                                           \
   writer.write(decoded);                                                       \
@@ -123,7 +123,7 @@ TEST(text, maps) {
 
 #define CHECK_FAILS(CHR, IN) do {                                              \
   arena_t arena;                                                               \
-  TextParser parser(&arena);                                                   \
+  TextReader parser(&arena);                                                   \
   variant_t decoded = parser.parse(IN, strlen(IN));                            \
   ASSERT_TRUE(parser.has_failed());                                            \
   ASSERT_FALSE(bool(decoded));                                                 \

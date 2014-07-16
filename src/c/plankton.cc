@@ -484,9 +484,9 @@ TextWriter::~TextWriter() {
 }
 
 // Utility used to print plankton values as ascii.
-class AsciiEncoder {
+class TextWriterImpl {
 public:
-  AsciiEncoder();
+  TextWriterImpl();
 
   // Writes the given value on the stream at the current indentation level.
   void write(variant_t value);
@@ -576,11 +576,11 @@ private:
   bool has_pending_newline_;
 };
 
-AsciiEncoder::AsciiEncoder()
+TextWriterImpl::TextWriterImpl()
   : indent_(0)
   , has_pending_newline_(false) { }
 
-void AsciiEncoder::write(variant_t value) {
+void TextWriterImpl::write(variant_t value) {
   switch (value.type()) {
     case variant_t::vtFalse:
       write_raw_string("%f");
@@ -612,7 +612,7 @@ void AsciiEncoder::write(variant_t value) {
   }
 }
 
-size_t AsciiEncoder::get_short_length(variant_t value, size_t offset) {
+size_t TextWriterImpl::get_short_length(variant_t value, size_t offset) {
   switch (value.type()) {
     case variant_t::vtInteger:
       return offset + 5;
@@ -645,18 +645,18 @@ size_t AsciiEncoder::get_short_length(variant_t value, size_t offset) {
   }
 }
 
-void AsciiEncoder::write_raw_string(const char *chars) {
+void TextWriterImpl::write_raw_string(const char *chars) {
   flush_pending_newline();
   size_t size = strlen(chars);
   chars_.write(chars, size);
 }
 
-void AsciiEncoder::write_raw_char(char c) {
+void TextWriterImpl::write_raw_char(char c) {
   flush_pending_newline();
   chars_.add(c);
 }
 
-void AsciiEncoder::flush_pending_newline() {
+void TextWriterImpl::flush_pending_newline() {
   if (!has_pending_newline_)
     return;
   chars_.add('\n');
@@ -664,43 +664,43 @@ void AsciiEncoder::flush_pending_newline() {
   has_pending_newline_ = false;
 }
 
-void AsciiEncoder::schedule_newline() {
+void TextWriterImpl::schedule_newline() {
   has_pending_newline_ = true;
 }
 
-void AsciiEncoder::indent() {
+void TextWriterImpl::indent() {
   indent_ += 2;
 }
 
-void AsciiEncoder::deindent() {
+void TextWriterImpl::deindent() {
   indent_ -= 2;
 }
 
-void AsciiEncoder::write_hex_byte(uint8_t c) {
+void TextWriterImpl::write_hex_byte(uint8_t c) {
   uint8_t high = (c >> 4) & 0xF;
   write_raw_char(high < 10 ? ('0' + high) : ('a' + high - 10));
   uint8_t low = c & 0xF;
   write_raw_char(low < 10 ? ('0' + low) : ('a' + low - 10));
 }
 
-void AsciiEncoder::write_integer(int64_t value) {
+void TextWriterImpl::write_integer(int64_t value) {
   char chars[64];
   sprintf(chars, "%li", value);
   write_raw_string(chars);
 }
 
-bool AsciiEncoder::is_unquoted_string_start(char c) {
+bool TextWriterImpl::is_unquoted_string_start(char c) {
   return ('a' <= c && c <= 'z')
       || ('A' <= c && c <= 'Z');
 }
 
-bool AsciiEncoder::is_unquoted_string_part(char c) {
+bool TextWriterImpl::is_unquoted_string_part(char c) {
   return is_unquoted_string_start(c)
       || ('0' <= c && c <= '9')
       || (c == '_');
 }
 
-bool AsciiEncoder::is_unescaped_char(char c) {
+bool TextWriterImpl::is_unescaped_char(char c) {
   if (c < ' ' || c > '~') {
     return false;
   } else {
@@ -708,7 +708,7 @@ bool AsciiEncoder::is_unescaped_char(char c) {
   }
 }
 
-bool AsciiEncoder::is_unquoted(const char *chars, size_t length) {
+bool TextWriterImpl::is_unquoted(const char *chars, size_t length) {
   if (length == 0)
     return false;
   if (!is_unquoted_string_start(chars[0]))
@@ -720,7 +720,7 @@ bool AsciiEncoder::is_unquoted(const char *chars, size_t length) {
   return true;
 }
 
-void AsciiEncoder::write_string(const char *chars, size_t length) {
+void TextWriterImpl::write_string(const char *chars, size_t length) {
   if (is_unquoted(chars, length)) {
     flush_pending_newline();
     chars_.write(chars, length);
@@ -751,15 +751,15 @@ void AsciiEncoder::write_string(const char *chars, size_t length) {
   write_raw_char('"');
 }
 
-const char AsciiEncoder::kBase64Chars[65] =
+const char TextWriterImpl::kBase64Chars[65] =
     "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
     "abcdefghijklmnopqrstuvwxyz"
     "0123456789"
     "+/";
 
-const char AsciiEncoder::kBase64Padding = '=';
+const char TextWriterImpl::kBase64Padding = '=';
 
-void AsciiEncoder::write_blob(const void *data, size_t size) {
+void TextWriterImpl::write_blob(const void *data, size_t size) {
   const uint8_t *bytes = static_cast<const uint8_t*>(data);
   write_raw_char('%');
   write_raw_char('[');
@@ -798,7 +798,7 @@ void AsciiEncoder::write_blob(const void *data, size_t size) {
   write_raw_char(']');
 }
 
-void AsciiEncoder::write_array(array_t array) {
+void TextWriterImpl::write_array(array_t array) {
   bool is_long = get_short_length(array, indent_) >= kShortLengthLimit;
   write_raw_char('[');
   if (is_long) {
@@ -821,7 +821,7 @@ void AsciiEncoder::write_array(array_t array) {
   write_raw_char(']');
 }
 
-void AsciiEncoder::write_map(map_t map) {
+void TextWriterImpl::write_map(map_t map) {
   bool is_long = get_short_length(map, indent_) >= kShortLengthLimit;
   write_raw_char('{');
   if (is_long) {
@@ -848,7 +848,7 @@ void AsciiEncoder::write_map(map_t map) {
   write_raw_char('}');
 }
 
-void AsciiEncoder::flush(TextWriter *writer) {
+void TextWriterImpl::flush(TextWriter *writer) {
   flush_pending_newline();
   writer->length_ = chars_.length();
   chars_.add('\0');
@@ -856,15 +856,15 @@ void AsciiEncoder::flush(TextWriter *writer) {
 }
 
 void TextWriter::write(variant_t value) {
-  AsciiEncoder encoder;
+  TextWriterImpl encoder;
   encoder.write(value);
   encoder.flush(this);
 }
 
 // Utility for parsing a particular string.
-class AsciiDecoder {
+class TextReaderImpl {
 public:
-  AsciiDecoder(const char *chars, size_t length, TextParser *parser);
+  TextReaderImpl(const char *chars, size_t length, TextReader *parser);
 
   // Decode a toplevel variant expression. A toplevel expression is different
   // from others because it must fill the whole string.
@@ -945,10 +945,10 @@ private:
   size_t length_;
   size_t cursor_;
   const char *chars_;
-  TextParser *parser_;
+  TextReader *parser_;
 };
 
-AsciiDecoder::AsciiDecoder(const char *chars, size_t length, TextParser *parser)
+TextReaderImpl::TextReaderImpl(const char *chars, size_t length, TextReader *parser)
   : length_(length)
   , cursor_(0)
   , chars_(chars)
@@ -956,7 +956,7 @@ AsciiDecoder::AsciiDecoder(const char *chars, size_t length, TextParser *parser)
   skip_whitespace();
 }
 
-void AsciiDecoder::skip_whitespace() {
+void TextReaderImpl::skip_whitespace() {
   // Loop around skipping any number of comments and the whitespace between
   // them.
   top: do {
@@ -971,7 +971,7 @@ void AsciiDecoder::skip_whitespace() {
   } while (false);
 }
 
-bool AsciiDecoder::is_whitespace(char c) {
+bool TextReaderImpl::is_whitespace(char c) {
   switch (c) {
     case ' ': case '\n': case '\t': case '\f': case '\r':
       return true;
@@ -980,7 +980,7 @@ bool AsciiDecoder::is_whitespace(char c) {
   }
 }
 
-bool AsciiDecoder::is_newline(char c) {
+bool TextReaderImpl::is_newline(char c) {
   switch (c) {
     case '\n': case '\f':
       return true;
@@ -989,15 +989,15 @@ bool AsciiDecoder::is_newline(char c) {
   }
 }
 
-bool AsciiDecoder::is_digit(char c) {
+bool TextReaderImpl::is_digit(char c) {
   return '0' <= c && c <= '9';
 }
 
-bool AsciiDecoder::decode_toplevel(variant_t *out) {
+bool TextReaderImpl::decode_toplevel(variant_t *out) {
   return decode(out) && (!has_more() || fail(out));
 }
 
-bool AsciiDecoder::decode(variant_t *out) {
+bool TextReaderImpl::decode(variant_t *out) {
   switch (current()) {
     case '%':
       advance();
@@ -1027,7 +1027,7 @@ bool AsciiDecoder::decode(variant_t *out) {
       char c = current();
       if (c == '-' || is_digit(c)) {
         return decode_integer(out);
-      } else if (AsciiEncoder::is_unquoted_string_start(c)) {
+      } else if (TextWriterImpl::is_unquoted_string_start(c)) {
         return decode_unquoted_string(out);
       } else {
         return fail(out);
@@ -1035,7 +1035,7 @@ bool AsciiDecoder::decode(variant_t *out) {
   }
 }
 
-bool AsciiDecoder::decode_integer(variant_t *out) {
+bool TextReaderImpl::decode_integer(variant_t *out) {
   bool is_negative = false;
   if (current() == '-') {
     is_negative = true;
@@ -1052,16 +1052,16 @@ bool AsciiDecoder::decode_integer(variant_t *out) {
   return succeed(variant_t::integer(result), out);
 }
 
-bool AsciiDecoder::decode_unquoted_string(variant_t *out) {
+bool TextReaderImpl::decode_unquoted_string(variant_t *out) {
   const char *start = chars_ + cursor_;
-  while (AsciiEncoder::is_unquoted_string_part(current()))
+  while (TextWriterImpl::is_unquoted_string_part(current()))
     advance();
   const char *end = chars_ + cursor_;
   skip_whitespace();
   return succeed(arena()->new_string(start, end - start), out);
 }
 
-bool AsciiEncoder::encode_short_escape(char c, char *out) {
+bool TextWriterImpl::encode_short_escape(char c, char *out) {
   switch (c) {
     case '\a': *out = 'a'; break;
     case '\b': *out = 'b'; break;
@@ -1081,7 +1081,7 @@ bool AsciiEncoder::encode_short_escape(char c, char *out) {
   return true;
 }
 
-bool AsciiDecoder::decode_short_escape(char c, char *out) {
+bool TextReaderImpl::decode_short_escape(char c, char *out) {
   switch (c) {
     case 'a': *out = '\a'; break;
     case 'b': *out = '\b'; break;
@@ -1114,7 +1114,7 @@ static bool parse_hex_digit(char c, uint8_t *out) {
   return true;
 }
 
-bool AsciiDecoder::decode_quoted_string(variant_t *out) {
+bool TextReaderImpl::decode_quoted_string(variant_t *out) {
   advance();
   Buffer<char> buf;
   while (has_more() && current() != '"') {
@@ -1151,7 +1151,7 @@ bool AsciiDecoder::decode_quoted_string(variant_t *out) {
   return succeed(arena()->new_string(*buf, buf.length()), out);
 }
 
-bool AsciiDecoder::decode_array(variant_t *out) {
+bool TextReaderImpl::decode_array(variant_t *out) {
   advance_and_skip();
   array_t result = arena()->new_array();
   while (has_more() && current() != ']') {
@@ -1171,7 +1171,7 @@ bool AsciiDecoder::decode_array(variant_t *out) {
   return succeed(result, out);
 }
 
-bool AsciiDecoder::decode_map(variant_t *out) {
+bool TextReaderImpl::decode_map(variant_t *out) {
   advance_and_skip();
   map_t result = arena()->new_map();
   while (has_more() && current() != '}') {
@@ -1203,7 +1203,7 @@ bool AsciiDecoder::decode_map(variant_t *out) {
 // Padding marker.
 #define PAD 254
 
-const uint8_t AsciiDecoder::kBase64CharToSextet[256] = {
+const uint8_t TextReaderImpl::kBase64CharToSextet[256] = {
   INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV,
   INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV,
   INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, 62,  INV, INV, INV, 63,
@@ -1222,7 +1222,7 @@ const uint8_t AsciiDecoder::kBase64CharToSextet[256] = {
   INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV
 };
 
-bool AsciiDecoder::decode_blob(variant_t *out) {
+bool TextReaderImpl::decode_blob(variant_t *out) {
   Buffer<uint8_t> data;
   if (current() == '[') {
     advance_and_skip();
@@ -1265,27 +1265,27 @@ bool AsciiDecoder::decode_blob(variant_t *out) {
   }
 }
 
-bool AsciiDecoder::fail(variant_t *out) {
+bool TextReaderImpl::fail(variant_t *out) {
   parser_->has_failed_ = true;
   parser_->offender_ = current();
   *out = variant_t::null();
   return false;
 }
 
-bool AsciiDecoder::succeed(variant_t value, variant_t *out) {
+bool TextReaderImpl::succeed(variant_t value, variant_t *out) {
   *out = value;
   return true;
 }
 
-TextParser::TextParser(arena_t *arena)
+TextReader::TextReader(arena_t *arena)
   : arena_(arena)
   , has_failed_(false)
   , offender_('\0') { }
 
-variant_t TextParser::parse(const char *chars, size_t length) {
+variant_t TextReader::parse(const char *chars, size_t length) {
   has_failed_ = false;
   offender_ = '\0';
-  AsciiDecoder decoder(chars, length, this);
+  TextReaderImpl decoder(chars, length, this);
   variant_t result;
   decoder.decode_toplevel(&result);
   return result;
