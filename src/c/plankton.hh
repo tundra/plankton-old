@@ -30,9 +30,9 @@ private:
     rtArenaBlob = 0x31,
     rtNull = 0x40,
     rtTrue = 0x50,
-    rtFalse = 0x60,
-    rtArenaArray = 0x70,
-    rtArenaMap = 0x80
+    rtFalse = 0x51,
+    rtArenaArray = 0x60,
+    rtArenaMap = 0x70
   };
 
 public:
@@ -43,10 +43,9 @@ public:
     vtString = 0x02,
     vtBlob = 0x03,
     vtNull = 0x04,
-    vtTrue = 0x05,
-    vtFalse = 0x06,
-    vtArray = 0x07,
-    vtMap = 0x08
+    vtBool = 0x05,
+    vtArray = 0x06,
+    vtMap = 0x07
   };
 
   // Initializes a variant representing null.
@@ -793,6 +792,7 @@ public:
 
   size_t size() { return size_; }
 private:
+  friend class BinaryWriterImpl;
   uint8_t *bytes_;
   size_t size_;
 };
@@ -817,6 +817,17 @@ private:
   friend class TextWriterImpl;
   char *chars_;
   size_t length_;
+};
+
+class BinaryReader {
+public:
+  BinaryReader(arena_t *arena);
+
+  variant_t parse(const void *data, size_t size);
+
+private:
+  friend class BinaryReaderImpl;
+  arena_t *arena_;
 };
 
 // Utility for converting a plankton variant to a 7-bit ascii string.

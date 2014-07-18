@@ -3,6 +3,8 @@
 
 filenames = [
   "plankton.cc",
+  "plankton-binary.cc",
+  "plankton-text.cc",
 ]
 
 objects = get_group("objects")

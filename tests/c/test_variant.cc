@@ -23,10 +23,10 @@ TEST(variant, simple) {
   ASSERT_EQ(0, str.integer_value());
   ASSERT_EQ(false, str.bool_value());
   variant_t yes = variant_t::yes();
-  ASSERT_EQ(variant_t::vtTrue, yes.type());
+  ASSERT_EQ(variant_t::vtBool, yes.type());
   ASSERT_EQ(true, yes.bool_value());
   variant_t no = variant_t::no();
-  ASSERT_EQ(variant_t::vtFalse, no.type());
+  ASSERT_EQ(variant_t::vtBool, no.type());
   ASSERT_EQ(false, no.bool_value());
 }
 
