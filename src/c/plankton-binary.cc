@@ -13,7 +13,8 @@ BinaryWriter::BinaryWriter()
   , size_(0) { }
 
 BinaryWriter::~BinaryWriter() {
-
+  delete[] bytes_;
+  bytes_ = NULL;
 }
 
 class BinaryWriterImpl : public BinaryImplUtils {
