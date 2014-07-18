@@ -10,27 +10,39 @@
 
 namespace plankton {
 
+// A simple buffer.
 template <typename T>
 class Buffer {
 public:
   Buffer();
   ~Buffer();
 
+  // Add the given value at the end of this buffer, expanding if necessary.
   void add(const T &value);
 
+  // Add 'count' elements from the given array to the end of this buffer,
+  // expanding if necessary.
   void write(const T *data, size_t count);
 
+  // Add the given value 'count' times to the end of this buffer, expanding if
+  // necessary.
   void fill(const T &value, size_t count);
 
+  // Returns the start of this buffer. The buffer is only valid until the next
+  // modification to the buffer.
   T *operator*() { return data_; }
 
+  // Returns the number of elements in this buffer.
   size_t length() { return cursor_; }
 
   // Returns the contents of this buffer and then removes any references to it
-  // such that it will not be disposed when this buffer is destroyed.
+  // such that it will not be disposed when this buffer is destroyed. The
+  // buffer can not be changed after this has been called (though length()
+  // remains valid).
   T *release();
 
 private:
+  // Ensures that this buffer will hold at least 'size' additional elements.
   void ensure_capacity(size_t size);
 
   size_t capacity_;

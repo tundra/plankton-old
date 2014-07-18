@@ -781,16 +781,21 @@ public:
   }
 };
 
+// Utility for serializing variant values to plankton.
 class BinaryWriter {
 public:
   BinaryWriter();
   ~BinaryWriter();
 
+  // Write the given value to this writer's internal buffer.
   void write(variant_t value);
 
+  // Returns the start of the buffer.
   uint8_t *operator*() { return bytes_; }
 
+  // Returns the size in bytes of the data written to this writer's buffer.
   size_t size() { return size_; }
+
 private:
   friend class BinaryWriterImpl;
   uint8_t *bytes_;
@@ -819,10 +824,13 @@ private:
   size_t length_;
 };
 
+// Utility for reading variant values from serialized data.
 class BinaryReader {
 public:
+  // Creates a new reader that allocates values from the given arena.
   BinaryReader(arena_t *arena);
 
+  // Deserializes the given input and returns the result as a variant.
   variant_t parse(const void *data, size_t size);
 
 private:

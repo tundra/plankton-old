@@ -27,11 +27,13 @@ public:
   void flush(BinaryWriter *writer);
 
 private:
-  // Writes a single byte to the stream.
+  // Write a single byte to the stream.
   void write_byte(uint8_t value);
 
+  // Write an untagged signed int64 varint.
   void write_int64(int64_t value);
 
+  // Write an untagged unsigned int64 varint.
   void write_uint64(uint64_t value);
 
   Buffer<uint8_t> bytes_;
@@ -75,16 +77,19 @@ public:
   bool decode(variant_t *result_out);
 
 private:
+  // Returns true iff there are more bytes to return.
   bool has_more() { return cursor_ < size_; }
 
-  uint8_t current() { return data_[cursor_]; }
-
+  // Advances past and returns the current byte.
   uint8_t read_byte() { return data_[cursor_++]; }
 
+  // Advances past and returns the current varint encoded unsigned int64.
   uint64_t read_uint64();
 
+  // Advances past and returns the current varint encoded signed int64.
   int64_t read_int64();
 
+  // Read a tagged integer's payload.
   bool decode_integer(variant_t *result_out);
 
   // Succeeds parsing of some expression, returning true.
@@ -159,7 +164,7 @@ int64_t BinaryReaderImpl::read_int64() {
 //
 //   0x00 -> 0
 //   0x80 0x00 -> 128 (= 2^7)
-//   0x80 0x00 -> 16512 (= 2^7 + 2^14)
+//   0x80 0x80 0x00 -> 16512 (= 2^7 + 2^14)
 //   0x80 0x80 0x80 0x00 -> 2113664 (= 2^7 + 2^14 + 2^21)
 //
 // This is also slightly more space efficient -- without the bias two bytes will
