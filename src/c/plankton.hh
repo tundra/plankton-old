@@ -18,7 +18,26 @@ class arena_string_t;
 class arena_sink_t;
 class arena_t;
 
-// A plankton variant.
+// A plankton variant. A variant can represent any of the plankton data types.
+// Some variant values, like integers and external strings, can be constructed
+// without allocation whereas others, like arrays and maps, must be allocated in
+// an arena. Some variant types can be mutable, such as strings and arrays, to
+// allow values to be built incrementally. All variant types can be frozen such
+// that any further modification will be rejected.
+//
+// Variants can be handled in two equivalent but slightly different ways,
+// depending on what's convenient. The basic variant_t type has methods for
+// interacting with all the different types. For instance you can ask for the
+// array length of any variant by calling variant_t::array_length, regardless of
+// whether you're statically sure it's an array. For arrays you'll get the
+// actual length back, for any other type there's a fallback result which in
+// this case is 0.
+//
+// Alternatively there are specialized types such as array_t that provide the
+// same functionality but in a more convenient form. So instead of calling
+// variant_t::array_length you can convert the value to an array and use
+// array_t::length. Semantically this is equivalent but it makes your
+// assumptions clear and the code more concise.
 class variant_t {
 private:
   // Tags that identify the internal representation of variants.
@@ -282,6 +301,9 @@ private:
   arena_map_t *data();
 };
 
+// A variant that represents a string. A string can be either an actual string
+// or null, to make conversion more convenient. If you want to be sure you're
+// really dealing with a string do an if-check.
 class string_t : public variant_t {
 public:
   explicit string_t(variant_t variant);
@@ -368,8 +390,13 @@ public:
   // the arena so the character array can be disposed after this call returns.
   variant_t new_string(const char *str, size_t length);
 
-  // Creates and returns a new mutable variant string.
-  variant_t new_string(size_t size);
+  // Creates and returns a new mutable variant string of the given length,
+  // initialized to all '\0's. Note that this doesn't mean that the string is
+  // initially empty. Variant strings can handle null characters so what you
+  // get is a 'length' long string where all the characters are null. The null
+  // terminator is implicitly allocated in addition to the requested length, so
+  // you only need to worry about the non-null characters.
+  variant_t new_string(size_t length);
 
   // Creates and returns a new variant blob. The contents it copied into this
   // arena so the data array can be disposed after this call returns.
