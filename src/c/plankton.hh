@@ -17,6 +17,28 @@ class arena_map_t;
 class arena_string_t;
 class arena_sink_t;
 class arena_t;
+class variant_t;
+
+// An iterator that allows you to scan through all the mappings in a map.
+class map_iterator_t {
+public:
+  // If there are more mappings in this map sets the key and value in the
+  // given out parameters and returns true. Otherwise returns false.
+  bool advance(variant_t *key, variant_t *value);
+
+  // Returns true iff the next call to advance will return true.
+  bool has_next();
+
+private:
+  friend class variant_t;
+  map_iterator_t(arena_map_t *data);
+  map_iterator_t() : data_(NULL), cursor_(0), limit_(0) { }
+
+  arena_map_t *data_;
+  uint32_t cursor_;
+  uint32_t limit_;
+};
+
 
 // A plankton variant. A variant can represent any of the plankton data types.
 // Some variant values, like integers and external strings, can be constructed
@@ -147,6 +169,14 @@ public:
   // If this variant is a blob returns the blob data. If not returns NULL.
   const void *blob_data() const;
 
+  // Returns the index'th byte in this blob if this is a blob of size at least
+  // index, otherwise 0.
+  uint8_t blob_get(size_t index) const;
+
+  // Sets the index'th byte if this is a mutable blob with size at least index.
+  // Returns true if setting succeeded.
+  bool blob_set(size_t index, uint8_t b);
+
   // Returns the length of this array.
   uint32_t array_length() const;
 
@@ -157,6 +187,23 @@ public:
   // Adds the given value at the end of this array if it is mutable. Returns
   // true if adding succeeded.
   bool array_add(variant_t value);
+
+  // Returns the number of mappings in this map, if this is a map, otherwise
+  // 0.
+  uint32_t map_size() const;
+
+  // Adds a mapping from the given key to the given value if this map is
+  // mutable. Returns true if setting succeeded.
+  bool map_set(variant_t key, variant_t value);
+
+  // Returns the mapping for the given key in this map if this contains the
+  // key, otherwise null.
+  variant_t map_get(variant_t key) const;
+
+  // Returns an iterator for iterating this map, if this is a map, otherwise an
+  // empty iterator. The first call to advance will yield the first mapping, if
+  // there is one.
+  map_iterator_t map_iter() const;
 
   // Returns the value of this boolean if it is a boolean, otherwise false. In
   // other words, true iff this is the boolean true value. Note that this is
@@ -192,6 +239,16 @@ public:
   // object.
   void ensure_frozen();
 
+  inline bool is_integer() const { return repr_tag_ == rtInteger; }
+
+  inline bool is_map() const { return repr_tag_ == rtArenaMap; }
+
+  inline bool is_array() const { return repr_tag_ == rtArenaArray; }
+
+  inline bool is_string() const { return type() == vtString; }
+
+  inline bool is_blob() const { return type() == vtBlob; }
+
 protected:
   repr_tag_t repr_tag_;
   union {
@@ -204,27 +261,22 @@ protected:
       uint32_t size_;
       const void *data_;
     } as_external_blob_;
+    arena_value_t *as_arena_value_;
     arena_array_t *as_arena_array_;
     arena_map_t *as_arena_map_;
     arena_string_t *as_arena_string_;
     arena_blob_t *as_arena_blob_;
   } data_;
 
-  inline bool is_integer() const { return repr_tag_ == rtInteger; }
-
-  inline variant_t(arena_array_t *arena_array);
-
-  inline variant_t(arena_map_t *arena_map);
-
 private:
   friend class arena_t;
 
   // Creates a variant with no payload and the given type.
-  variant_t(repr_tag_t tag) : repr_tag_(tag) { data_.as_integer_ = 0; }
+  variant_t(repr_tag_t tag)
+    : repr_tag_(tag) { data_.as_integer_ = 0; }
 
-  inline variant_t(arena_string_t *arena_string);
-
-  inline variant_t(arena_blob_t *arena_blob);
+  variant_t(repr_tag_t tag, arena_value_t *arena_value)
+    : repr_tag_(tag) { data_.as_arena_value_ = arena_value; }
 };
 
 // A variant that represents an array. An array can be either an actual array
@@ -238,18 +290,14 @@ public:
 
   // Adds the given value at the end of this array if it is mutable. Returns
   // true if adding succeeded.
-  bool add(variant_t value);
+  bool add(variant_t value) { return array_add(value); }
 
   // Returns the length of this array.
-  uint32_t length() const;
+  uint32_t length() const { return array_length(); }
 
   // Returns the index'th element, null if the index is greater than the array's
   // length.
-  variant_t operator[](size_t index) const;
-
-private:
-  friend class arena_t;
-  explicit array_t(arena_array_t *data);
+  variant_t operator[](size_t index) const { return array_get(index); }
 };
 
 // A variant that represents a map. A map can be either an actual map or null,
@@ -257,48 +305,23 @@ private:
 // dealing with a map do an if-check.
 class map_t : public variant_t {
 public:
-  // An iterator that allows you to scan through all the mappings in a map.
-  class iterator {
-  public:
-    // If there are more mappings in this map sets the key and value in the
-    // given out parameters and returns true. Otherwise returns false.
-    bool advance(variant_t *key, variant_t *value);
-
-    // Returns true iff the next call to advance will return true.
-    bool has_next();
-
-  private:
-    friend class map_t;
-    iterator(arena_map_t *data) : data_(data), cursor_(0) { }
-
-    arena_map_t *data_;
-    size_t cursor_;
-  };
-
   // Conversion to a map of some value. If the value is indeed a map the
   // result is a proper map, if it is something else the result is null.
   explicit map_t(variant_t variant);
 
   // Adds a mapping from the given key to the given value if this map is
   // mutable. Returns true if setting succeeded.
-  bool set(variant_t key, variant_t value);
+  bool set(variant_t key, variant_t value) { return map_set(key, value); }
 
   // Returns the mapping for the given key.
-  variant_t operator[](variant_t key);
+  variant_t operator[](variant_t key) { return map_get(key); }
 
   // Returns the number of mappings in this map.
-  size_t size();
+  uint32_t size() const { return map_size(); }
 
   // Returns an iterator for iterating this map. The first call to advance will
   // yield the first mapping, if there is one.
-  iterator iter() { return iterator(data()); }
-
-private:
-  friend class arena_t;
-  explicit map_t(arena_map_t *data);
-
-  // Returns this map's underlying data.
-  arena_map_t *data();
+  map_iterator_t iter() const { return map_iter(); }
 };
 
 // A variant that represents a string. A string can be either an actual string
@@ -309,21 +332,34 @@ public:
   explicit string_t(variant_t variant);
 
   // Returns the length of this string if it is a string, otherwise 0.
-  size_t length();
+  size_t length() const { return string_length(); }
 
   // Returns the index'th character in this string if this is a string with
   // at least index characters, otherwise 0.
-  char get(size_t index);
+  char get(size_t index) const { return string_get(index); }
 
   // Sets the index'th character if this is a mutable string with at least
   // index characters. Returns true if setting succeeded.
-  bool set(size_t index, char c);
+  bool set(size_t index, char c) { return string_set(index, c); }
+};
 
-private:
-  friend class arena_t;
-  explicit string_t(arena_string_t *data);
+// A variant that represents a blob. A blob can be either an actual blob or
+// null, to make conversion more convenient. If you want to be sure you're
+// really dealing with a blob do an if-check.
+class blob_t : public variant_t {
+public:
+  explicit blob_t(variant_t variant);
 
-  arena_string_t *data();
+  // Returns the size of this blob if it is a blob, otherwise 0.
+  size_t size() const { return blob_size(); }
+
+  // Returns the index'th byte in this blob if this is a blob of size at least
+  // index, otherwise 0.
+  uint8_t get(size_t index) const { return blob_get(index); }
+
+  // Sets the index'th byte if this is a mutable blob with size at least index.
+  // Returns true if setting succeeded.
+  bool set(size_t index, uint8_t b) { return blob_set(index, b); }
 };
 
 // A sink is like a pointer to a variant except that it also has access to an
@@ -384,11 +420,11 @@ public:
   // Creates and returns a new variant string. The string is fully owned by
   // the arena so the character array can be disposed after this call returns.
   // The length of the string is determined using strlen.
-  variant_t new_string(const char *str);
+  string_t new_string(const char *str);
 
   // Creates and returns a new variant string. The string is fully owned by
   // the arena so the character array can be disposed after this call returns.
-  variant_t new_string(const char *str, size_t length);
+  string_t new_string(const char *str, size_t length);
 
   // Creates and returns a new mutable variant string of the given length,
   // initialized to all '\0's. Note that this doesn't mean that the string is
@@ -396,11 +432,15 @@ public:
   // get is a 'length' long string where all the characters are null. The null
   // terminator is implicitly allocated in addition to the requested length, so
   // you only need to worry about the non-null characters.
-  variant_t new_string(size_t length);
+  string_t new_string(size_t length);
 
   // Creates and returns a new variant blob. The contents it copied into this
   // arena so the data array can be disposed after this call returns.
-  variant_t new_blob(const void *data, size_t size);
+  blob_t new_blob(const void *data, size_t size);
+
+  // Creates and returns a new mutable variant blob of the given size,
+  // initialized to all zeros.
+  blob_t new_blob(size_t size);
 
   // Creates and returns a new sink value.
   sink_t new_sink();

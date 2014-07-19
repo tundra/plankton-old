@@ -163,7 +163,7 @@ size_t TextWriterImpl::get_short_length(variant_t value, size_t offset) {
       map_t map = map_t(value);
       size_t current = offset + 2;
       variant_t key, value;
-      for (map_t::iterator iter = map.iter();
+      for (map_iterator_t iter = map.iter();
            iter.advance(&key, &value) && current < kShortLengthLimit;) {
         current = get_short_length(key, current) + 2;
         current = get_short_length(value, current);
@@ -360,7 +360,7 @@ void TextWriterImpl::write_map(map_t map) {
   }
   variant_t key;
   variant_t value;
-  for (map_t::iterator iter = map.iter(); iter.advance(&key, &value);) {
+  for (map_iterator_t iter = map.iter(); iter.advance(&key, &value);) {
     write(key);
     write_raw_char(':');
     write_raw_char(' ');
@@ -698,6 +698,7 @@ bool TextReaderImpl::decode_array(variant_t *out) {
   if (current() != ']')
     return fail(out);
   advance_and_skip();
+  result.ensure_frozen();
   return succeed(result, out);
 }
 
@@ -724,6 +725,7 @@ bool TextReaderImpl::decode_map(variant_t *out) {
   if (current() != '}')
     return fail(out);
   advance_and_skip();
+  result.ensure_frozen();
   return succeed(result, out);
 }
 

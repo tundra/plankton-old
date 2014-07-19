@@ -51,22 +51,22 @@ public:
 
   bool set(variant_t key, variant_t value);
 
-  variant_t operator[](variant_t key);
+  variant_t get(variant_t key) const;
 
-  size_t size() { return size_; }
+  uint32_t size() const { return size_; }
 
 private:
-  friend class map_t::iterator;
+  friend class map_iterator_t;
 
   arena_t *origin_;
-  size_t size_;
-  size_t capacity_;
+  uint32_t size_;
+  uint32_t capacity_;
   entry_t *elms_;
 };
 
 class arena_string_t : public arena_value_t {
 public:
-  explicit arena_string_t(char *chars, size_t length, bool is_frozen);
+  arena_string_t(char *chars, size_t length, bool is_frozen);
 
   size_t length() { return length_; }
 
@@ -81,15 +81,15 @@ private:
 
 class arena_blob_t : public arena_value_t {
 public:
-  explicit arena_blob_t(const void *data, size_t size);
+  arena_blob_t(void *data, uint32_t size, bool is_frozen);
 
-  size_t size() { return size_; }
+  uint32_t size() { return size_; }
 
-  const void *data() { return data_; }
+  void *data() { return data_; }
 
 private:
-  const void *data_;
-  size_t size_;
+  void *data_;
+  uint32_t size_;
 };
 
 class arena_sink_t {
@@ -133,38 +133,51 @@ array_t arena_t::new_array() {
 
 array_t arena_t::new_array(size_t init_capacity) {
   arena_array_t *data = alloc_value<arena_array_t>();
-  return array_t(new (data) arena_array_t(this, init_capacity));
+  variant_t result(variant_t::rtArenaArray, new (data) arena_array_t(this, init_capacity));
+  return array_t(result);
 }
 
 map_t arena_t::new_map() {
   arena_map_t *data = alloc_value<arena_map_t>();
-  return map_t(new (data) arena_map_t(this));
+  variant_t result(variant_t::rtArenaMap, new (data) arena_map_t(this));
+  return map_t(result);
 }
 
-variant_t arena_t::new_string(const char *str) {
+string_t arena_t::new_string(const char *str) {
   return new_string(str, strlen(str));
 }
 
-variant_t arena_t::new_string(const char *str, size_t length) {
+string_t arena_t::new_string(const char *str, size_t length) {
   arena_string_t *data = alloc_value<arena_string_t>();
   char *own_str = alloc_values<char>(length + 1);
   memcpy(own_str, str, length);
   own_str[length] = '\0';
-  return variant_t(new (data) arena_string_t(own_str, length, true));
+  variant_t result(variant_t::rtArenaString, new (data) arena_string_t(own_str, length, true));
+  return string_t(result);
 }
 
-variant_t arena_t::new_string(size_t length) {
+string_t arena_t::new_string(size_t length) {
   arena_string_t *data = alloc_value<arena_string_t>();
   char *own_str = alloc_values<char>(length + 1);
   memset(own_str, '\0', length + 1);
-  return variant_t(new (data) arena_string_t(own_str, length, false));
+  variant_t result(variant_t::rtArenaString, new (data) arena_string_t(own_str, length, false));
+  return string_t(result);
 }
 
-variant_t arena_t::new_blob(const void *start, size_t size) {
+blob_t arena_t::new_blob(const void *start, size_t size) {
   arena_blob_t *data = alloc_value<arena_blob_t>();
   uint8_t *own_start = alloc_values<uint8_t>(size);
   memcpy(own_start, start, size);
-  return variant_t(new (data) arena_blob_t(own_start, size));
+  variant_t result(variant_t::rtArenaBlob, new (data) arena_blob_t(own_start, size, true));
+  return blob_t(result);
+}
+
+blob_t arena_t::new_blob(size_t size) {
+  arena_blob_t *data = alloc_value<arena_blob_t>();
+  uint8_t *bytes = alloc_values<uint8_t>(size);
+  memset(bytes, 0, size);
+  variant_t result(variant_t::rtArenaBlob, new (data) arena_blob_t(data, size, false));
+  return blob_t(result);
 }
 
 sink_t arena_t::new_sink() {
@@ -225,13 +238,10 @@ bool variant_t::is_frozen() {
     case rtExternalBlob:
       return true;
     case rtArenaArray:
-      return data_.as_arena_array_->is_frozen();
     case rtArenaMap:
-      return data_.as_arena_map_->is_frozen();
     case rtArenaString:
-      return data_.as_arena_string_->is_frozen();
     case rtArenaBlob:
-      return data_.as_arena_blob_->is_frozen();
+      return data_.as_arena_value_->is_frozen();
     default:
       return false;
   }
@@ -240,16 +250,10 @@ bool variant_t::is_frozen() {
 void variant_t::ensure_frozen() {
   switch (repr_tag_) {
     case rtArenaArray:
-      data_.as_arena_array_->ensure_frozen();
-      break;
     case rtArenaMap:
-      data_.as_arena_map_->ensure_frozen();
-      break;
     case rtArenaString:
-      data_.as_arena_string_->ensure_frozen();
-      break;
     case rtArenaBlob:
-      data_.as_arena_blob_->ensure_frozen();
+      data_.as_arena_value_->ensure_frozen();
       break;
     default:
       break;
@@ -264,59 +268,23 @@ variant_t variant_t::blob(const void *data, size_t size) {
   return result;
 }
 
-uint32_t variant_t::blob_size() const {
-  switch (repr_tag_) {
-    case rtExternalBlob:
-      return data_.as_external_blob_.size_;
-    case rtArenaBlob:
-      return data_.as_arena_blob_->size();
-    default:
-      return 0;
-  }
-}
-
-const void *variant_t::blob_data() const {
-  switch (repr_tag_) {
-    case rtExternalBlob:
-      return data_.as_external_blob_.data_;
-    case rtArenaBlob:
-      return data_.as_arena_blob_->data();
-    default:
-      return NULL;
-  }
-}
-
-array_t::array_t(arena_array_t *data) : variant_t(data) { }
-
 array_t::array_t(variant_t variant) : variant_t() {
   // Initialize this to the null value and then, if the given variant is an
   // array, override with the variant's state.
-  if (variant.type() == vtArray)
+  if (variant.is_array())
     *static_cast<variant_t*>(this) = variant;
 }
 
 bool variant_t::array_add(variant_t value) {
-  return (type() == vtArray) ? data_.as_arena_array_->add(value) : false;
-}
-
-bool array_t::add(variant_t value) {
-  return array_add(value);
+  return is_array() ? data_.as_arena_array_->add(value) : false;
 }
 
 uint32_t variant_t::array_length() const {
-  return (type() == vtArray) ? data_.as_arena_array_->length() : 0;
-}
-
-uint32_t array_t::length() const {
-  return array_length();
+  return is_array() ? data_.as_arena_array_->length() : 0;
 }
 
 variant_t variant_t::array_get(size_t index) const {
-  return (type() == vtArray) ? data_.as_arena_array_->get(index) : null();
-}
-
-variant_t array_t::operator[](size_t index) const {
-  return array_get(index);
+  return is_array() ? data_.as_arena_array_->get(index) : null();
 }
 
 arena_array_t::arena_array_t(arena_t *origin, size_t init_capacity)
@@ -347,8 +315,6 @@ variant_t arena_array_t::get(size_t index) {
   return (index < length_) ? elms_[index] : variant_t::null();
 }
 
-map_t::map_t(arena_map_t *data) : variant_t(data) { }
-
 map_t::map_t(variant_t variant) : variant_t() {
   // Initialize this to the null value and then, if the given variant is a map,
   // override with the variant's state.
@@ -356,24 +322,29 @@ map_t::map_t(variant_t variant) : variant_t() {
     *static_cast<variant_t*>(this) = variant;
 }
 
-size_t map_t::size() {
-  return *this ? data()->size() : 0;
+uint32_t variant_t::map_size() const {
+  return is_map() ? data_.as_arena_map_->size() : 0;
 }
 
-bool map_t::set(variant_t key, variant_t value) {
-  return (*this) && data()->set(key, value);
+bool variant_t::map_set(variant_t key, variant_t value) {
+  return is_map() ? data_.as_arena_map_->set(key, value) : false;
 }
 
-variant_t map_t::operator[](variant_t key) {
-  return *this ? data()->operator[](key) : variant_t::null();
+variant_t variant_t::map_get(variant_t key) const {
+  return is_map() ? data_.as_arena_map_->get(key) : variant_t::null();
 }
 
-arena_map_t *map_t::data() {
-  return data_.as_arena_map_;
+map_iterator_t variant_t::map_iter() const {
+  return is_map() ? map_iterator_t(data_.as_arena_map_) : map_iterator_t();
 }
 
-bool map_t::iterator::advance(variant_t *key, variant_t *value) {
-  if (cursor_ == data_->size()) {
+map_iterator_t::map_iterator_t(arena_map_t *data)
+  : data_(data)
+  , cursor_(0)
+  , limit_(data->size_) { }
+
+bool map_iterator_t::advance(variant_t *key, variant_t *value) {
+  if (cursor_ == limit_) {
     return false;
   } else {
     *key = data_->elms_[cursor_].key;
@@ -383,7 +354,7 @@ bool map_t::iterator::advance(variant_t *key, variant_t *value) {
   }
 }
 
-bool map_t::iterator::has_next() {
+bool map_iterator_t::has_next() {
   return cursor_ < data_->size();
 }
 
@@ -408,7 +379,7 @@ bool arena_map_t::set(variant_t key, variant_t value) {
   return true;
 }
 
-variant_t arena_map_t::operator[](variant_t key) {
+variant_t arena_map_t::get(variant_t key) const {
   for (size_t i = 0; i < size_; i++) {
     entry_t *entry = &elms_[i];
     if (entry->key == key)
@@ -449,25 +420,15 @@ char variant_t::string_get(size_t index) const {
 
 bool variant_t::string_set(size_t index, char c) {
   if (is_frozen() || index >= string_length())
+    // Only strings have nonzero length and only arena strings can be mutable
+    // so this handles all other cases.
     return false;
   return data_.as_arena_string_->set(index, c);
 }
 
 string_t::string_t(variant_t variant) {
-  if (variant.type() == vtString)
+  if (variant.is_string())
     *static_cast<variant_t*>(this) = variant;
-}
-
-size_t string_t::length() {
-  return string_length();
-}
-
-char string_t::get(size_t index) {
-  return string_get(index);
-}
-
-bool string_t::set(size_t index, char c) {
-  return string_set(index, c);
 }
 
 arena_string_t::arena_string_t(char *chars, size_t length, bool is_frozen)
@@ -483,9 +444,54 @@ bool arena_string_t::set(size_t index, char c) {
   return true;
 }
 
-arena_blob_t::arena_blob_t(const void *data, size_t size)
+arena_blob_t::arena_blob_t(void *data, uint32_t size, bool is_frozen)
   : data_(data)
-  , size_(size) { }
+  , size_(size) {
+  is_frozen_ = is_frozen;
+}
+
+uint32_t variant_t::blob_size() const {
+  switch (repr_tag_) {
+    case rtExternalBlob:
+      return data_.as_external_blob_.size_;
+    case rtArenaBlob:
+      return data_.as_arena_blob_->size();
+    default:
+      return 0;
+  }
+}
+
+const void *variant_t::blob_data() const {
+  switch (repr_tag_) {
+    case rtExternalBlob:
+      return data_.as_external_blob_.data_;
+    case rtArenaBlob:
+      return data_.as_arena_blob_->data();
+    default:
+      return NULL;
+  }
+}
+
+uint8_t variant_t::blob_get(size_t index) const {
+  if (index >= blob_size())
+    // Only real blobs have nonzero size so this all non-blobs end up here.
+    return 0;
+  return static_cast<const uint8_t*>(blob_data())[index];
+}
+
+bool variant_t::blob_set(size_t index, uint8_t b) {
+  if (is_frozen() || index >= blob_size())
+    // Only blobs have nonzero size and only arena blobs can be mutable so this
+    // handles all other cases.
+    return false;
+  static_cast<uint8_t*>(data_.as_arena_blob_->data())[index] = b;
+  return true;
+}
+
+blob_t::blob_t(variant_t variant) {
+  if (variant.is_blob())
+    *static_cast<variant_t*>(this) = variant;
+}
 
 sink_t::sink_t(arena_sink_t *data)
   : data_(data) { }

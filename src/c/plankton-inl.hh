@@ -39,26 +39,6 @@ variant_t variant_t::string(const char *string, size_t length) {
   return variant_t(string, length);
 }
 
-variant_t::variant_t(arena_array_t *arena_array) {
-  repr_tag_ = rtArenaArray;
-  data_.as_arena_array_ = arena_array;
-}
-
-variant_t::variant_t(arena_map_t *arena_map) {
-  repr_tag_ = rtArenaMap;
-  data_.as_arena_map_ = arena_map;
-}
-
-variant_t::variant_t(arena_string_t *arena_string) {
-  repr_tag_ = rtArenaString;
-  data_.as_arena_string_ = arena_string;
-}
-
-variant_t::variant_t(arena_blob_t *arena_blob) {
-  repr_tag_ = rtArenaBlob;
-  data_.as_arena_blob_ = arena_blob;
-}
-
 int64_t variant_t::integer_value() const {
   return is_integer() ? data_.as_integer_ : 0;
 }

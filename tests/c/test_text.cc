@@ -14,6 +14,7 @@ using namespace plankton;
   arena_t decoder;                                                             \
   TextReader parser(&decoder);                                                 \
   variant_t decoded = parser.parse(*writer, writer.length());                  \
+  ASSERT_TRUE(decoded.is_frozen());                                            \
   TextWriter rewriter;                                                         \
   rewriter.write(decoded);                                                     \
   ASSERT_EQ(0, strcmp(EXP, *rewriter));                                        \
