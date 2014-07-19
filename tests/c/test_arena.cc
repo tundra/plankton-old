@@ -26,11 +26,16 @@ TEST(arena, alloc_values) {
 TEST(arena, array) {
   arena_t arena;
   array_t array = arena.new_array();
+  ASSERT_FALSE(array.is_frozen());
   for (size_t i = 0; i < 100; i++) {
     ASSERT_EQ(i, array.length());
-    array.add(i);
+    ASSERT_TRUE(array.add(i));
     ASSERT_EQ(i + 1, array.length());
   }
+  array.ensure_frozen();
+  ASSERT_TRUE(array.is_frozen());
+  ASSERT_FALSE(array.add(100));
+  ASSERT_EQ(100, array.length());
   for (size_t i = 0; i < 100; i++) {
     variant_t elm = array[i];
     ASSERT_EQ(i, elm.integer_value());
@@ -49,11 +54,16 @@ TEST(arena, array) {
 TEST(arena, map) {
   arena_t arena;
   map_t map = arena.new_map();
+  ASSERT_FALSE(map.is_frozen());
   for (size_t i = 0; i < 100; i++) {
     ASSERT_EQ(i, map.size());
     map.set(i, i + 3);
     ASSERT_EQ(i + 1, map.size());
   }
+  map.ensure_frozen();
+  ASSERT_TRUE(map.is_frozen());
+  ASSERT_FALSE(map.set(1000, 1001));
+  ASSERT_EQ(100, map.size());
   for (size_t i = 0; i < 100; i++) {
     variant_t elm = map[i];
     ASSERT_EQ(i + 3, elm.integer_value());
@@ -67,6 +77,12 @@ TEST(arena, map) {
   ASSERT_FALSE(bool(null_map));
   ASSERT_TRUE(null_map[10] == variant_t::null());
   ASSERT_EQ(0, null_map.size());
+}
+
+TEST(arena, mutstring) {
+  arena_t arena;
+  variant_t var = arena.new_string(3);
+  ASSERT_FALSE(var.is_frozen());
 }
 
 TEST(arena, sink) {

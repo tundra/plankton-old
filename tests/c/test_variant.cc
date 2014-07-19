@@ -14,20 +14,25 @@ TEST(variant, simple) {
   ASSERT_EQ(0, intger.string_length());
   ASSERT_EQ(false, intger.bool_value());
   ASSERT_TRUE(intger.string_chars() == NULL);
+  ASSERT_TRUE(intger.is_frozen());
   variant_t null;
   ASSERT_EQ(variant_t::vtNull, null.type());
   ASSERT_EQ(0, null.integer_value());
   ASSERT_EQ(false, null.bool_value());
+  ASSERT_TRUE(null.is_frozen());
   variant_t str = "test";
   ASSERT_EQ(variant_t::vtString, str.type());
   ASSERT_EQ(0, str.integer_value());
   ASSERT_EQ(false, str.bool_value());
+  ASSERT_TRUE(str.is_frozen());
   variant_t yes = variant_t::yes();
   ASSERT_EQ(variant_t::vtBool, yes.type());
   ASSERT_EQ(true, yes.bool_value());
+  ASSERT_TRUE(yes.is_frozen());
   variant_t no = variant_t::no();
   ASSERT_EQ(variant_t::vtBool, no.type());
   ASSERT_EQ(false, no.bool_value());
+  ASSERT_TRUE(no.is_frozen());
 }
 
 TEST(variant, equality) {

@@ -27,6 +27,8 @@ public:
   void flush(BinaryWriter *writer);
 
 private:
+  void encode_array(array_t value);
+
   // Write a single byte to the stream.
   void write_byte(uint8_t value);
 
@@ -46,6 +48,9 @@ void BinaryWriterImpl::flush(BinaryWriter *writer) {
 
 void BinaryWriterImpl::encode(variant_t value) {
   switch (value.type()) {
+    case variant_t::vtArray:
+      encode_array(array_t(value));
+      break;
     case variant_t::vtBool:
       write_byte(value.bool_value() ? boTrue : boFalse);
       break;
@@ -58,6 +63,14 @@ void BinaryWriterImpl::encode(variant_t value) {
       write_byte(boNull);
       break;
   }
+}
+
+void BinaryWriterImpl::encode_array(array_t value) {
+  write_byte(boArray);
+  size_t length = value.length();
+  write_uint64(length);
+  for (size_t i = 0; i < length; i++)
+    encode(value[i]);
 }
 
 void BinaryWriterImpl::write_byte(uint8_t value) {
@@ -92,6 +105,9 @@ private:
   // Read a tagged integer's payload.
   bool decode_integer(variant_t *result_out);
 
+  // Read an array's payload.
+  bool decode_array(variant_t *result_out);
+
   // Succeeds parsing of some expression, returning true.
   bool succeed(variant_t value, variant_t *out);
 
@@ -120,6 +136,8 @@ bool BinaryReaderImpl::decode(variant_t *result_out) {
       return succeed(variant_t::null(), result_out);
     case boInteger:
       return decode_integer(result_out);
+    case boArray:
+      return decode_array(result_out);
     default:
       return false;
   }
@@ -128,6 +146,19 @@ bool BinaryReaderImpl::decode(variant_t *result_out) {
 bool BinaryReaderImpl::decode_integer(variant_t *result_out) {
   int64_t value = read_int64();
   return succeed(variant_t::integer(value), result_out);
+}
+
+bool BinaryReaderImpl::decode_array(variant_t *result_out) {
+  uint64_t length = read_uint64();
+  array_t result = reader_->arena_->new_array(length);
+  for (size_t i = 0; i < length; i++) {
+    variant_t elm;
+    if (!decode(&elm))
+      return false;
+    result.add(elm);
+  }
+  result.ensure_frozen();
+  return succeed(result, result_out);
 }
 
 void BinaryWriterImpl::write_int64(int64_t value) {

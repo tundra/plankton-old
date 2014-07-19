@@ -114,11 +114,30 @@ public:
   // Returns the characters of this string if it is a string, otherwise NULL.
   const char *string_chars() const;
 
+  // Returns the index'th character in this string if this is a string with
+  // at least index characters, otherwise 0.
+  char string_get(size_t index) const;
+
+  // Sets the index'th character if this is a mutable string with at least
+  // index characters. Returns true if setting succeeded.
+  bool string_set(size_t index, char value);
+
   // If this variant is a blob, returns the number of bytes. If not, returns 0.
   uint32_t blob_size() const;
 
   // If this variant is a blob returns the blob data. If not returns NULL.
   const void *blob_data() const;
+
+  // Returns the length of this array.
+  uint32_t array_length() const;
+
+  // Returns the index'th element, null if the index is greater than the array's
+  // length.
+  variant_t array_get(size_t index) const;
+
+  // Adds the given value at the end of this array if it is mutable. Returns
+  // true if adding succeeded.
+  bool array_add(variant_t value);
 
   // Returns the value of this boolean if it is a boolean, otherwise false. In
   // other words, true iff this is the boolean true value. Note that this is
@@ -143,6 +162,16 @@ public:
   // created by the same new_... call. So two arrays with the same values are
   // not necessarily considered identical.
   bool operator==(variant_t that);
+
+  // Returns true iff this value is locally immutable. Note that even if this
+  // returns true it doesn't mean that nothing about this value can change -- it
+  // may contain references to other values that are mutable.
+  bool is_frozen();
+
+  // Renders this value locally immutable. Values referenced from this one may
+  // be mutable so it may still change indirectly, just not this concrete
+  // object.
+  void ensure_frozen();
 
 protected:
   repr_tag_t repr_tag_;
@@ -188,22 +217,20 @@ public:
   // result is a proper array, if it is something else the result is null.
   explicit array_t(variant_t variant);
 
-  // Adds the given value at the end of this array.
-  array_t add(variant_t value);
+  // Adds the given value at the end of this array if it is mutable. Returns
+  // true if adding succeeded.
+  bool add(variant_t value);
 
   // Returns the length of this array.
-  size_t length();
+  uint32_t length() const;
 
   // Returns the index'th element, null if the index is greater than the array's
   // length.
-  variant_t operator[](size_t index);
+  variant_t operator[](size_t index) const;
 
 private:
   friend class arena_t;
   explicit array_t(arena_array_t *data);
-
-  // Returns this array's underlying data.
-  arena_array_t *data();
 };
 
 // A variant that represents a map. A map can be either an actual map or null,
@@ -233,8 +260,9 @@ public:
   // result is a proper map, if it is something else the result is null.
   explicit map_t(variant_t variant);
 
-  // Adds a mapping from the given key to the given value.
-  map_t set(variant_t key, variant_t value);
+  // Adds a mapping from the given key to the given value if this map is
+  // mutable. Returns true if setting succeeded.
+  bool set(variant_t key, variant_t value);
 
   // Returns the mapping for the given key.
   variant_t operator[](variant_t key);
@@ -252,6 +280,28 @@ private:
 
   // Returns this map's underlying data.
   arena_map_t *data();
+};
+
+class string_t : public variant_t {
+public:
+  explicit string_t(variant_t variant);
+
+  // Returns the length of this string if it is a string, otherwise 0.
+  size_t length();
+
+  // Returns the index'th character in this string if this is a string with
+  // at least index characters, otherwise 0.
+  char get(size_t index);
+
+  // Sets the index'th character if this is a mutable string with at least
+  // index characters. Returns true if setting succeeded.
+  bool set(size_t index, char c);
+
+private:
+  friend class arena_t;
+  explicit string_t(arena_string_t *data);
+
+  arena_string_t *data();
 };
 
 // A sink is like a pointer to a variant except that it also has access to an
@@ -300,8 +350,11 @@ public:
   template <typename T>
   T *alloc_value();
 
-  // Creates and returns a new array value.
+  // Creates and returns a new mutable array value.
   array_t new_array();
+
+  // Creates and returns a new mutable array value.
+  array_t new_array(size_t init_capacity);
 
   // Creates and returns a new map value.
   map_t new_map();
@@ -314,6 +367,9 @@ public:
   // Creates and returns a new variant string. The string is fully owned by
   // the arena so the character array can be disposed after this call returns.
   variant_t new_string(const char *str, size_t length);
+
+  // Creates and returns a new mutable variant string.
+  variant_t new_string(size_t size);
 
   // Creates and returns a new variant blob. The contents it copied into this
   // arena so the data array can be disposed after this call returns.

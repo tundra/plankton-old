@@ -19,7 +19,8 @@ public:
     boTrue,
     boFalse,
     boNull,
-    boInteger
+    boInteger,
+    boArray
   };
 };
 

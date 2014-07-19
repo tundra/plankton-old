@@ -16,6 +16,7 @@ using namespace plankton;
   arena_t arena;                                                               \
   BinaryReader reader(&arena);                                                 \
   variant_t decoded = reader.parse(*writer, writer.size());                    \
+  ASSERT_TRUE(decoded.is_frozen());                                            \
   TextWriter input_writer;                                                     \
   input_writer.write(input);                                                   \
   TextWriter decoded_writer;                                                   \
@@ -68,4 +69,17 @@ TEST(binary, integers) {
   for (int i = -6553600; i < 6553600; i += 11112)
     CHECK_BINARY(variant_t::integer(i));
   CHECK_BINARY(variant_t::integer(0xFFFFFFFFULL));
+}
+
+TEST(binary, array) {
+  arena_t arena;
+  array_t array = arena.new_array(0);
+  CHECK_BINARY(array);
+  ASSERT_TRUE(array.add(4));
+  CHECK_BINARY(array);
+  ASSERT_TRUE(array.add(variant_t::yes()));
+  CHECK_BINARY(array);
+  array_t inner = arena.new_array(0);
+  ASSERT_TRUE(array.add(inner));
+  CHECK_BINARY(array);
 }
