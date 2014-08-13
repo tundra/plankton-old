@@ -6,7 +6,6 @@ import re
 filenames = [
   "test_arena.cc",
   "test_binary.cc",
-  "test_callback.cc",
   "test_text.cc",
   "test_variant.cc",
 ]
