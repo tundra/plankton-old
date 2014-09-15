@@ -62,39 +62,27 @@ private:
 class variant_t {
 private:
 public:
-  // The different types of variants. The values are the corresponding
-  // representation tags downshifted by 4.
-  enum type_t {
-    vtInteger = 0x01,
-    vtString = 0x02,
-    vtBlob = 0x03,
-    vtNull = 0x04,
-    vtBool = 0x05,
-    vtArray = 0x06,
-    vtMap = 0x07
-  };
-
   // Initializes a variant representing null.
-  inline variant_t() {
-    value_.repr_tag_ = variant_p::rtNull;
-    payload()->as_integer_ = 0;
-  }
+  inline variant_t() : value_(pton_null()) { }
+
+  // Converts a C-style variant to a C++-style one.
+  inline variant_t(pton_variant_t value) : value_(value) { }
 
   // Static method that returns a variant representing null. Equivalent to
   // the no-arg constructor but more explicit.
-  static inline variant_t null() { return variant_t(); }
+  static inline variant_t null() { return variant_t(pton_null()); }
 
   // Returns a variant representing the boolean true. Called 'yes' because
   // 'true' is a keyword.
-  static inline variant_t yes() { return variant_t(variant_p::rtTrue); }
+  static inline variant_t yes() { return variant_t(pton_true()); }
 
   // Returns a variant representing the boolean false. Called 'no' because
   // 'false' is a keyword.
-  static inline variant_t no() { return variant_t(variant_p::rtFalse); }
+  static inline variant_t no() { return variant_t(pton_false()); }
 
   // Returns a variant representing a bool, false if the value is 0, true
-  // otherwise.
-  static inline variant_t boolean(int value) { return variant_t(value ? variant_p::rtTrue : variant_p::rtFalse); }
+  // otherwise. Called 'boolean' because 'bool' has a tendency to be taken.
+  static inline variant_t boolean(int value) { return variant_t(pton_bool(value)); }
 
   // Initializes a variant representing an integer with the given value. Note
   // that this is funky when used with a literal 0 because it also matches the
@@ -118,20 +106,20 @@ public:
   // Initializes a variant representing a string with the given contents. This
   // does not copy the string so it has to stay alive for as long as the
   // variant is used. Use an arena to create a variant that does copy the string.
-  inline variant_t(const char *string, size_t length);
+  inline variant_t(const char *string, uint32_t length);
 
   // Explicit constructor for string-valued variants. Note that the variant does
   // not take ownership of the string so it must stay alive as long as the
   // variant does. Use an arena to create a variant that does take ownership.
-  static inline variant_t string(const char *string, size_t length);
+  static inline variant_t string(const char *string, uint32_t length);
 
   // Explicit constructor for a binary blob. The size is in bytes. This
   // does not copy the string so it has to stay alive for as long as the
   // variant is used. Use an arena to create a variant that does copy the string.
-  static variant_t blob(const void *data, size_t size);
+  static variant_t blob(const void *data, uint32_t size);
 
-  // Returns this value't type.
-  type_t type() const;
+  // Returns this value's type.
+  pton_variant_t::type_t type() const;
 
   // Returns the integer value of this variant if it is an integer, otherwise
   // 0.
@@ -145,11 +133,11 @@ public:
 
   // Returns the index'th character in this string if this is a string with
   // at least index characters, otherwise 0.
-  char string_get(size_t index) const;
+  char string_get(uint32_t index) const;
 
   // Sets the index'th character if this is a mutable string with at least
   // index characters. Returns true if setting succeeded.
-  bool string_set(size_t index, char value);
+  bool string_set(uint32_t index, char value);
 
   // If this variant is a blob, returns the number of bytes. If not, returns 0.
   uint32_t blob_size() const;
@@ -159,18 +147,18 @@ public:
 
   // Returns the index'th byte in this blob if this is a blob of size at least
   // index, otherwise 0.
-  uint8_t blob_get(size_t index) const;
+  uint8_t blob_get(uint32_t index) const;
 
   // Sets the index'th byte if this is a mutable blob with size at least index.
   // Returns true if setting succeeded.
-  bool blob_set(size_t index, uint8_t b);
+  bool blob_set(uint32_t index, uint8_t b);
 
-  // Returns the length of this array.
+  // Returns the length of this array, 0 if this is not an array.
   uint32_t array_length() const;
 
   // Returns the index'th element, null if the index is greater than the array's
   // length.
-  variant_t array_get(size_t index) const;
+  variant_t array_get(uint32_t index) const;
 
   // Adds the given value at the end of this array if it is mutable. Returns
   // true if adding succeeded.
@@ -227,21 +215,27 @@ public:
   // object.
   void ensure_frozen();
 
-  inline bool is_integer() const { return repr_tag() == variant_p::rtInteger; }
+  // Is this value an integer?
+  inline bool is_integer() const { return pton_is_integer(value_); }
 
-  inline bool is_map() const { return repr_tag() == variant_p::rtArenaMap; }
+  // Is this value a map?
+  inline bool is_map() const { return pton_is_map(value_); }
 
-  inline bool is_array() const { return repr_tag() == variant_p::rtArenaArray; }
+  // Is this value an array?
+  inline bool is_array() const { return pton_is_array(value_); }
 
-  inline bool is_string() const { return type() == vtString; }
+  inline bool is_string() const { return type() == pton_variant_t::vtString; }
 
-  inline bool is_blob() const { return type() == vtBlob; }
+  inline bool is_blob() const { return type() == pton_variant_t::vtBlob; }
+
+  inline pton_variant_t to_c() { return value_; }
 
 protected:
-  variant_p value_;
+  friend class sink_t;
+  pton_variant_t value_;
 
   // Convenience accessor for the representation tag.
-  variant_p::repr_tag_t repr_tag() const { return value_.repr_tag_; }
+  pton_variant_t::repr_tag_t repr_tag() const { return value_.repr_tag_; }
 
   pton_variant_payload_t *payload() { return &value_.payload_; }
 
@@ -251,12 +245,12 @@ private:
   friend class ::pton_arena_t;
 
   // Creates a variant with no payload and the given type.
-  variant_t(variant_p::repr_tag_t tag) {
+  variant_t(pton_variant_t::repr_tag_t tag) {
     value_.repr_tag_ = tag;
     payload()->as_integer_ = 0;
   }
 
-  variant_t(variant_p::repr_tag_t tag, pton_arena_value_t *arena_value) {
+  variant_t(pton_variant_t::repr_tag_t tag, pton_arena_value_t *arena_value) {
     value_.repr_tag_ = tag;
     payload()->as_arena_value_ = arena_value;
   }
@@ -280,7 +274,7 @@ public:
 
   // Returns the index'th element, null if the index is greater than the array's
   // length.
-  variant_t operator[](size_t index) const { return array_get(index); }
+  variant_t operator[](uint32_t index) const { return array_get(index); }
 };
 
 // A variant that represents a map. A map can be either an actual map or null,
@@ -315,15 +309,15 @@ public:
   explicit string_t(variant_t variant);
 
   // Returns the length of this string if it is a string, otherwise 0.
-  size_t length() const { return string_length(); }
+  uint32_t length() const { return string_length(); }
 
   // Returns the index'th character in this string if this is a string with
   // at least index characters, otherwise 0.
-  char get(size_t index) const { return string_get(index); }
+  char get(uint32_t index) const { return string_get(index); }
 
   // Sets the index'th character if this is a mutable string with at least
   // index characters. Returns true if setting succeeded.
-  bool set(size_t index, char c) { return string_set(index, c); }
+  bool set(uint32_t index, char c) { return string_set(index, c); }
 };
 
 // A variant that represents a blob. A blob can be either an actual blob or
@@ -334,15 +328,15 @@ public:
   explicit blob_t(variant_t variant);
 
   // Returns the size of this blob if it is a blob, otherwise 0.
-  size_t size() const { return blob_size(); }
+  uint32_t size() const { return blob_size(); }
 
   // Returns the index'th byte in this blob if this is a blob of size at least
   // index, otherwise 0.
-  uint8_t get(size_t index) const { return blob_get(index); }
+  uint8_t get(uint32_t index) const { return blob_get(index); }
 
   // Sets the index'th byte if this is a mutable blob with size at least index.
   // Returns true if setting succeeded.
-  bool set(size_t index, uint8_t b) { return blob_set(index, b); }
+  bool set(uint32_t index, uint8_t b) { return blob_set(index, b); }
 };
 
 // A sink is like a pointer to a variant except that it also has access to an
@@ -367,9 +361,9 @@ public:
 
 private:
   friend class ::pton_arena_t;
-  explicit sink_t(pton_arena_sink_t *data);
+  explicit sink_t(pton_sink_t *data);
 
-  pton_arena_sink_t *data_;
+  pton_sink_t *data_;
 };
 
 // Utility for serializing variant values to plankton.
@@ -469,7 +463,7 @@ public:
   // Allocates a new array of values the given size within this arena. Public
   // for testing only. The values are not initialized.
   template <typename T>
-  T *alloc_values(size_t elms);
+  T *alloc_values(uint32_t elms);
 
   // Allocates a single value of the given type. The value is not initialized.
   template <typename T>
@@ -479,7 +473,7 @@ public:
   plankton::array_t new_array();
 
   // Creates and returns a new mutable array value.
-  plankton::array_t new_array(size_t init_capacity);
+  plankton::array_t new_array(uint32_t init_capacity);
 
   // Creates and returns a new map value.
   plankton::map_t new_map();
@@ -491,7 +485,7 @@ public:
 
   // Creates and returns a new variant string. The string is fully owned by
   // the arena so the character array can be disposed after this call returns.
-  plankton::string_t new_string(const char *str, size_t length);
+  plankton::string_t new_string(const char *str, uint32_t length);
 
   // Creates and returns a new mutable variant string of the given length,
   // initialized to all '\0's. Note that this doesn't mean that the string is
@@ -499,25 +493,27 @@ public:
   // get is a 'length' long string where all the characters are null. The null
   // terminator is implicitly allocated in addition to the requested length, so
   // you only need to worry about the non-null characters.
-  plankton::string_t new_string(size_t length);
+  plankton::string_t new_string(uint32_t length);
 
   // Creates and returns a new variant blob. The contents it copied into this
   // arena so the data array can be disposed after this call returns.
-  plankton::blob_t new_blob(const void *data, size_t size);
+  plankton::blob_t new_blob(const void *data, uint32_t size);
 
   // Creates and returns a new mutable variant blob of the given size,
   // initialized to all zeros.
-  plankton::blob_t new_blob(size_t size);
+  plankton::blob_t new_blob(uint32_t size);
 
   // Creates and returns a new sink value.
   plankton::sink_t new_sink();
 
 private:
+  friend pton_sink_t *pton_new_sink(pton_arena_t *arena);
+
   // Allocates a raw block of memory.
-  void *alloc_raw(size_t size);
+  void *alloc_raw(uint32_t size);
 
   // Allocates the backing storage for a sink value.
-  pton_arena_sink_t *alloc_sink();
+  pton_sink_t *alloc_sink();
 
   size_t capacity_;
   size_t used_;

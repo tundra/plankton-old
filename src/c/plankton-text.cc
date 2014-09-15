@@ -116,25 +116,25 @@ TextWriterImpl::TextWriterImpl()
 
 void TextWriterImpl::write(variant_t value) {
   switch (value.type()) {
-    case variant_t::vtBool:
+    case pton_variant_t::vtBool:
       write_raw_string(value.bool_value() ? "%t" : "%f");
       break;
-    case variant_t::vtNull:
+    case pton_variant_t::vtNull:
       write_raw_string("%n");
       break;
-    case variant_t::vtInteger:
+    case pton_variant_t::vtInteger:
       write_integer(value.integer_value());
       break;
-    case variant_t::vtString:
+    case pton_variant_t::vtString:
       write_string(value.string_chars(), value.string_length());
       break;
-    case variant_t::vtBlob:
+    case pton_variant_t::vtBlob:
       write_blob(value.blob_data(), value.blob_size());
       break;
-    case variant_t::vtArray:
+    case pton_variant_t::vtArray:
       write_array(array_t(value));
       break;
-    case variant_t::vtMap:
+    case pton_variant_t::vtMap:
       write_map(map_t(value));
       break;
     default:
@@ -145,21 +145,21 @@ void TextWriterImpl::write(variant_t value) {
 
 size_t TextWriterImpl::get_short_length(variant_t value, size_t offset) {
   switch (value.type()) {
-    case variant_t::vtInteger:
+    case pton_variant_t::vtInteger:
       return offset + 5;
-    case variant_t::vtBool:
-    case variant_t::vtNull:
+    case pton_variant_t::vtBool:
+    case pton_variant_t::vtNull:
       return offset + 2;
-    case variant_t::vtString:
+    case pton_variant_t::vtString:
       return offset + value.string_length();
-    case variant_t::vtArray: {
+    case pton_variant_t::vtArray: {
       array_t array = array_t(value);
       size_t current = offset + 2;
       for (size_t i = 0; i < array.length() && current < kShortLengthLimit; i++)
         current = get_short_length(array[i], current) + 2;
       return current;
     }
-    case variant_t::vtMap: {
+    case pton_variant_t::vtMap: {
       map_t map = map_t(value);
       size_t current = offset + 2;
       variant_t key, value;

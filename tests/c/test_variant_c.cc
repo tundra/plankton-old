@@ -3,81 +3,70 @@
 
 #include "test/asserts.hh"
 #include "test/unittest.hh"
-#include "plankton-inl.hh"
 
-using namespace plankton;
+BEGIN_C_INCLUDES
+#include "plankton-inl.h"
+END_C_INCLUDES
 
 TEST(variant_c, simple) {
-  variant_t intger = 10;
-  ASSERT_EQ(variant_t::vtInteger, intger.type());
-  ASSERT_EQ(10, intger.integer_value());
-  ASSERT_EQ(0, intger.string_length());
-  ASSERT_EQ(false, intger.bool_value());
-  ASSERT_TRUE(intger.string_chars() == NULL);
-  ASSERT_TRUE(intger.is_frozen());
-  variant_t null;
-  ASSERT_EQ(variant_t::vtNull, null.type());
-  ASSERT_EQ(0, null.integer_value());
-  ASSERT_EQ(false, null.bool_value());
-  ASSERT_TRUE(null.is_frozen());
-  variant_t str = "test";
-  ASSERT_EQ(variant_t::vtString, str.type());
-  ASSERT_EQ(0, str.integer_value());
-  ASSERT_EQ(false, str.bool_value());
-  ASSERT_TRUE(str.is_frozen());
-  variant_t yes = variant_t::yes();
-  ASSERT_EQ(variant_t::vtBool, yes.type());
-  ASSERT_EQ(true, yes.bool_value());
-  ASSERT_TRUE(yes.is_frozen());
-  variant_t no = variant_t::no();
-  ASSERT_EQ(variant_t::vtBool, no.type());
-  ASSERT_EQ(false, no.bool_value());
-  ASSERT_TRUE(no.is_frozen());
+  pton_variant_t intger = pton_integer(10);
+  ASSERT_EQ(pton_variant_t::vtInteger, pton_get_type(intger));
+  ASSERT_EQ(10, pton_get_integer_value(intger));
+  ASSERT_EQ(0, pton_get_string_length(intger));
+  ASSERT_EQ(false, pton_get_bool_value(intger));
+  ASSERT_TRUE(pton_get_string_chars(intger) == NULL);
+  ASSERT_TRUE(pton_is_frozen(intger));
+  pton_variant_t null = pton_null();
+  ASSERT_EQ(pton_variant_t::vtNull, pton_get_type(null));
+  ASSERT_EQ(0, pton_get_integer_value(null));
+  ASSERT_EQ(false, pton_get_bool_value(null));
+  ASSERT_TRUE(pton_is_frozen(null));
+  pton_variant_t str = pton_c_str("test");
+  ASSERT_EQ(pton_variant_t::vtString, pton_get_type(str));
+  ASSERT_EQ(0, pton_get_integer_value(str));
+  ASSERT_EQ(false, pton_get_bool_value(str));
+  ASSERT_TRUE(pton_is_frozen(str));
+  pton_variant_t yes = pton_true();
+  ASSERT_EQ(pton_variant_t::vtBool, pton_get_type(yes));
+  ASSERT_EQ(true, pton_get_bool_value(yes));
+  ASSERT_TRUE(pton_is_frozen(yes));
+  pton_variant_t no = pton_false();
+  ASSERT_EQ(pton_variant_t::vtBool, pton_get_type(no));
+  ASSERT_EQ(false, pton_get_bool_value(no));
+  ASSERT_TRUE(pton_is_frozen(no));
 }
 
 TEST(variant_c, equality) {
-  arena_t arena;
-  variant_t z0 = variant_t::integer(0);
-  variant_t z1 = variant_t::integer(0);
-  ASSERT_TRUE(z0 == z1);
-  variant_t sx0 = "x";
-  ASSERT_FALSE(z0 == sx0);
-  variant_t sx1 = "x";
-  ASSERT_TRUE(sx0 == sx1);
-  variant_t sx2 = arena.new_string("x");
-  ASSERT_TRUE(sx0 == sx2);
-  variant_t sy = "y";
-  ASSERT_FALSE(sx0 == sy);
-  variant_t sxy = "xy";
-  ASSERT_FALSE(sxy == sx0);
-  ASSERT_FALSE(sxy == sy);
-  ASSERT_TRUE(variant_t::null() == variant_t::null());
-  ASSERT_TRUE(variant_t::yes() == variant_t::yes());
-  ASSERT_TRUE(variant_t::no() == variant_t::no());
-  ASSERT_FALSE(variant_t::null() == variant_t::no());
-  array_t a0 = arena.new_array();
-  ASSERT_TRUE(a0 == a0);
-  array_t a1 = arena.new_array();
-  ASSERT_FALSE(a0 == a1);
-}
-
-TEST(variant_c, as_bool) {
-  size_t ticks = 0;
-  if (variant_t::null())
-    ticks++;
-  ASSERT_EQ(0, ticks);
-  if (variant_t::yes())
-    ticks++;
-  ASSERT_EQ(1, ticks);
-  if (variant_t::no())
-    ticks++;
-  ASSERT_EQ(2, ticks);
+  pton_arena_t *arena = pton_new_arena();
+  pton_variant_t z0 = pton_integer(0);
+  pton_variant_t z1 = pton_integer(0);
+  ASSERT_TRUE(pton_variants_equal(z0, z1));
+  pton_variant_t sx0 = pton_c_str("x");
+  ASSERT_FALSE(pton_variants_equal(z0, sx0));
+  pton_variant_t sx1 = pton_c_str("x");
+  ASSERT_TRUE(pton_variants_equal(sx0, sx1));
+  pton_variant_t sx2 = pton_new_c_str(arena, "x");
+  ASSERT_TRUE(pton_variants_equal(sx0, sx2));
+  pton_variant_t sy = pton_c_str("y");
+  ASSERT_FALSE(pton_variants_equal(sx0, sy));
+  pton_variant_t sxy = pton_c_str("xy");
+  ASSERT_FALSE(pton_variants_equal(sxy, sx0));
+  ASSERT_FALSE(pton_variants_equal(sxy, sy));
+  ASSERT_TRUE(pton_variants_equal(pton_null(), pton_null()));
+  ASSERT_TRUE(pton_variants_equal(pton_true(), pton_true()));
+  ASSERT_TRUE(pton_variants_equal(pton_false(), pton_false()));
+  ASSERT_FALSE(pton_variants_equal(pton_null(), pton_false()));
+  pton_variant_t a0 = pton_new_array(arena);
+  ASSERT_TRUE(pton_variants_equal(a0, a0));
+  pton_variant_t a1 = pton_new_array(arena);
+  ASSERT_FALSE(pton_variants_equal(a0, a1));
+  pton_dispose_arena(arena);
 }
 
 TEST(variant_c, blob) {
   uint8_t data[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-  variant_t var = variant_t::blob(data, 10);
-  ASSERT_TRUE(var.type() == variant_t::vtBlob);
-  ASSERT_EQ(10, var.blob_size());
-  ASSERT_TRUE(var.blob_data() == data);
+  pton_variant_t var = pton_blob(data, 10);
+  ASSERT_TRUE(pton_get_type(var) == pton_variant_t::vtBlob);
+  ASSERT_EQ(10, pton_get_blob_size(var));
+  ASSERT_TRUE(pton_get_blob_data(var) == data);
 }

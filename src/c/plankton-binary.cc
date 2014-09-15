@@ -48,17 +48,17 @@ void BinaryWriterImpl::flush(BinaryWriter *writer) {
 
 void BinaryWriterImpl::encode(variant_t value) {
   switch (value.type()) {
-    case variant_t::vtArray:
+    case pton_variant_t::vtArray:
       encode_array(array_t(value));
       break;
-    case variant_t::vtBool:
+    case pton_variant_t::vtBool:
       write_byte(value.bool_value() ? boTrue : boFalse);
       break;
-    case variant_t::vtInteger:
+    case pton_variant_t::vtInteger:
       write_byte(boInteger);
       write_int64(value.integer_value());
       break;
-    case variant_t::vtNull:
+    case pton_variant_t::vtNull:
     default:
       write_byte(boNull);
       break;

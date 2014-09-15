@@ -7,7 +7,7 @@
 
 using namespace plankton;
 
-TEST(arena, alloc_values) {
+TEST(arena_cpp, alloc_values) {
   arena_t arena;
   int32_t *blocks[100];
   for (size_t i = 1; i < 100; i++) {
@@ -23,7 +23,7 @@ TEST(arena, alloc_values) {
   }
 }
 
-TEST(arena, array) {
+TEST(arena_cpp, array) {
   arena_t arena;
   array_t array = arena.new_array();
   ASSERT_FALSE(array.is_frozen());
@@ -51,7 +51,7 @@ TEST(arena, array) {
   ASSERT_EQ(0, null_array.length());
 }
 
-TEST(arena, map) {
+TEST(arena_cpp, map) {
   arena_t arena;
   map_t map = arena.new_map();
   ASSERT_FALSE(map.is_frozen());
@@ -79,13 +79,13 @@ TEST(arena, map) {
   ASSERT_EQ(0, null_map.size());
 }
 
-TEST(arena, mutstring) {
+TEST(arena_cpp, mutstring) {
   arena_t arena;
   variant_t var = arena.new_string(3);
   ASSERT_FALSE(var.is_frozen());
 }
 
-TEST(arena, sink) {
+TEST(arena_cpp, sink) {
   arena_t arena;
   sink_t s0 = arena.new_sink();
   ASSERT_FALSE(bool(*s0));

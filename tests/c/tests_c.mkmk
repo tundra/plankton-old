@@ -4,11 +4,12 @@
 import re
 
 filenames = [
-  "test_arena.cc",
+  "test_arena_c.cc",
+  "test_arena_cpp.cc",
   "test_binary.cc",
   "test_text.cc",
-  "test_variant_cpp.cc",
   "test_variant_c.cc",
+  "test_variant_cpp.cc",
 ]
 
 # Compile a single test file, ensuring that the include paths are hooked up
