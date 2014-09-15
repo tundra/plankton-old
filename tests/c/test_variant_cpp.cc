@@ -7,7 +7,7 @@
 
 using namespace plankton;
 
-TEST(variant, simple) {
+TEST(variant_cpp, simple) {
   variant_t intger = 10;
   ASSERT_EQ(variant_t::vtInteger, intger.type());
   ASSERT_EQ(10, intger.integer_value());
@@ -35,7 +35,7 @@ TEST(variant, simple) {
   ASSERT_TRUE(no.is_frozen());
 }
 
-TEST(variant, equality) {
+TEST(variant_cpp, equality) {
   arena_t arena;
   variant_t z0 = variant_t::integer(0);
   variant_t z1 = variant_t::integer(0);
@@ -61,7 +61,7 @@ TEST(variant, equality) {
   ASSERT_FALSE(a0 == a1);
 }
 
-TEST(variant, as_bool) {
+TEST(variant_cpp, as_bool) {
   size_t ticks = 0;
   if (variant_t::null())
     ticks++;
@@ -74,7 +74,7 @@ TEST(variant, as_bool) {
   ASSERT_EQ(2, ticks);
 }
 
-TEST(variant, blob) {
+TEST(variant_cpp, blob) {
   uint8_t data[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
   variant_t var = variant_t::blob(data, 10);
   ASSERT_TRUE(var.type() == variant_t::vtBlob);

@@ -241,7 +241,7 @@ bool BinaryReaderImpl::succeed(variant_t value, variant_t *out) {
   return true;
 }
 
-BinaryReader::BinaryReader(arena_t *arena)
+BinaryReader::BinaryReader(pton_arena_t *arena)
   : arena_(arena) { }
 
 variant_t BinaryReader::parse(const void *data, size_t size) {

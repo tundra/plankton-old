@@ -7,12 +7,12 @@ filenames = [
   "plankton-text.cc",
 ]
 
-objects = get_group("objects")
+library = get_group("library")
 for filename in filenames:
   source = c.get_source_file(filename)
   source.add_include(get_dep("tclib").get_child("src", "c"))
   object = source.get_object()
-  objects.add_member(object)
+  library.add_member(object)
 
 all = get_group("all")
-all.add_member(objects)
+all.add_member(library)

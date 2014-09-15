@@ -4,7 +4,7 @@
 include("c", "src_c.mkmk")
 
 objects = get_group("objects")
-objects.add_dependency(get_external("src", "c", "objects"))
+objects.add_dependency(get_external("src", "c", "library"))
 
 all = add_alias("all")
 all.add_member(get_external("src", "c", "all"))

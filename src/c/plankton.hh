@@ -3,20 +3,19 @@
 
 /// C++ implementation of the plankton serialization format.
 
-#ifndef _PLANKTON
-#define _PLANKTON
+#ifndef _PLANKTON_HH
+#define _PLANKTON_HH
 
 #include "stdc.h"
 
+BEGIN_C_INCLUDES
+#include "plankton.h"
+END_C_INCLUDES
+
 namespace plankton {
 
-class arena_array_t;
-class arena_blob_t;
-class arena_value_t;
-class arena_map_t;
-class arena_string_t;
-class arena_sink_t;
-class arena_t;
+typedef ::pton_arena_t arena_t;
+
 class variant_t;
 
 // An iterator that allows you to scan through all the mappings in a map.
@@ -31,10 +30,10 @@ public:
 
 private:
   friend class variant_t;
-  map_iterator_t(arena_map_t *data);
+  map_iterator_t(pton_arena_map_t *data);
   map_iterator_t() : data_(NULL), cursor_(0), limit_(0) { }
 
-  arena_map_t *data_;
+  pton_arena_map_t *data_;
   uint32_t cursor_;
   uint32_t limit_;
 };
@@ -62,20 +61,6 @@ private:
 // assumptions clear and the code more concise.
 class variant_t {
 private:
-  // Tags that identify the internal representation of variants.
-  enum repr_tag_t {
-    rtInteger = 0x10,
-    rtExternalString = 0x20,
-    rtArenaString = 0x21,
-    rtExternalBlob = 0x30,
-    rtArenaBlob = 0x31,
-    rtNull = 0x40,
-    rtTrue = 0x50,
-    rtFalse = 0x51,
-    rtArenaArray = 0x60,
-    rtArenaMap = 0x70
-  };
-
 public:
   // The different types of variants. The values are the corresponding
   // representation tags downshifted by 4.
@@ -90,7 +75,10 @@ public:
   };
 
   // Initializes a variant representing null.
-  inline variant_t() : repr_tag_(rtNull) { data_.as_integer_ = 0; }
+  inline variant_t() {
+    value_.repr_tag_ = variant_p::rtNull;
+    payload()->as_integer_ = 0;
+  }
 
   // Static method that returns a variant representing null. Equivalent to
   // the no-arg constructor but more explicit.
@@ -98,15 +86,15 @@ public:
 
   // Returns a variant representing the boolean true. Called 'yes' because
   // 'true' is a keyword.
-  static inline variant_t yes() { return variant_t(rtTrue); }
+  static inline variant_t yes() { return variant_t(variant_p::rtTrue); }
 
   // Returns a variant representing the boolean false. Called 'no' because
   // 'false' is a keyword.
-  static inline variant_t no() { return variant_t(rtFalse); }
+  static inline variant_t no() { return variant_t(variant_p::rtFalse); }
 
   // Returns a variant representing a bool, false if the value is 0, true
   // otherwise.
-  static inline variant_t boolean(int value) { return variant_t(value ? rtTrue : rtFalse); }
+  static inline variant_t boolean(int value) { return variant_t(value ? variant_p::rtTrue : variant_p::rtFalse); }
 
   // Initializes a variant representing an integer with the given value. Note
   // that this is funky when used with a literal 0 because it also matches the
@@ -239,44 +227,39 @@ public:
   // object.
   void ensure_frozen();
 
-  inline bool is_integer() const { return repr_tag_ == rtInteger; }
+  inline bool is_integer() const { return repr_tag() == variant_p::rtInteger; }
 
-  inline bool is_map() const { return repr_tag_ == rtArenaMap; }
+  inline bool is_map() const { return repr_tag() == variant_p::rtArenaMap; }
 
-  inline bool is_array() const { return repr_tag_ == rtArenaArray; }
+  inline bool is_array() const { return repr_tag() == variant_p::rtArenaArray; }
 
   inline bool is_string() const { return type() == vtString; }
 
   inline bool is_blob() const { return type() == vtBlob; }
 
 protected:
-  repr_tag_t repr_tag_;
-  union {
-    int64_t as_integer_;
-    struct {
-      uint32_t length_;
-      const char *chars_;
-    } as_external_string_;
-    struct {
-      uint32_t size_;
-      const void *data_;
-    } as_external_blob_;
-    arena_value_t *as_arena_value_;
-    arena_array_t *as_arena_array_;
-    arena_map_t *as_arena_map_;
-    arena_string_t *as_arena_string_;
-    arena_blob_t *as_arena_blob_;
-  } data_;
+  variant_p value_;
+
+  // Convenience accessor for the representation tag.
+  variant_p::repr_tag_t repr_tag() const { return value_.repr_tag_; }
+
+  pton_variant_payload_t *payload() { return &value_.payload_; }
+
+  const pton_variant_payload_t *payload() const { return &value_.payload_; }
 
 private:
-  friend class arena_t;
+  friend class ::pton_arena_t;
 
   // Creates a variant with no payload and the given type.
-  variant_t(repr_tag_t tag)
-    : repr_tag_(tag) { data_.as_integer_ = 0; }
+  variant_t(variant_p::repr_tag_t tag) {
+    value_.repr_tag_ = tag;
+    payload()->as_integer_ = 0;
+  }
 
-  variant_t(repr_tag_t tag, arena_value_t *arena_value)
-    : repr_tag_(tag) { data_.as_arena_value_ = arena_value; }
+  variant_t(variant_p::repr_tag_t tag, pton_arena_value_t *arena_value) {
+    value_.repr_tag_ = tag;
+    payload()->as_arena_value_ = arena_value;
+  }
 };
 
 // A variant that represents an array. An array can be either an actual array
@@ -383,78 +366,10 @@ public:
   bool set(variant_t value);
 
 private:
-  friend class arena_t;
-  explicit sink_t(arena_sink_t *data);
+  friend class ::pton_arena_t;
+  explicit sink_t(pton_arena_sink_t *data);
 
-  arena_sink_t *data_;
-};
-
-// An arena within which plankton values can be allocated. Once the values are
-// no longer needed all can be disposed by disposing the arena.
-class arena_t {
-public:
-  // Creates a new empty arena.
-  inline arena_t();
-
-  // Disposes all memory allocated within this arena.
-  ~arena_t();
-
-  // Allocates a new array of values the given size within this arena. Public
-  // for testing only. The values are not initialized.
-  template <typename T>
-  T *alloc_values(size_t elms);
-
-  // Allocates a single value of the given type. The value is not initialized.
-  template <typename T>
-  T *alloc_value();
-
-  // Creates and returns a new mutable array value.
-  array_t new_array();
-
-  // Creates and returns a new mutable array value.
-  array_t new_array(size_t init_capacity);
-
-  // Creates and returns a new map value.
-  map_t new_map();
-
-  // Creates and returns a new variant string. The string is fully owned by
-  // the arena so the character array can be disposed after this call returns.
-  // The length of the string is determined using strlen.
-  string_t new_string(const char *str);
-
-  // Creates and returns a new variant string. The string is fully owned by
-  // the arena so the character array can be disposed after this call returns.
-  string_t new_string(const char *str, size_t length);
-
-  // Creates and returns a new mutable variant string of the given length,
-  // initialized to all '\0's. Note that this doesn't mean that the string is
-  // initially empty. Variant strings can handle null characters so what you
-  // get is a 'length' long string where all the characters are null. The null
-  // terminator is implicitly allocated in addition to the requested length, so
-  // you only need to worry about the non-null characters.
-  string_t new_string(size_t length);
-
-  // Creates and returns a new variant blob. The contents it copied into this
-  // arena so the data array can be disposed after this call returns.
-  blob_t new_blob(const void *data, size_t size);
-
-  // Creates and returns a new mutable variant blob of the given size,
-  // initialized to all zeros.
-  blob_t new_blob(size_t size);
-
-  // Creates and returns a new sink value.
-  sink_t new_sink();
-
-private:
-  // Allocates a raw block of memory.
-  void *alloc_raw(size_t size);
-
-  // Allocates the backing storage for a sink value.
-  arena_sink_t *alloc_sink();
-
-  size_t capacity_;
-  size_t used_;
-  uint8_t **blocks_;
+  pton_arena_sink_t *data_;
 };
 
 // Utility for serializing variant values to plankton.
@@ -504,21 +419,21 @@ private:
 class BinaryReader {
 public:
   // Creates a new reader that allocates values from the given arena.
-  BinaryReader(arena_t *arena);
+  BinaryReader(pton_arena_t *arena);
 
   // Deserializes the given input and returns the result as a variant.
   variant_t parse(const void *data, size_t size);
 
 private:
   friend class BinaryReaderImpl;
-  arena_t *arena_;
+  pton_arena_t *arena_;
 };
 
 // Utility for converting a plankton variant to a 7-bit ascii string.
 class TextReader {
 public:
   // Creates a new parser which uses the given arena for allocation.
-  TextReader(arena_t *arena);
+  TextReader(pton_arena_t *arena);
 
   // Parse the given input, returning the value. If any errors occur the
   // has_failed() and offender() methods can be used to identify what the
@@ -534,11 +449,79 @@ public:
 
 private:
   friend class TextReaderImpl;
-  arena_t *arena_;
+  pton_arena_t *arena_;
   bool has_failed_;
   char offender_;
 };
 
 } // namespace plankton
 
-#endif // _PLANKTON
+// An arena within which plankton values can be allocated. Once the values are
+// no longer needed all can be disposed by disposing the arena.
+class pton_arena_t {
+public:
+  // Creates a new empty arena.
+  inline pton_arena_t();
+
+  // Disposes all memory allocated within this arena.
+  ~pton_arena_t();
+
+  // Allocates a new array of values the given size within this arena. Public
+  // for testing only. The values are not initialized.
+  template <typename T>
+  T *alloc_values(size_t elms);
+
+  // Allocates a single value of the given type. The value is not initialized.
+  template <typename T>
+  T *alloc_value();
+
+  // Creates and returns a new mutable array value.
+  plankton::array_t new_array();
+
+  // Creates and returns a new mutable array value.
+  plankton::array_t new_array(size_t init_capacity);
+
+  // Creates and returns a new map value.
+  plankton::map_t new_map();
+
+  // Creates and returns a new variant string. The string is fully owned by
+  // the arena so the character array can be disposed after this call returns.
+  // The length of the string is determined using strlen.
+  plankton::string_t new_string(const char *str);
+
+  // Creates and returns a new variant string. The string is fully owned by
+  // the arena so the character array can be disposed after this call returns.
+  plankton::string_t new_string(const char *str, size_t length);
+
+  // Creates and returns a new mutable variant string of the given length,
+  // initialized to all '\0's. Note that this doesn't mean that the string is
+  // initially empty. Variant strings can handle null characters so what you
+  // get is a 'length' long string where all the characters are null. The null
+  // terminator is implicitly allocated in addition to the requested length, so
+  // you only need to worry about the non-null characters.
+  plankton::string_t new_string(size_t length);
+
+  // Creates and returns a new variant blob. The contents it copied into this
+  // arena so the data array can be disposed after this call returns.
+  plankton::blob_t new_blob(const void *data, size_t size);
+
+  // Creates and returns a new mutable variant blob of the given size,
+  // initialized to all zeros.
+  plankton::blob_t new_blob(size_t size);
+
+  // Creates and returns a new sink value.
+  plankton::sink_t new_sink();
+
+private:
+  // Allocates a raw block of memory.
+  void *alloc_raw(size_t size);
+
+  // Allocates the backing storage for a sink value.
+  pton_arena_sink_t *alloc_sink();
+
+  size_t capacity_;
+  size_t used_;
+  uint8_t **blocks_;
+};
+
+#endif // _PLANKTON_HH

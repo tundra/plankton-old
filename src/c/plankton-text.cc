@@ -465,7 +465,7 @@ private:
   bool decode_map(variant_t *out);
 
   // Returns the arena to use for allocation.
-  arena_t *arena() { return parser_->arena_; }
+  pton_arena_t *arena() { return parser_->arena_; }
 
   // Given a character, returns the special character it encodes (for instance
   // a newline for 'n'), or a null character if this one doesn't represent a
@@ -809,7 +809,7 @@ bool TextReaderImpl::succeed(variant_t value, variant_t *out) {
   return true;
 }
 
-TextReader::TextReader(arena_t *arena)
+TextReader::TextReader(pton_arena_t *arena)
   : arena_(arena)
   , has_failed_(false)
   , offender_('\0') { }
