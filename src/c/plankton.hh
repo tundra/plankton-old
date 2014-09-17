@@ -10,6 +10,7 @@
 
 BEGIN_C_INCLUDES
 #include "plankton.h"
+#include "utils/alloc.h"
 END_C_INCLUDES
 
 namespace plankton {
@@ -366,6 +367,32 @@ private:
   pton_sink_t *data_;
 };
 
+// Utility for encoding plankton data. For most uses you can use a BinaryWriter
+// to encode a whole variant at a time, but in cases where data is represented
+// in some other way you can use this to build custom encoding.
+class Assembler {
+public:
+  Assembler() : assm_(pton_new_assembler()) { }
+  ~Assembler() { pton_dispose_assembler(assm_); }
+
+  bool begin_array(uint32_t length) { return pton_assembler_begin_array(assm_, length); }
+  bool begin_map(uint32_t size);
+
+  bool emit_bool(bool value) { return pton_assembler_emit_bool(assm_, value); }
+  bool emit_null() { return pton_assembler_emit_null(assm_); }
+  bool emit_int64(int64_t value) { return pton_assembler_emit_int64(assm_, value); }
+
+  memory_block_t flush() {
+    uint8_t *memory = 0;
+    size_t size = 0;
+    pton_assembler_flush(assm_, &memory, &size);
+    return new_memory_block(memory, size);
+  }
+
+private:
+  pton_assembler_t *assm_;
+};
+
 // Utility for serializing variant values to plankton.
 class BinaryWriter {
 public:
@@ -382,7 +409,7 @@ public:
   size_t size() { return size_; }
 
 private:
-  friend class BinaryWriterImpl;
+  friend struct VariantWriter;
   uint8_t *bytes_;
   size_t size_;
 };

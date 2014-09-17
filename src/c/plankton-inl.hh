@@ -7,7 +7,10 @@
 #define _PLANKTON_INL
 
 #include "plankton.hh"
+
+BEGIN_C_INCLUDES
 #include "plankton-inl.h"
+END_C_INCLUDES
 
 namespace plankton {
 

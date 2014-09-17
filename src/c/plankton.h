@@ -10,10 +10,11 @@
 
 struct pton_arena_array_t;
 struct pton_arena_blob_t;
-struct pton_arena_value_t;
 struct pton_arena_map_t;
 struct pton_arena_string_t;
 struct pton_arena_t;
+struct pton_arena_value_t;
+struct pton_assembler_t;
 struct pton_sink_t;
 
 union pton_variant_payload_t {
@@ -210,5 +211,19 @@ bool pton_sink_set(pton_sink_t *sink, pton_variant_t value);
 // Returns the value stored in this sink. If the sink is empty the result is
 // null.
 pton_variant_t pton_sink_get(pton_sink_t *sink);
+
+pton_assembler_t *pton_new_assembler();
+
+void pton_dispose_assembler(pton_assembler_t *assm);
+
+bool pton_assembler_begin_array(pton_assembler_t *assm, uint32_t length);
+
+bool pton_assembler_emit_bool(pton_assembler_t *assm, bool value);
+
+bool pton_assembler_emit_null(pton_assembler_t *assm);
+
+bool pton_assembler_emit_int64(pton_assembler_t *assm, int64_t value);
+
+bool pton_assembler_flush(pton_assembler_t *assm, uint8_t **memory_out, size_t *size_out);
 
 #endif // _PLANKTON_H

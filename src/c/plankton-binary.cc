@@ -6,6 +6,116 @@
 #include "utils-inl.hh"
 #include <new>
 
+using namespace plankton;
+
+struct pton_assembler_t : public BinaryImplUtils {
+public:
+  // Write the given value to the stream.
+  void encode(variant_t value);
+
+  // Flush the contents of the stream, storing them in the fields of the given
+  // writer.
+  void flush(BinaryWriter *writer);
+
+  bool begin_array(uint32_t length);
+
+  bool emit_bool(bool value);
+
+  bool emit_null();
+
+  bool emit_int64(int64_t value);
+
+  memory_block_t flush();
+
+private:
+  // Write a single byte to the stream.
+  bool write_byte(uint8_t value);
+
+  // Write an untagged signed int64 varint.
+  bool write_int64(int64_t value);
+
+  // Write an untagged unsigned int64 varint.
+  bool write_uint64(uint64_t value);
+
+  Buffer<uint8_t> bytes_;
+};
+
+pton_assembler_t *pton_new_assembler() {
+  return new pton_assembler_t();
+}
+
+bool pton_assembler_t::begin_array(uint32_t length) {
+  return write_byte(boArray) && write_uint64(length);
+}
+
+bool pton_assembler_t::emit_bool(bool value) {
+  return write_byte(value ? boTrue : boFalse);
+}
+
+bool pton_assembler_t::emit_null() {
+  return write_byte(boNull);
+}
+
+bool pton_assembler_t::emit_int64(int64_t value) {
+  return write_byte(boInteger) && write_int64(value);
+}
+
+memory_block_t pton_assembler_t::flush() {
+  return new_memory_block(bytes_.release(), bytes_.length());
+}
+
+bool pton_assembler_flush(pton_assembler_t *assm, uint8_t **memory_out, size_t *size_out) {
+  memory_block_t data = assm->flush();
+  *memory_out = static_cast<uint8_t*>(data.memory);
+  *size_out = data.size;
+  return true;
+}
+
+void pton_dispose_assembler(pton_assembler_t *assm) {
+  delete assm;
+}
+
+bool pton_assembler_begin_array(pton_assembler_t *assm, uint32_t length) {
+  return assm->begin_array(length);
+}
+
+bool pton_assembler_emit_bool(pton_assembler_t *assm, bool value) {
+  return assm->emit_bool(value);
+}
+
+bool pton_assembler_emit_null(pton_assembler_t *assm) {
+  return assm->emit_null();
+}
+
+bool pton_assembler_emit_int64(pton_assembler_t *assm, int64_t value) {
+  return assm->emit_int64(value);
+}
+
+bool pton_assembler_t::write_byte(uint8_t value) {
+  bytes_.add(value);
+  return true;
+}
+
+bool pton_assembler_t::write_int64(int64_t value) {
+  uint64_t zigzag = (value << 1) ^ (value >> 63);
+  return write_uint64(zigzag);
+}
+
+bool pton_assembler_t::write_uint64(uint64_t value) {
+  if (value >= 0x80) {
+    write_byte((value & 0x7F) | 0x80);
+    uint64_t current = (value >> 7) - 1;
+    while (current >= 0x80) {
+      write_byte((current & 0x7F) | 0x80);
+      current = (current >> 7) - 1;
+    }
+    write_byte(current);
+  } else {
+    write_byte(value);
+  }
+  return true;
+}
+
 namespace plankton {
 
 BinaryWriter::BinaryWriter()
@@ -17,8 +127,10 @@ BinaryWriter::~BinaryWriter() {
   bytes_ = NULL;
 }
 
-class BinaryWriterImpl : public BinaryImplUtils {
+class VariantWriter {
 public:
+  VariantWriter(Assembler *assm) : assm_(assm) { }
+
   // Write the given value to the stream.
   void encode(variant_t value);
 
@@ -26,61 +138,49 @@ public:
   // writer.
   void flush(BinaryWriter *writer);
 
-private:
   void encode_array(array_t value);
 
-  // Write a single byte to the stream.
-  void write_byte(uint8_t value);
-
-  // Write an untagged signed int64 varint.
-  void write_int64(int64_t value);
-
-  // Write an untagged unsigned int64 varint.
-  void write_uint64(uint64_t value);
-
-  Buffer<uint8_t> bytes_;
+private:
+  Assembler *assm_;
+  Assembler *assm() { return assm_; }
 };
 
-void BinaryWriterImpl::flush(BinaryWriter *writer) {
-  writer->size_ = bytes_.length();
-  writer->bytes_ = bytes_.release();
+void VariantWriter::flush(BinaryWriter *writer) {
+  memory_block_t memory = assm()->flush();
+  writer->size_ = memory.size;
+  writer->bytes_ = static_cast<uint8_t*>(memory.memory);
 }
 
-void BinaryWriterImpl::encode(variant_t value) {
+void VariantWriter::encode(variant_t value) {
   switch (value.type()) {
     case pton_variant_t::vtArray:
       encode_array(array_t(value));
       break;
     case pton_variant_t::vtBool:
-      write_byte(value.bool_value() ? boTrue : boFalse);
+      assm()->emit_bool(value.bool_value());
       break;
     case pton_variant_t::vtInteger:
-      write_byte(boInteger);
-      write_int64(value.integer_value());
+      assm()->emit_int64(value.integer_value());
       break;
     case pton_variant_t::vtNull:
     default:
-      write_byte(boNull);
+      assm()->emit_null();
       break;
   }
 }
 
-void BinaryWriterImpl::encode_array(array_t value) {
-  write_byte(boArray);
+void VariantWriter::encode_array(array_t value) {
   size_t length = value.length();
-  write_uint64(length);
+  assm()->begin_array(length);
   for (size_t i = 0; i < length; i++)
     encode(value[i]);
 }
 
-void BinaryWriterImpl::write_byte(uint8_t value) {
-  bytes_.add(value);
-}
-
 void BinaryWriter::write(variant_t value) {
-  BinaryWriterImpl impl;
-  impl.encode(value);
-  impl.flush(this);
+  Assembler assm;
+  VariantWriter writer(&assm);
+  writer.encode(value);
+  writer.flush(this);
 }
 
 class BinaryReaderImpl : public BinaryImplUtils {
@@ -161,11 +261,6 @@ bool BinaryReaderImpl::decode_array(variant_t *result_out) {
   return succeed(result, result_out);
 }
 
-void BinaryWriterImpl::write_int64(int64_t value) {
-  uint64_t zigzag = (value << 1) ^ (value >> 63);
-  write_uint64(zigzag);
-}
-
 int64_t BinaryReaderImpl::read_int64() {
   uint64_t zigzag = read_uint64();
   return (zigzag >> 1) ^ (-(zigzag & 1));
@@ -219,20 +314,6 @@ uint64_t BinaryReaderImpl::read_uint64() {
     return result;
   } else {
     return next;
-  }
-}
-
-void BinaryWriterImpl::write_uint64(uint64_t value) {
-  if (value >= 0x80) {
-    write_byte((value & 0x7F) | 0x80);
-    uint64_t current = (value >> 7) - 1;
-    while (current >= 0x80) {
-      write_byte((current & 0x7F) | 0x80);
-      current = (current >> 7) - 1;
-    }
-    write_byte(current);
-  } else {
-    write_byte(value);
   }
 }
 
