@@ -8,7 +8,7 @@
 using namespace plankton;
 
 // Shared between all the arena types.
-class pton_arena_value_t {
+struct pton_arena_value_t {
 public:
   pton_arena_value_t() : is_frozen_(false) { }
 
@@ -21,7 +21,7 @@ protected:
 };
 
 // An arena-allocated array.
-class pton_arena_array_t : public pton_arena_value_t {
+struct pton_arena_array_t : public pton_arena_value_t {
 public:
   pton_arena_array_t(pton_arena_t *origin, uint32_t init_capacity);
 
@@ -32,7 +32,7 @@ public:
   uint32_t length() { return length_; }
 
 private:
-  friend class pton_arena_t;
+  friend struct pton_arena_t;
   static const uint32_t kDefaultInitCapacity = 8;
   pton_arena_t *origin_;
   uint32_t length_;
@@ -64,7 +64,7 @@ private:
   entry_t *elms_;
 };
 
-class pton_arena_string_t : public pton_arena_value_t {
+struct pton_arena_string_t : public pton_arena_value_t {
 public:
   pton_arena_string_t(char *chars, uint32_t length, bool is_frozen);
 
@@ -79,7 +79,7 @@ private:
   uint32_t length_;
 };
 
-class pton_arena_blob_t : public pton_arena_value_t {
+struct pton_arena_blob_t : public pton_arena_value_t {
 public:
   pton_arena_blob_t(void *data, uint32_t size, bool is_frozen);
 
@@ -92,7 +92,7 @@ private:
   uint32_t size_;
 };
 
-class pton_sink_t {
+struct pton_sink_t {
 public:
   explicit pton_sink_t(pton_arena_t *origin);
 

@@ -242,7 +242,7 @@ protected:
   const pton_variant_payload_t *payload() const { return &value_.payload_; }
 
 private:
-  friend class ::pton_arena_t;
+  friend struct ::pton_arena_t;
 
   // Creates a variant with no payload and the given type.
   variant_t(pton_variant_t::repr_tag_t tag) {
@@ -360,7 +360,7 @@ public:
   bool set(variant_t value);
 
 private:
-  friend class ::pton_arena_t;
+  friend struct ::pton_arena_t;
   explicit sink_t(pton_sink_t *data);
 
   pton_sink_t *data_;
@@ -452,7 +452,7 @@ private:
 
 // An arena within which plankton values can be allocated. Once the values are
 // no longer needed all can be disposed by disposing the arena.
-class pton_arena_t {
+struct pton_arena_t {
 public:
   // Creates a new empty arena.
   inline pton_arena_t();
