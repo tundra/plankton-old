@@ -17,25 +17,6 @@ struct pton_arena_value_t;
 struct pton_assembler_t;
 struct pton_sink_t;
 
-// The contents of a variant. This is the part that changes depending on the
-// type of the variant.
-union pton_variant_payload_t {
-  int64_t as_integer_;
-  struct {
-    uint32_t length_;
-    const char *chars_;
-  } as_external_string_;
-  struct {
-    uint32_t size_;
-    const void *data_;
-  } as_external_blob_;
-  pton_arena_value_t *as_arena_value_;
-  pton_arena_array_t *as_arena_array_;
-  pton_arena_map_t *as_arena_map_;
-  pton_arena_string_t *as_arena_string_;
-  pton_arena_blob_t *as_arena_blob_;
-};
-
 // A value that encodes a value and the value's type. It provides a uniform
 // interface that abstracts over all the different types that can be encoded
 // to and decoded from plankton.
@@ -66,75 +47,107 @@ struct pton_variant_t {
     vtMap = 0x07
   };
 
-  // This variant's tag.
-  repr_tag_t repr_tag_;
+  // The header of the variant. This part is the same in all variants.
+  struct pton_variant_header_t {
+    // The tag that identifies what kind of variant we're dealing with.
+    repr_tag_t repr_tag_ IF_MSVC(, : 8);
+    // A tag used to identify the version of plankton that produced this value.
+    // All variants returned from a binary plankton implementation will have the
+    // same version tag, and the version of all arguments will be checked
+    // against that tag. If a function is called with the wrong version the call
+    // will abort immediately. This can be used to trap binary incompatibility
+    // by bumping the version when making incompatible changes to variant
+    // representation. It is also useful in trapping invalid or uninitialized
+    // data viewed as variants.
+    uint8_t binary_version_ IF_MSVC(, : 8);
+    // A length or size field. Only used by some variants but it wastes space
+    // on 64 bits to put it in the payload.
+    uint32_t length_ IF_MSVC(, : 32);
+  };
+
+  // The contents of a variant. This is the part that changes depending on the
+  // type of the variant.
+  union pton_variant_payload_t {
+    int64_t as_int64_;
+    pton_arena_value_t *as_arena_value_;
+    pton_arena_array_t *as_arena_array_;
+    pton_arena_map_t *as_arena_map_;
+    pton_arena_string_t *as_arena_string_;
+    pton_arena_blob_t *as_arena_blob_;
+    const void *as_external_blob_data_;
+    const char *as_external_string_chars_;
+  };
+
+  pton_variant_header_t header_;
   pton_variant_payload_t payload_;
 };
 
-// Is the given value an integer?
-static bool pton_is_integer(pton_variant_t variant) {
-  return variant.repr_tag_ == pton_variant_t::rtInteger;
-}
-
-// Is this value an array?
-static bool pton_is_array(pton_variant_t variant) {
-  return variant.repr_tag_ == pton_variant_t::rtArenaArray;
-}
-
-// Is this value a map?
-static bool pton_is_map(pton_variant_t variant) {
-  return variant.repr_tag_ == pton_variant_t::rtArenaMap;
-}
-
 // Returns a variant representing null.
-static pton_variant_t pton_null() {
-  pton_variant_t result;
-  result.repr_tag_ = pton_variant_t::rtNull;
-  result.payload_.as_integer_ = 0;
-  return result;
-}
+pton_variant_t pton_null();
 
 // Returns a variant representing the boolean true.
-static pton_variant_t pton_true() {
-  pton_variant_t result;
-  result.repr_tag_ = pton_variant_t::rtTrue;
-  result.payload_.as_integer_ = 0;
-  return result;
-}
+pton_variant_t pton_true();
 
 // Returns a variant representing the boolean false.
-static pton_variant_t pton_false() {
-  pton_variant_t result;
-  result.repr_tag_ = pton_variant_t::rtFalse;
-  result.payload_.as_integer_ = 0;
-  return result;
-}
+pton_variant_t pton_false();
 
 // Returns a variant representing the given boolean.
-static pton_variant_t pton_bool(bool value) {
-  pton_variant_t result;
-  result.repr_tag_ = value ? pton_variant_t::rtTrue : pton_variant_t::rtFalse;
-  result.payload_.as_integer_ = 0;
-  return result;
-}
+pton_variant_t pton_bool(bool value);
+
+// Initializes a variant representing an integer with the given value.
+pton_variant_t pton_integer(int64_t value);
+
+// Constructor for string-valued variants. Note that the variant does not take
+// ownership of the string so it must stay alive as long as the variant does.
+// Use an arena to create a variant that does take ownership.
+pton_variant_t pton_string(const char *chars, uint32_t length);
+
+// Constructor for string-valued variants. This function uses strlen to
+// determine the length of the string; use pton_string instead to pass an
+// explicit length. Note that the variant does not take ownership of the string
+// so it must stay alive as long as the variant does. Use an arena to create a
+// variant that does take ownership.
+pton_variant_t pton_c_str(const char *chars);
+
+// Constructor for a binary blob. The size is in bytes. This does not copy the
+// string so it has to stay alive for as long as the variant is used. Use an
+// arena to create a variant that does copy the blob.
+pton_variant_t pton_blob(const void *data, uint32_t size);
+
+// Is the given value an integer?
+bool pton_is_integer(pton_variant_t variant);
+
+// Is this value an array?
+bool pton_is_array(pton_variant_t variant);
+
+// Is this value a map?
+bool pton_is_map(pton_variant_t variant);
+
+// Returns the value of the given boolean if it is a boolean, otherwise false.
+// In other words, true iff the value is the boolean true value.
+bool pton_bool_value(pton_variant_t variant);
+
+// Returns the integer value of this variant if it is an integer, otherwise
+// 0.
+int64_t pton_int64_value(pton_variant_t variant);
 
 // Returns the given value's type.
-pton_variant_t::type_t pton_get_type(pton_variant_t variant);
+pton_variant_t::type_t pton_type(pton_variant_t variant);
 
 // Returns the length of the given value if it is a string, otherwise 0.
-uint32_t pton_get_string_length(pton_variant_t variant);
+uint32_t pton_string_length(pton_variant_t variant);
 
 // Returns the characters of this string if it is a string, otherwise NULL.
-const char *pton_get_string_chars(pton_variant_t variant);
+const char *pton_string_chars(pton_variant_t variant);
 
 // If this variant is a blob, returns the number of bytes. If not, returns 0.
-uint32_t pton_get_blob_size(pton_variant_t variant);
+uint32_t pton_blob_size(pton_variant_t variant);
 
 // If this variant is a blob returns the blob data. If not returns NULL.
-const void *pton_get_blob_data(pton_variant_t variant);
+const void *pton_blob_data(pton_variant_t variant);
 
 // Returns the length of this array, 0 if this is not an array.
-uint32_t pton_get_array_length(pton_variant_t variant);
+uint32_t pton_array_length(pton_variant_t variant);
 
 // Adds the given value at the end of the array if it is mutable. Returns
 // true if adding succeeded. Adding will fail if the variant is not an array or

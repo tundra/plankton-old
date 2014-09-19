@@ -7,6 +7,18 @@
 
 using namespace plankton;
 
+// The current plankton version.
+#define BINARY_VERSION 85
+
+extern "C" {
+  int pton_abort_on_incompatible_version_85 = 1;
+}
+
+// Expands to an initializer for a variant with the given tag and length fields
+// in their headers. In particular, this initializes the version field
+// appropriately.
+#define __PTON_VARIANT_INIT__(tag, length) { { tag, BINARY_VERSION, length }, 0 }
+
 // Shared between all the arena types.
 struct pton_arena_value_t {
 public:
@@ -143,6 +155,12 @@ pton_variant_t pton_new_array(pton_arena_t *arena) {
   return arena->new_array().to_c();
 }
 
+variant_t::variant_t(pton_variant_t::repr_tag_t tag, pton_arena_value_t *arena_value) {
+  pton_variant_t value = __PTON_VARIANT_INIT__(tag, 0);
+  value.payload_.as_arena_value_ = arena_value;
+  value_ = value;
+}
+
 array_t pton_arena_t::new_array(uint32_t init_capacity) {
   pton_arena_array_t *data = alloc_value<pton_arena_array_t>();
   variant_t result(pton_variant_t::rtArenaArray, new (data) pton_arena_array_t(this, init_capacity));
@@ -227,34 +245,48 @@ pton_sink_t *pton_new_sink(pton_arena_t *arena) {
   return arena->alloc_sink();
 }
 
-pton_variant_t::type_t pton_get_type(pton_variant_t variant) {
-  return static_cast<pton_variant_t::type_t>(variant.repr_tag_ >> 4);
+static void pton_check_binary_version(pton_variant_t variant) {
+  if (variant.header_.binary_version_ !=BINARY_VERSION) {
+    if (!pton_abort_on_incompatible_version_85)
+      return;
+    fprintf(stderr, "Plankton version mismatch: expected %i, found %i.\n",
+        BINARY_VERSION, variant.header_.binary_version_);
+    fflush(stderr);
+    abort();
+  }
+}
+
+pton_variant_t::type_t pton_type(pton_variant_t variant) {
+  pton_check_binary_version(variant);
+  return static_cast<pton_variant_t::type_t>(variant.header_.repr_tag_ >> 4);
 }
 
 pton_variant_t::type_t variant_t::type() const {
-  return pton_get_type(value_);
+  return pton_type(value_);
 }
 
 bool pton_variants_equal(pton_variant_t a, pton_variant_t b) {
-  pton_variant_t::type_t a_type = pton_get_type(a);
-  pton_variant_t::type_t b_type = pton_get_type(b);
+  pton_check_binary_version(a);
+  pton_check_binary_version(b);
+  pton_variant_t::type_t a_type = pton_type(a);
+  pton_variant_t::type_t b_type = pton_type(b);
   if (a_type != b_type)
     return false;
   switch (a_type) {
     case pton_variant_t::vtInteger:
-      return pton_get_integer_value(a) == pton_get_integer_value(b);
+      return pton_int64_value(a) == pton_int64_value(b);
     case pton_variant_t::vtString: {
-      uint32_t length = pton_get_string_length(a);
-      if (pton_get_string_length(b) != length)
+      uint32_t length = pton_string_length(a);
+      if (pton_string_length(b) != length)
         return false;
-      return strncmp(pton_get_string_chars(a), pton_get_string_chars(b), length) == 0;
+      return strncmp(pton_string_chars(a), pton_string_chars(b), length) == 0;
     }
     case pton_variant_t::vtBlob: {
-      uint32_t size = pton_get_blob_size(a);
-      if (pton_get_blob_size(b) != size)
+      uint32_t size = pton_blob_size(a);
+      if (pton_blob_size(b) != size)
         return false;
-      return strncmp(static_cast<const char*>(pton_get_blob_data(a)),
-          static_cast<const char*>(pton_get_blob_data(b)), size) == 0;
+      return strncmp(static_cast<const char*>(pton_blob_data(a)),
+          static_cast<const char*>(pton_blob_data(b)), size) == 0;
     }
     case pton_variant_t::vtArray:
       return a.payload_.as_arena_array_ == b.payload_.as_arena_array_;
@@ -263,7 +295,7 @@ bool pton_variants_equal(pton_variant_t a, pton_variant_t b) {
     case pton_variant_t::vtNull:
       return true;
     case pton_variant_t::vtBool:
-      return a.repr_tag_ == b.repr_tag_;
+      return a.header_.repr_tag_ == b.header_.repr_tag_;
     default:
       return false;
   }
@@ -274,7 +306,8 @@ bool variant_t::operator==(variant_t that) {
 }
 
 bool pton_is_frozen(pton_variant_t variant) {
-  switch (variant.repr_tag_) {
+  pton_check_binary_version(variant);
+  switch (variant.header_.repr_tag_) {
     case pton_variant_t::rtInteger:
     case pton_variant_t::rtNull:
     case pton_variant_t::rtTrue:
@@ -297,7 +330,8 @@ bool variant_t::is_frozen() {
 }
 
 void pton_ensure_frozen(pton_variant_t variant) {
-  switch (variant.repr_tag_) {
+  pton_check_binary_version(variant);
+  switch (variant.header_.repr_tag_) {
     case pton_variant_t::rtArenaArray:
     case pton_variant_t::rtArenaMap:
     case pton_variant_t::rtArenaString:
@@ -325,6 +359,8 @@ array_t::array_t(variant_t variant) : variant_t() {
 }
 
 bool pton_array_add(pton_variant_t array, pton_variant_t value) {
+  pton_check_binary_version(array);
+  pton_check_binary_version(value);
   return pton_is_array(array) && array.payload_.as_arena_array_->add(value);
 }
 
@@ -332,15 +368,17 @@ bool variant_t::array_add(variant_t value) {
   return pton_array_add(value_, value.value_);
 }
 
-uint32_t pton_get_array_length(pton_variant_t variant) {
+uint32_t pton_array_length(pton_variant_t variant) {
+  pton_check_binary_version(variant);
   return pton_is_array(variant) ? variant.payload_.as_arena_array_->length() : 0;
 }
 
 uint32_t variant_t::array_length() const {
-  return pton_get_array_length(value_);
+  return pton_array_length(value_);
 }
 
 pton_variant_t pton_array_get(pton_variant_t variant, uint32_t index) {
+  pton_check_binary_version(variant);
   return pton_is_array(variant)
       ? variant.payload_.as_arena_array_->get(index).to_c()
       : pton_null();
@@ -386,6 +424,7 @@ map_t::map_t(variant_t variant) : variant_t() {
 }
 
 uint32_t pton_map_size(pton_variant_t variant) {
+  pton_check_binary_version(variant);
   return pton_is_map(variant) ? variant.payload_.as_arena_map_->size() : 0;
 }
 
@@ -394,6 +433,9 @@ uint32_t variant_t::map_size() const {
 }
 
 bool pton_map_set(pton_variant_t map, pton_variant_t key, pton_variant_t value) {
+  pton_check_binary_version(map);
+  pton_check_binary_version(key);
+  pton_check_binary_version(value);
   return pton_is_map(map) && map.payload_.as_arena_map_->set(key, value);
 }
 
@@ -402,6 +444,8 @@ bool variant_t::map_set(variant_t key, variant_t value) {
 }
 
 pton_variant_t pton_map_get(pton_variant_t variant, pton_variant_t key) {
+  pton_check_binary_version(variant);
+  pton_check_binary_version(key);
   return pton_is_map(variant)
       ? variant.payload_.as_arena_map_->get(key).to_c()
       : pton_null();
@@ -465,10 +509,11 @@ variant_t pton_arena_map_t::get(variant_t key) const {
   return variant_t::null();
 }
 
-uint32_t pton_get_string_length(pton_variant_t variant) {
-  switch (variant.repr_tag_) {
+uint32_t pton_string_length(pton_variant_t variant) {
+  pton_check_binary_version(variant);
+  switch (variant.header_.repr_tag_) {
   case pton_variant_t::rtExternalString:
-    return variant.payload_.as_external_string_.length_;
+    return variant.header_.length_;
   case pton_variant_t::rtArenaString:
     return variant.payload_.as_arena_string_->length();
   default:
@@ -477,13 +522,14 @@ uint32_t pton_get_string_length(pton_variant_t variant) {
 }
 
 uint32_t variant_t::string_length() const {
-  return pton_get_string_length(value_);
+  return pton_string_length(value_);
 }
 
-const char *pton_get_string_chars(pton_variant_t variant) {
-  switch (variant.repr_tag_) {
+const char *pton_string_chars(pton_variant_t variant) {
+  pton_check_binary_version(variant);
+  switch (variant.header_.repr_tag_) {
     case pton_variant_t::rtExternalString:
-      return variant.payload_.as_external_string_.chars_;
+      return variant.payload_.as_external_string_chars_;
     case pton_variant_t::rtArenaString:
       return variant.payload_.as_arena_string_->chars();
     default:
@@ -492,7 +538,7 @@ const char *pton_get_string_chars(pton_variant_t variant) {
 }
 
 const char *variant_t::string_chars() const {
-  return pton_get_string_chars(value_);
+  return pton_string_chars(value_);
 }
 
 char variant_t::string_get(uint32_t index) const {
@@ -535,10 +581,11 @@ pton_arena_blob_t::pton_arena_blob_t(void *data, uint32_t size, bool is_frozen)
   is_frozen_ = is_frozen;
 }
 
-uint32_t pton_get_blob_size(pton_variant_t variant) {
-  switch (variant.repr_tag_) {
+uint32_t pton_blob_size(pton_variant_t variant) {
+  pton_check_binary_version(variant);
+  switch (variant.header_.repr_tag_) {
     case pton_variant_t::rtExternalBlob:
-      return variant.payload_.as_external_blob_.size_;
+      return variant.header_.length_;
     case pton_variant_t::rtArenaBlob:
       return variant.payload_.as_arena_blob_->size();
     default:
@@ -547,13 +594,14 @@ uint32_t pton_get_blob_size(pton_variant_t variant) {
 }
 
 uint32_t variant_t::blob_size() const {
-  return pton_get_blob_size(value_);
+  return pton_blob_size(value_);
 }
 
-const void *pton_get_blob_data(pton_variant_t variant) {
-  switch (variant.repr_tag_) {
+const void *pton_blob_data(pton_variant_t variant) {
+  pton_check_binary_version(variant);
+  switch (variant.header_.repr_tag_) {
     case pton_variant_t::rtExternalBlob:
-      return variant.payload_.as_external_blob_.data_;
+      return variant.payload_.as_external_blob_data_;
     case pton_variant_t::rtArenaBlob:
       return variant.payload_.as_arena_blob_->data();
     default:
@@ -562,7 +610,7 @@ const void *pton_get_blob_data(pton_variant_t variant) {
 }
 
 const void *variant_t::blob_data() const {
-  return pton_get_blob_data(value_);
+  return pton_blob_data(value_);
 }
 
 uint8_t variant_t::blob_get(uint32_t index) const {
@@ -598,6 +646,7 @@ variant_t sink_t::operator*() const {
 }
 
 bool pton_sink_set(pton_sink_t *sink, pton_variant_t value) {
+  pton_check_binary_version(value);
   return sink->set(value);
 }
 
@@ -622,3 +671,75 @@ bool pton_sink_t::set(variant_t value) {
     return false;
   }
 }
+
+bool pton_is_integer(pton_variant_t variant) {
+  pton_check_binary_version(variant);
+  return variant.header_.repr_tag_ == pton_variant_t::rtInteger;
+}
+
+bool pton_is_array(pton_variant_t variant) {
+  pton_check_binary_version(variant);
+  return variant.header_.repr_tag_ == pton_variant_t::rtArenaArray;
+}
+
+bool pton_is_map(pton_variant_t variant) {
+  pton_check_binary_version(variant);
+  return variant.header_.repr_tag_ == pton_variant_t::rtArenaMap;
+}
+
+bool pton_bool_value(pton_variant_t variant) {
+  pton_check_binary_version(variant);
+  return variant.header_.repr_tag_ == pton_variant_t::rtTrue;
+}
+
+int64_t pton_int64_value(pton_variant_t variant) {
+  pton_check_binary_version(variant);
+  return pton_is_integer(variant) ? variant.payload_.as_int64_ : 0;
+}
+
+pton_variant_t pton_null() {
+  pton_variant_t result = __PTON_VARIANT_INIT__(pton_variant_t::rtNull, 0);
+  return result;
+}
+
+pton_variant_t pton_true() {
+  pton_variant_t result = __PTON_VARIANT_INIT__(pton_variant_t::rtTrue, 0);
+  return result;
+}
+
+pton_variant_t pton_false() {
+  pton_variant_t result = __PTON_VARIANT_INIT__(pton_variant_t::rtFalse, 0);
+  return result;
+}
+
+pton_variant_t pton_bool(bool value) {
+  pton_variant_t result = __PTON_VARIANT_INIT__(
+      value ? pton_variant_t::rtTrue : pton_variant_t::rtFalse,
+      0);
+  return result;
+}
+
+pton_variant_t pton_integer(int64_t value) {
+  pton_variant_t result = __PTON_VARIANT_INIT__(pton_variant_t::rtInteger, 0);
+  result.payload_.as_int64_ = value;
+  return result;
+}
+
+pton_variant_t pton_string(const char *chars, uint32_t length) {
+  pton_variant_t result = __PTON_VARIANT_INIT__(pton_variant_t::rtExternalString,
+      length);
+  result.payload_.as_external_string_chars_ = chars;
+  return result;
+}
+
+pton_variant_t pton_c_str(const char *chars) {
+  return pton_string(chars, strlen(chars));
+}
+
+pton_variant_t pton_blob(const void *data, uint32_t size) {
+  pton_variant_t result = __PTON_VARIANT_INIT__(pton_variant_t::rtExternalBlob,
+      size);
+  result.payload_.as_external_blob_data_ = data;
+  return result;
+}
+

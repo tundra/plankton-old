@@ -217,17 +217,17 @@ public:
   void ensure_frozen();
 
   // Is this value an integer?
-  inline bool is_integer() const { return pton_is_integer(value_); }
+  inline bool is_integer() const;
 
   // Is this value a map?
-  inline bool is_map() const { return pton_is_map(value_); }
+  inline bool is_map() const;
 
   // Is this value an array?
-  inline bool is_array() const { return pton_is_array(value_); }
+  inline bool is_array() const;
 
-  inline bool is_string() const { return type() == pton_variant_t::vtString; }
+  inline bool is_string() const;
 
-  inline bool is_blob() const { return type() == pton_variant_t::vtBlob; }
+  inline bool is_blob() const;
 
   inline pton_variant_t to_c() { return value_; }
 
@@ -236,25 +236,16 @@ protected:
   pton_variant_t value_;
 
   // Convenience accessor for the representation tag.
-  pton_variant_t::repr_tag_t repr_tag() const { return value_.repr_tag_; }
+  pton_variant_t::repr_tag_t repr_tag() const { return value_.header_.repr_tag_; }
 
-  pton_variant_payload_t *payload() { return &value_.payload_; }
+  pton_variant_t::pton_variant_payload_t *payload() { return &value_.payload_; }
 
-  const pton_variant_payload_t *payload() const { return &value_.payload_; }
+  const pton_variant_t::pton_variant_payload_t *payload() const { return &value_.payload_; }
 
 private:
   friend struct ::pton_arena_t;
 
-  // Creates a variant with no payload and the given type.
-  variant_t(pton_variant_t::repr_tag_t tag) {
-    value_.repr_tag_ = tag;
-    payload()->as_integer_ = 0;
-  }
-
-  variant_t(pton_variant_t::repr_tag_t tag, pton_arena_value_t *arena_value) {
-    value_.repr_tag_ = tag;
-    payload()->as_arena_value_ = arena_value;
-  }
+  variant_t(pton_variant_t::repr_tag_t tag, pton_arena_value_t *arena_value);
 };
 
 // A variant that represents an array. An array can be either an actual array
@@ -423,7 +414,7 @@ public:
   size_t size() { return size_; }
 
 private:
-  friend struct VariantWriter;
+  friend class VariantWriter;
   uint8_t *bytes_;
   size_t size_;
 };

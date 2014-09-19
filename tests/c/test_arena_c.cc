@@ -13,17 +13,17 @@ TEST(arena_c, array) {
   pton_variant_t array = pton_new_array(arena);
   ASSERT_FALSE(pton_is_frozen(array));
   for (size_t i = 0; i < 100; i++) {
-    ASSERT_EQ(i, pton_get_array_length(array));
+    ASSERT_EQ(i, pton_array_length(array));
     ASSERT_TRUE(pton_array_add(array, pton_integer(i)));
-    ASSERT_EQ(i + 1, pton_get_array_length(array));
+    ASSERT_EQ(i + 1, pton_array_length(array));
   }
   pton_ensure_frozen(array);
   ASSERT_TRUE(pton_is_frozen(array));
   ASSERT_FALSE(pton_array_add(array, pton_integer(100)));
-  ASSERT_EQ(100, pton_get_array_length(array));
+  ASSERT_EQ(100, pton_array_length(array));
   for (size_t i = 0; i < 100; i++) {
     pton_variant_t elm = pton_array_get(array, i);
-    ASSERT_EQ(i, pton_get_integer_value(elm));
+    ASSERT_EQ(i, pton_int64_value(elm));
   }
   pton_dispose_arena(arena);
 }
@@ -43,7 +43,7 @@ TEST(arena_c, map) {
   ASSERT_EQ(100, pton_map_size(map));
   for (size_t i = 0; i < 100; i++) {
     pton_variant_t elm = pton_map_get(map, pton_integer(i));
-    ASSERT_EQ(i + 3, pton_get_integer_value(elm));
+    ASSERT_EQ(i + 3, pton_int64_value(elm));
   }
   pton_dispose_arena(arena);
 }
