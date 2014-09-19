@@ -23,11 +23,19 @@ public:
 
   bool begin_map(uint32_t length);
 
+  bool begin_object();
+
+  bool begin_environment_reference();
+
   bool emit_bool(bool value);
 
   bool emit_null();
 
   bool emit_int64(int64_t value);
+
+  bool emit_utf8(const char *chars, uint32_t length);
+
+  bool emit_reference(uint64_t offset);
 
   memory_block_t flush();
 
@@ -68,6 +76,22 @@ bool pton_assembler_t::emit_bool(bool value) {
   return write_byte(value ? boTrue : boFalse);
 }
 
+bool pton_assembler_t::begin_object() {
+  return write_byte(boObject);
+}
+
+bool pton_assembler_begin_object(pton_assembler_t *assm) {
+  return assm->begin_object();
+}
+
+bool pton_assembler_t::begin_environment_reference() {
+  return write_byte(boEnvironmentReference);
+}
+
+bool pton_assembler_begin_environment_reference(pton_assembler_t *assm) {
+  return assm->begin_environment_reference();
+}
+
 bool pton_assembler_emit_bool(pton_assembler_t *assm, bool value) {
   return assm->emit_bool(value);
 }
@@ -86,6 +110,26 @@ bool pton_assembler_t::emit_int64(int64_t value) {
 
 bool pton_assembler_emit_int64(pton_assembler_t *assm, int64_t value) {
   return assm->emit_int64(value);
+}
+
+bool pton_assembler_t::emit_utf8(const char *chars, uint32_t length) {
+  write_byte(boUtf8);
+  write_uint64(length);
+  bytes_.write(reinterpret_cast<const uint8_t*>(chars), length);
+  return true;
+}
+
+bool pton_assembler_emit_utf8(pton_assembler_t *assm, const char *chars,
+    uint32_t length) {
+  return assm->emit_utf8(chars, length);
+}
+
+bool pton_assembler_t::emit_reference(uint64_t offset) {
+  return write_byte(boReference) && write_uint64(offset);
+}
+
+bool pton_assembler_emit_reference(pton_assembler_t *assm, uint64_t offset) {
+  return assm->emit_reference(offset);
 }
 
 memory_block_t pton_assembler_t::flush() {

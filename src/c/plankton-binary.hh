@@ -17,11 +17,15 @@ public:
   // Opcode values.
   enum opcode_t {
     boInteger = 0,
+    boUtf8 = 1,
     boArray = 2,
     boMap = 3,
     boNull = 4,
     boTrue = 5,
-    boFalse = 6
+    boFalse = 6,
+    boObject = 7,
+    boReference = 8,
+    boEnvironmentReference = 9
   };
 };
 

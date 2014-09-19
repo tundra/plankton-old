@@ -239,6 +239,12 @@ bool pton_assembler_begin_array(pton_assembler_t *assm, uint32_t length);
 // followed immediately by the mappings, keys and values alternating.
 bool pton_assembler_begin_map(pton_assembler_t *assm, uint32_t size);
 
+// Writes an object header.
+bool pton_assembler_begin_object(pton_assembler_t *assm);
+
+// Writes the header of an environment reference.
+bool pton_assembler_begin_environment_reference(pton_assembler_t *assm);
+
 // Writes the given boolean value.
 bool pton_assembler_emit_bool(pton_assembler_t *assm, bool value);
 
@@ -247,6 +253,13 @@ bool pton_assembler_emit_null(pton_assembler_t *assm);
 
 // Writes an int64 with the given value.
 bool pton_assembler_emit_int64(pton_assembler_t *assm, int64_t value);
+
+// Writes an utf8-encoded string.
+bool pton_assembler_emit_utf8(pton_assembler_t *assm, const char *chars,
+    uint32_t length);
+
+// Writes a reference to the previously seen object at the given offset.
+bool pton_assembler_emit_reference(pton_assembler_t *assm, uint64_t offset);
 
 // Flushes the given assembler, writing the output into the given parameters.
 // The caller assumes ownership of the returned array and is responsible for
