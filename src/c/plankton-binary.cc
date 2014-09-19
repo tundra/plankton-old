@@ -19,6 +19,8 @@ public:
 
   bool begin_array(uint32_t length);
 
+  bool begin_map(uint32_t length);
+
   bool emit_bool(bool value);
 
   bool emit_null();
@@ -48,16 +50,40 @@ bool pton_assembler_t::begin_array(uint32_t length) {
   return write_byte(boArray) && write_uint64(length);
 }
 
+bool pton_assembler_begin_array(pton_assembler_t *assm, uint32_t length) {
+  return assm->begin_array(length);
+}
+
+bool pton_assembler_t::begin_map(uint32_t size) {
+  return write_byte(boMap) && write_uint64(size);
+}
+
+bool pton_assembler_begin_map(pton_assembler_t *assm, uint32_t size) {
+  return assm->begin_map(size);
+}
+
 bool pton_assembler_t::emit_bool(bool value) {
   return write_byte(value ? boTrue : boFalse);
+}
+
+bool pton_assembler_emit_bool(pton_assembler_t *assm, bool value) {
+  return assm->emit_bool(value);
 }
 
 bool pton_assembler_t::emit_null() {
   return write_byte(boNull);
 }
 
+bool pton_assembler_emit_null(pton_assembler_t *assm) {
+  return assm->emit_null();
+}
+
 bool pton_assembler_t::emit_int64(int64_t value) {
   return write_byte(boInteger) && write_int64(value);
+}
+
+bool pton_assembler_emit_int64(pton_assembler_t *assm, int64_t value) {
+  return assm->emit_int64(value);
 }
 
 memory_block_t pton_assembler_t::flush() {
@@ -73,22 +99,6 @@ bool pton_assembler_flush(pton_assembler_t *assm, uint8_t **memory_out, size_t *
 
 void pton_dispose_assembler(pton_assembler_t *assm) {
   delete assm;
-}
-
-bool pton_assembler_begin_array(pton_assembler_t *assm, uint32_t length) {
-  return assm->begin_array(length);
-}
-
-bool pton_assembler_emit_bool(pton_assembler_t *assm, bool value) {
-  return assm->emit_bool(value);
-}
-
-bool pton_assembler_emit_null(pton_assembler_t *assm) {
-  return assm->emit_null();
-}
-
-bool pton_assembler_emit_int64(pton_assembler_t *assm, int64_t value) {
-  return assm->emit_int64(value);
 }
 
 bool pton_assembler_t::write_byte(uint8_t value) {
@@ -140,6 +150,8 @@ public:
 
   void encode_array(array_t value);
 
+  void encode_map(map_t value);
+
 private:
   Assembler *assm_;
   Assembler *assm() { return assm_; }
@@ -155,6 +167,9 @@ void VariantWriter::encode(variant_t value) {
   switch (value.type()) {
     case pton_variant_t::vtArray:
       encode_array(array_t(value));
+      break;
+    case pton_variant_t::vtMap:
+      encode_map(map_t(value));
       break;
     case pton_variant_t::vtBool:
       assm()->emit_bool(value.bool_value());
@@ -175,6 +190,20 @@ void VariantWriter::encode_array(array_t value) {
   for (size_t i = 0; i < length; i++)
     encode(value[i]);
 }
+
+void VariantWriter::encode_map(map_t value) {
+  size_t size = value.size();
+  assm()->begin_map(size);
+  map_iterator_t iter = value.map_iter();
+  while (iter.has_next()) {
+    variant_t key;
+    variant_t value;
+    iter.advance(&key, &value);
+    encode(key);
+    encode(value);
+  }
+}
+
 
 void BinaryWriter::write(variant_t value) {
   Assembler assm;
@@ -208,6 +237,9 @@ private:
   // Read an array's payload.
   bool decode_array(variant_t *result_out);
 
+  // Read a map's payload.
+  bool decode_map(variant_t *result_out);
+
   // Succeeds parsing of some expression, returning true.
   bool succeed(variant_t value, variant_t *out);
 
@@ -238,6 +270,8 @@ bool BinaryReaderImpl::decode(variant_t *result_out) {
       return decode_integer(result_out);
     case boArray:
       return decode_array(result_out);
+    case boMap:
+      return decode_map(result_out);
     default:
       return false;
   }
@@ -256,6 +290,22 @@ bool BinaryReaderImpl::decode_array(variant_t *result_out) {
     if (!decode(&elm))
       return false;
     result.add(elm);
+  }
+  result.ensure_frozen();
+  return succeed(result, result_out);
+}
+
+bool BinaryReaderImpl::decode_map(variant_t *result_out) {
+  uint64_t size = read_uint64();
+  map_t result = reader_->arena_->new_map();
+  for (size_t i = 0; i < size; i++) {
+    variant_t key;
+    if (!decode(&key))
+      return false;
+    variant_t value;
+    if (!decode(&value))
+      return false;
+    result.set(key, value);
   }
   result.ensure_frozen();
   return succeed(result, result_out);

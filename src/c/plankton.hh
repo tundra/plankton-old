@@ -375,13 +375,27 @@ public:
   Assembler() : assm_(pton_new_assembler()) { }
   ~Assembler() { pton_dispose_assembler(assm_); }
 
+  // Writes an array header for an array with the given number of elements. This
+  // must be followed immediately by the elements.
   bool begin_array(uint32_t length) { return pton_assembler_begin_array(assm_, length); }
-  bool begin_map(uint32_t size);
 
+  // Writes a map header for a map with the given number of mappings. This must be
+  // followed immediately by the mappings, keys and values alternating.
+  bool begin_map(uint32_t size) { return pton_assembler_begin_map(assm_, size); }
+
+  // Writes the given boolean value.
   bool emit_bool(bool value) { return pton_assembler_emit_bool(assm_, value); }
+
+  // Writes the null value.
   bool emit_null() { return pton_assembler_emit_null(assm_); }
+
+  // Writes an int64 with the given value.
   bool emit_int64(int64_t value) { return pton_assembler_emit_int64(assm_, value); }
 
+  // Flushes the given assembler, writing the output into the given parameters.
+  // The caller assumes ownership of the returned array and is responsible for
+  // freeing it. This doesn't free the assembler, it must still be disposed with
+  // pton_dispose_assembler.
   memory_block_t flush() {
     uint8_t *memory = 0;
     size_t size = 0;

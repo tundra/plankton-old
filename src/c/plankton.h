@@ -212,18 +212,33 @@ bool pton_sink_set(pton_sink_t *sink, pton_variant_t value);
 // null.
 pton_variant_t pton_sink_get(pton_sink_t *sink);
 
+// Create a new plankton assembler.
 pton_assembler_t *pton_new_assembler();
 
+// Disposes a plankton assembler.
 void pton_dispose_assembler(pton_assembler_t *assm);
 
+// Writes an array header for an array with the given number of elements. This
+// must be followed immediately by the elements.
 bool pton_assembler_begin_array(pton_assembler_t *assm, uint32_t length);
 
+// Writes a map header for a map with the given number of mappings. This must be
+// followed immediately by the mappings, keys and values alternating.
+bool pton_assembler_begin_map(pton_assembler_t *assm, uint32_t size);
+
+// Writes the given boolean value.
 bool pton_assembler_emit_bool(pton_assembler_t *assm, bool value);
 
+// Writes the null value.
 bool pton_assembler_emit_null(pton_assembler_t *assm);
 
+// Writes an int64 with the given value.
 bool pton_assembler_emit_int64(pton_assembler_t *assm, int64_t value);
 
+// Flushes the given assembler, writing the output into the given parameters.
+// The caller assumes ownership of the returned array and is responsible for
+// freeing it. This doesn't free the assembler, it must still be disposed with
+// pton_dispose_assembler.
 bool pton_assembler_flush(pton_assembler_t *assm, uint8_t **memory_out, size_t *size_out);
 
 #endif // _PLANKTON_H

@@ -83,3 +83,16 @@ TEST(binary, array) {
   ASSERT_TRUE(array.add(inner));
   CHECK_BINARY(array);
 }
+
+TEST(binary, map) {
+  arena_t arena;
+  map_t map = arena.new_map();
+  CHECK_BINARY(map);
+  ASSERT_TRUE(map.set(4, 5));
+  CHECK_BINARY(map);
+  ASSERT_TRUE(map.set(variant_t::yes(), variant_t::no()));
+  CHECK_BINARY(map);
+  map_t inner = arena.new_map();
+  ASSERT_TRUE(map.set(8, inner));
+  CHECK_BINARY(map);
+}

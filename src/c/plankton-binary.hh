@@ -16,11 +16,12 @@ class BinaryImplUtils {
 public:
   // Opcode values.
   enum opcode_t {
-    boTrue,
-    boFalse,
-    boNull,
-    boInteger,
-    boArray
+    boInteger = 0,
+    boArray = 2,
+    boMap = 3,
+    boNull = 4,
+    boTrue = 5,
+    boFalse = 6
   };
 };
 
