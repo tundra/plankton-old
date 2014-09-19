@@ -8,12 +8,12 @@
 using namespace plankton;
 
 // The current plankton version.
-#define BINARY_VERSION 85
+#define BINARY_VERSION 0xBE
 
 // Expands to an initializer for a variant with the given tag and length fields
 // in their headers. In particular, this initializes the version field
 // appropriately.
-#define VARIANT_INIT(tag, length) { { tag, BINARY_VERSION, length }, 0 }
+#define VARIANT_INIT(tag, length) {{tag, BINARY_VERSION, length}, {0}}
 
 // Shared between all the arena types.
 struct pton_arena_value_t {
