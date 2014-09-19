@@ -10,14 +10,10 @@ using namespace plankton;
 // The current plankton version.
 #define BINARY_VERSION 85
 
-extern "C" {
-  int pton_abort_on_incompatible_version_85 = 1;
-}
-
 // Expands to an initializer for a variant with the given tag and length fields
 // in their headers. In particular, this initializes the version field
 // appropriately.
-#define __PTON_VARIANT_INIT__(tag, length) { { tag, BINARY_VERSION, length }, 0 }
+#define VARIANT_INIT(tag, length) { { tag, BINARY_VERSION, length }, 0 }
 
 // Shared between all the arena types.
 struct pton_arena_value_t {
@@ -156,7 +152,7 @@ pton_variant_t pton_new_array(pton_arena_t *arena) {
 }
 
 variant_t::variant_t(pton_variant_t::repr_tag_t tag, pton_arena_value_t *arena_value) {
-  pton_variant_t value = __PTON_VARIANT_INIT__(tag, 0);
+  pton_variant_t value = VARIANT_INIT(tag, 0);
   value.payload_.as_arena_value_ = arena_value;
   value_ = value;
 }
@@ -247,8 +243,6 @@ pton_sink_t *pton_new_sink(pton_arena_t *arena) {
 
 static void pton_check_binary_version(pton_variant_t variant) {
   if (variant.header_.binary_version_ !=BINARY_VERSION) {
-    if (!pton_abort_on_incompatible_version_85)
-      return;
     fprintf(stderr, "Plankton version mismatch: expected %i, found %i.\n",
         BINARY_VERSION, variant.header_.binary_version_);
     fflush(stderr);
@@ -698,35 +692,35 @@ int64_t pton_int64_value(pton_variant_t variant) {
 }
 
 pton_variant_t pton_null() {
-  pton_variant_t result = __PTON_VARIANT_INIT__(pton_variant_t::rtNull, 0);
+  pton_variant_t result = VARIANT_INIT(pton_variant_t::rtNull, 0);
   return result;
 }
 
 pton_variant_t pton_true() {
-  pton_variant_t result = __PTON_VARIANT_INIT__(pton_variant_t::rtTrue, 0);
+  pton_variant_t result = VARIANT_INIT(pton_variant_t::rtTrue, 0);
   return result;
 }
 
 pton_variant_t pton_false() {
-  pton_variant_t result = __PTON_VARIANT_INIT__(pton_variant_t::rtFalse, 0);
+  pton_variant_t result = VARIANT_INIT(pton_variant_t::rtFalse, 0);
   return result;
 }
 
 pton_variant_t pton_bool(bool value) {
-  pton_variant_t result = __PTON_VARIANT_INIT__(
+  pton_variant_t result = VARIANT_INIT(
       value ? pton_variant_t::rtTrue : pton_variant_t::rtFalse,
       0);
   return result;
 }
 
 pton_variant_t pton_integer(int64_t value) {
-  pton_variant_t result = __PTON_VARIANT_INIT__(pton_variant_t::rtInteger, 0);
+  pton_variant_t result = VARIANT_INIT(pton_variant_t::rtInteger, 0);
   result.payload_.as_int64_ = value;
   return result;
 }
 
 pton_variant_t pton_string(const char *chars, uint32_t length) {
-  pton_variant_t result = __PTON_VARIANT_INIT__(pton_variant_t::rtExternalString,
+  pton_variant_t result = VARIANT_INIT(pton_variant_t::rtExternalString,
       length);
   result.payload_.as_external_string_chars_ = chars;
   return result;
@@ -737,7 +731,7 @@ pton_variant_t pton_c_str(const char *chars) {
 }
 
 pton_variant_t pton_blob(const void *data, uint32_t size) {
-  pton_variant_t result = __PTON_VARIANT_INIT__(pton_variant_t::rtExternalBlob,
+  pton_variant_t result = VARIANT_INIT(pton_variant_t::rtExternalBlob,
       size);
   result.payload_.as_external_blob_data_ = data;
   return result;

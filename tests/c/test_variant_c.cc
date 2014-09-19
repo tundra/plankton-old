@@ -5,7 +5,7 @@
 #include "test/unittest.hh"
 
 BEGIN_C_INCLUDES
-#include "plankton-inl.h"
+#include "plankton.h"
 END_C_INCLUDES
 
 TEST(variant_c, simple) {
