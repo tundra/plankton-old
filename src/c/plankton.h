@@ -8,49 +8,46 @@
 
 #include "stdc.h"
 
-struct pton_arena_array_t;
-struct pton_arena_blob_t;
-struct pton_arena_map_t;
-struct pton_arena_string_t;
-struct pton_arena_t;
-struct pton_arena_value_t;
-struct pton_assembler_t;
-struct pton_sink_t;
+typedef struct pton_arena_array_t pton_arena_array_t;
+typedef struct pton_arena_blob_t pton_arena_blob_t;
+typedef struct pton_arena_map_t pton_arena_map_t;
+typedef struct pton_arena_string_t pton_arena_string_t;
+typedef struct pton_arena_t pton_arena_t;
+typedef struct pton_arena_value_t pton_arena_value_t;
+typedef struct pton_assembler_t pton_assembler_t;
+typedef struct pton_sink_t pton_sink_t;
+
+// The different types of variants. The values are the corresponding
+// representation tags downshifted by 4.
+typedef enum pton_type_t {
+  PTON_INTEGER = 0x01,
+  PTON_STRING = 0x02,
+  PTON_BLOB = 0x03,
+  PTON_NULL = 0x04,
+  PTON_BOOL = 0x05,
+  PTON_ARRAY = 0x06,
+  PTON_MAP = 0x07
+} pton_type_t;
 
 // A value that encodes a value and the value's type. It provides a uniform
 // interface that abstracts over all the different types that can be encoded
 // to and decoded from plankton.
-struct pton_variant_t {
-  // Tags that identify the internal representation of variants.
-  enum repr_tag_t {
-    rtInteger = 0x10,
-    rtExternalString = 0x20,
-    rtArenaString = 0x21,
-    rtExternalBlob = 0x30,
-    rtArenaBlob = 0x31,
-    rtNull = 0x40,
-    rtTrue = 0x50,
-    rtFalse = 0x51,
-    rtArenaArray = 0x60,
-    rtArenaMap = 0x70
-  };
-
-  // The different types of variants. The values are the corresponding
-  // representation tags downshifted by 4.
-  enum type_t {
-    vtInteger = 0x01,
-    vtString = 0x02,
-    vtBlob = 0x03,
-    vtNull = 0x04,
-    vtBool = 0x05,
-    vtArray = 0x06,
-    vtMap = 0x07
-  };
-
+typedef struct {
   // The header of the variant. This part is the same in all variants.
-  struct pton_variant_header_t {
+  struct header_t {
     // The tag that identifies what kind of variant we're dealing with.
-    repr_tag_t repr_tag_ IF_MSVC(, : 8);
+    enum repr_tag_t {
+        REPR_INT64 = 0x10,
+        REPR_EXTN_STRING = 0x20,
+        REPR_ARNA_STRING = 0x21,
+        REPR_EXTN_BLOB = 0x30,
+        REPR_ARNA_BLOB = 0x31,
+        REPR_NULL = 0x40,
+        REPR_TRUE = 0x50,
+        REPR_FALSE = 0x51,
+        REPR_ARNA_ARRAY = 0x60,
+        REPR_ARNA_MAP = 0x70
+    } repr_tag_ IF_MSVC(, : 8);
     // A tag used to identify the version of plankton that produced this value.
     // All variants returned from a binary plankton implementation will have the
     // same version tag, and the version of all arguments will be checked
@@ -63,11 +60,11 @@ struct pton_variant_t {
     // A length or size field. Only used by some variants but it wastes space
     // on 64 bits to put it in the payload.
     uint32_t length_ IF_MSVC(, : 32);
-  };
+  } header_;
 
   // The contents of a variant. This is the part that changes depending on the
   // type of the variant.
-  union pton_variant_payload_t {
+  union payload_t {
     int64_t as_int64_;
     pton_arena_value_t *as_arena_value_;
     pton_arena_array_t *as_arena_array_;
@@ -76,11 +73,9 @@ struct pton_variant_t {
     pton_arena_blob_t *as_arena_blob_;
     const void *as_external_blob_data_;
     const char *as_external_string_chars_;
-  };
+  } payload_;
 
-  pton_variant_header_t header_;
-  pton_variant_payload_t payload_;
-};
+} pton_variant_t;
 
 // Returns a variant representing null.
 pton_variant_t pton_null();
@@ -132,7 +127,7 @@ bool pton_bool_value(pton_variant_t variant);
 int64_t pton_int64_value(pton_variant_t variant);
 
 // Returns the given value's type.
-pton_variant_t::type_t pton_type(pton_variant_t variant);
+pton_type_t pton_type(pton_variant_t variant);
 
 // Returns the length of the given value if it is a string, otherwise 0.
 uint32_t pton_string_length(pton_variant_t variant);

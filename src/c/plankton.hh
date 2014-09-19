@@ -120,7 +120,7 @@ public:
   static variant_t blob(const void *data, uint32_t size);
 
   // Returns this value's type.
-  pton_variant_t::type_t type() const;
+  pton_type_t type() const;
 
   // Returns the integer value of this variant if it is an integer, otherwise
   // 0.
@@ -235,17 +235,19 @@ protected:
   friend class sink_t;
   pton_variant_t value_;
 
+  typedef pton_variant_t::header_t::repr_tag_t repr_tag_t;
+
   // Convenience accessor for the representation tag.
-  pton_variant_t::repr_tag_t repr_tag() const { return value_.header_.repr_tag_; }
+  repr_tag_t repr_tag() const { return value_.header_.repr_tag_; }
 
-  pton_variant_t::pton_variant_payload_t *payload() { return &value_.payload_; }
+  pton_variant_t::payload_t *payload() { return &value_.payload_; }
 
-  const pton_variant_t::pton_variant_payload_t *payload() const { return &value_.payload_; }
+  const pton_variant_t::payload_t *payload() const { return &value_.payload_; }
 
 private:
   friend struct ::pton_arena_t;
 
-  variant_t(pton_variant_t::repr_tag_t tag, pton_arena_value_t *arena_value);
+  variant_t(repr_tag_t tag, pton_arena_value_t *arena_value);
 };
 
 // A variant that represents an array. An array can be either an actual array

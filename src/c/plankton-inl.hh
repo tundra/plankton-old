@@ -38,7 +38,7 @@ bool variant_t::bool_value() const {
 }
 
 variant_t::operator bool() const {
-  return repr_tag() != pton_variant_t::rtNull;
+  return repr_tag() != pton_variant_t::header_t::REPR_NULL;
 }
 
 // Is this value an integer?
@@ -57,11 +57,11 @@ bool variant_t::is_array() const {
 }
 
 bool variant_t::is_string() const {
-  return type() == pton_variant_t::vtString;
+  return type() == PTON_STRING;
 }
 
 bool variant_t::is_blob() const {
-  return type() == pton_variant_t::vtBlob;
+  return type() == PTON_BLOB;
 }
 
 } // namespace plankton

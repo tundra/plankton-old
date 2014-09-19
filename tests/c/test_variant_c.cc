@@ -10,28 +10,28 @@ END_C_INCLUDES
 
 TEST(variant_c, simple) {
   pton_variant_t intger = pton_integer(10);
-  ASSERT_EQ(pton_variant_t::vtInteger, pton_type(intger));
+  ASSERT_EQ(PTON_INTEGER, pton_type(intger));
   ASSERT_EQ(10, pton_int64_value(intger));
   ASSERT_EQ(0, pton_string_length(intger));
   ASSERT_EQ(false, pton_bool_value(intger));
   ASSERT_TRUE(pton_string_chars(intger) == NULL);
   ASSERT_TRUE(pton_is_frozen(intger));
   pton_variant_t null = pton_null();
-  ASSERT_EQ(pton_variant_t::vtNull, pton_type(null));
+  ASSERT_EQ(PTON_NULL, pton_type(null));
   ASSERT_EQ(0, pton_int64_value(null));
   ASSERT_EQ(false, pton_bool_value(null));
   ASSERT_TRUE(pton_is_frozen(null));
   pton_variant_t str = pton_c_str("test");
-  ASSERT_EQ(pton_variant_t::vtString, pton_type(str));
+  ASSERT_EQ(PTON_STRING, pton_type(str));
   ASSERT_EQ(0, pton_int64_value(str));
   ASSERT_EQ(false, pton_bool_value(str));
   ASSERT_TRUE(pton_is_frozen(str));
   pton_variant_t yes = pton_true();
-  ASSERT_EQ(pton_variant_t::vtBool, pton_type(yes));
+  ASSERT_EQ(PTON_BOOL, pton_type(yes));
   ASSERT_EQ(true, pton_bool_value(yes));
   ASSERT_TRUE(pton_is_frozen(yes));
   pton_variant_t no = pton_false();
-  ASSERT_EQ(pton_variant_t::vtBool, pton_type(no));
+  ASSERT_EQ(PTON_BOOL, pton_type(no));
   ASSERT_EQ(false, pton_bool_value(no));
   ASSERT_TRUE(pton_is_frozen(no));
 }
@@ -66,7 +66,7 @@ TEST(variant_c, equality) {
 TEST(variant_c, blob) {
   uint8_t data[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
   pton_variant_t var = pton_blob(data, 10);
-  ASSERT_TRUE(pton_type(var) == pton_variant_t::vtBlob);
+  ASSERT_TRUE(pton_type(var) == PTON_BLOB);
   ASSERT_EQ(10, pton_blob_size(var));
   ASSERT_TRUE(pton_blob_data(var) == data);
 }

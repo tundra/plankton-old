@@ -151,7 +151,7 @@ pton_variant_t pton_new_array(pton_arena_t *arena) {
   return arena->new_array().to_c();
 }
 
-variant_t::variant_t(pton_variant_t::repr_tag_t tag, pton_arena_value_t *arena_value) {
+variant_t::variant_t(repr_tag_t tag, pton_arena_value_t *arena_value) {
   pton_variant_t value = VARIANT_INIT(tag, 0);
   value.payload_.as_arena_value_ = arena_value;
   value_ = value;
@@ -159,7 +159,7 @@ variant_t::variant_t(pton_variant_t::repr_tag_t tag, pton_arena_value_t *arena_v
 
 array_t pton_arena_t::new_array(uint32_t init_capacity) {
   pton_arena_array_t *data = alloc_value<pton_arena_array_t>();
-  variant_t result(pton_variant_t::rtArenaArray, new (data) pton_arena_array_t(this, init_capacity));
+  variant_t result(pton_variant_t::header_t::REPR_ARNA_ARRAY, new (data) pton_arena_array_t(this, init_capacity));
   return array_t(result);
 }
 
@@ -169,7 +169,7 @@ pton_variant_t pton_new_array_with_capacity(pton_arena_t *arena, uint32_t init_c
 
 map_t pton_arena_t::new_map() {
   pton_arena_map_t *data = alloc_value<pton_arena_map_t>();
-  variant_t result(pton_variant_t::rtArenaMap, new (data) pton_arena_map_t(this));
+  variant_t result(pton_variant_t::header_t::REPR_ARNA_MAP, new (data) pton_arena_map_t(this));
   return map_t(result);
 }
 
@@ -190,7 +190,7 @@ string_t pton_arena_t::new_string(const char *str, uint32_t length) {
   char *own_str = alloc_values<char>(length + 1);
   memcpy(own_str, str, length);
   own_str[length] = '\0';
-  variant_t result(pton_variant_t::rtArenaString, new (data) pton_arena_string_t(own_str, length, true));
+  variant_t result(pton_variant_t::header_t::REPR_ARNA_STRING, new (data) pton_arena_string_t(own_str, length, true));
   return string_t(result);
 }
 
@@ -202,7 +202,7 @@ string_t pton_arena_t::new_string(uint32_t length) {
   pton_arena_string_t *data = alloc_value<pton_arena_string_t>();
   char *own_str = alloc_values<char>(length + 1);
   memset(own_str, '\0', length + 1);
-  variant_t result(pton_variant_t::rtArenaString, new (data) pton_arena_string_t(own_str, length, false));
+  variant_t result(pton_variant_t::header_t::REPR_ARNA_STRING, new (data) pton_arena_string_t(own_str, length, false));
   return string_t(result);
 }
 
@@ -214,7 +214,7 @@ blob_t pton_arena_t::new_blob(const void *start, uint32_t size) {
   pton_arena_blob_t *data = alloc_value<pton_arena_blob_t>();
   uint8_t *own_start = alloc_values<uint8_t>(size);
   memcpy(own_start, start, size);
-  variant_t result(pton_variant_t::rtArenaBlob, new (data) pton_arena_blob_t(own_start, size, true));
+  variant_t result(pton_variant_t::header_t::REPR_ARNA_BLOB, new (data) pton_arena_blob_t(own_start, size, true));
   return blob_t(result);
 }
 
@@ -222,7 +222,7 @@ blob_t pton_arena_t::new_blob(uint32_t size) {
   pton_arena_blob_t *data = alloc_value<pton_arena_blob_t>();
   uint8_t *bytes = alloc_values<uint8_t>(size);
   memset(bytes, 0, size);
-  variant_t result(pton_variant_t::rtArenaBlob, new (data) pton_arena_blob_t(data, size, false));
+  variant_t result(pton_variant_t::header_t::REPR_ARNA_BLOB, new (data) pton_arena_blob_t(data, size, false));
   return blob_t(result);
 }
 
@@ -250,45 +250,45 @@ static void pton_check_binary_version(pton_variant_t variant) {
   }
 }
 
-pton_variant_t::type_t pton_type(pton_variant_t variant) {
+pton_type_t pton_type(pton_variant_t variant) {
   pton_check_binary_version(variant);
-  return static_cast<pton_variant_t::type_t>(variant.header_.repr_tag_ >> 4);
+  return static_cast<pton_type_t>(variant.header_.repr_tag_ >> 4);
 }
 
-pton_variant_t::type_t variant_t::type() const {
+pton_type_t variant_t::type() const {
   return pton_type(value_);
 }
 
 bool pton_variants_equal(pton_variant_t a, pton_variant_t b) {
   pton_check_binary_version(a);
   pton_check_binary_version(b);
-  pton_variant_t::type_t a_type = pton_type(a);
-  pton_variant_t::type_t b_type = pton_type(b);
+  pton_type_t a_type = pton_type(a);
+  pton_type_t b_type = pton_type(b);
   if (a_type != b_type)
     return false;
   switch (a_type) {
-    case pton_variant_t::vtInteger:
+    case PTON_INTEGER:
       return pton_int64_value(a) == pton_int64_value(b);
-    case pton_variant_t::vtString: {
+    case PTON_STRING: {
       uint32_t length = pton_string_length(a);
       if (pton_string_length(b) != length)
         return false;
       return strncmp(pton_string_chars(a), pton_string_chars(b), length) == 0;
     }
-    case pton_variant_t::vtBlob: {
+    case PTON_BLOB: {
       uint32_t size = pton_blob_size(a);
       if (pton_blob_size(b) != size)
         return false;
       return strncmp(static_cast<const char*>(pton_blob_data(a)),
           static_cast<const char*>(pton_blob_data(b)), size) == 0;
     }
-    case pton_variant_t::vtArray:
+    case PTON_ARRAY:
       return a.payload_.as_arena_array_ == b.payload_.as_arena_array_;
-    case pton_variant_t::vtMap:
+    case PTON_MAP:
       return a.payload_.as_arena_map_ == b.payload_.as_arena_map_;
-    case pton_variant_t::vtNull:
+    case PTON_NULL:
       return true;
-    case pton_variant_t::vtBool:
+    case PTON_BOOL:
       return a.header_.repr_tag_ == b.header_.repr_tag_;
     default:
       return false;
@@ -302,17 +302,17 @@ bool variant_t::operator==(variant_t that) {
 bool pton_is_frozen(pton_variant_t variant) {
   pton_check_binary_version(variant);
   switch (variant.header_.repr_tag_) {
-    case pton_variant_t::rtInteger:
-    case pton_variant_t::rtNull:
-    case pton_variant_t::rtTrue:
-    case pton_variant_t::rtFalse:
-    case pton_variant_t::rtExternalString:
-    case pton_variant_t::rtExternalBlob:
+    case pton_variant_t::header_t::REPR_INT64:
+    case pton_variant_t::header_t::REPR_NULL:
+    case pton_variant_t::header_t::REPR_TRUE:
+    case pton_variant_t::header_t::REPR_FALSE:
+    case pton_variant_t::header_t::REPR_EXTN_STRING:
+    case pton_variant_t::header_t::REPR_EXTN_BLOB:
       return true;
-    case pton_variant_t::rtArenaArray:
-    case pton_variant_t::rtArenaMap:
-    case pton_variant_t::rtArenaString:
-    case pton_variant_t::rtArenaBlob:
+    case pton_variant_t::header_t::REPR_ARNA_ARRAY:
+    case pton_variant_t::header_t::REPR_ARNA_MAP:
+    case pton_variant_t::header_t::REPR_ARNA_STRING:
+    case pton_variant_t::header_t::REPR_ARNA_BLOB:
       return variant.payload_.as_arena_value_->is_frozen();
     default:
       return false;
@@ -326,10 +326,10 @@ bool variant_t::is_frozen() {
 void pton_ensure_frozen(pton_variant_t variant) {
   pton_check_binary_version(variant);
   switch (variant.header_.repr_tag_) {
-    case pton_variant_t::rtArenaArray:
-    case pton_variant_t::rtArenaMap:
-    case pton_variant_t::rtArenaString:
-    case pton_variant_t::rtArenaBlob:
+    case pton_variant_t::header_t::REPR_ARNA_ARRAY:
+    case pton_variant_t::header_t::REPR_ARNA_MAP:
+    case pton_variant_t::header_t::REPR_ARNA_STRING:
+    case pton_variant_t::header_t::REPR_ARNA_BLOB:
       variant.payload_.as_arena_value_->ensure_frozen();
       break;
     default:
@@ -413,7 +413,7 @@ variant_t pton_arena_array_t::get(uint32_t index) {
 map_t::map_t(variant_t variant) : variant_t() {
   // Initialize this to the null value and then, if the given variant is a map,
   // override with the variant's state.
-  if (variant.type() == pton_variant_t::vtMap)
+  if (variant.type() == PTON_MAP)
     *static_cast<variant_t*>(this) = variant;
 }
 
@@ -506,9 +506,9 @@ variant_t pton_arena_map_t::get(variant_t key) const {
 uint32_t pton_string_length(pton_variant_t variant) {
   pton_check_binary_version(variant);
   switch (variant.header_.repr_tag_) {
-  case pton_variant_t::rtExternalString:
+  case pton_variant_t::header_t::REPR_EXTN_STRING:
     return variant.header_.length_;
-  case pton_variant_t::rtArenaString:
+  case pton_variant_t::header_t::REPR_ARNA_STRING:
     return variant.payload_.as_arena_string_->length();
   default:
     return 0;
@@ -522,9 +522,9 @@ uint32_t variant_t::string_length() const {
 const char *pton_string_chars(pton_variant_t variant) {
   pton_check_binary_version(variant);
   switch (variant.header_.repr_tag_) {
-    case pton_variant_t::rtExternalString:
+    case pton_variant_t::header_t::REPR_EXTN_STRING:
       return variant.payload_.as_external_string_chars_;
-    case pton_variant_t::rtArenaString:
+    case pton_variant_t::header_t::REPR_ARNA_STRING:
       return variant.payload_.as_arena_string_->chars();
     default:
       return NULL;
@@ -578,9 +578,9 @@ pton_arena_blob_t::pton_arena_blob_t(void *data, uint32_t size, bool is_frozen)
 uint32_t pton_blob_size(pton_variant_t variant) {
   pton_check_binary_version(variant);
   switch (variant.header_.repr_tag_) {
-    case pton_variant_t::rtExternalBlob:
+    case pton_variant_t::header_t::REPR_EXTN_BLOB:
       return variant.header_.length_;
-    case pton_variant_t::rtArenaBlob:
+    case pton_variant_t::header_t::REPR_ARNA_BLOB:
       return variant.payload_.as_arena_blob_->size();
     default:
       return 0;
@@ -594,9 +594,9 @@ uint32_t variant_t::blob_size() const {
 const void *pton_blob_data(pton_variant_t variant) {
   pton_check_binary_version(variant);
   switch (variant.header_.repr_tag_) {
-    case pton_variant_t::rtExternalBlob:
+    case pton_variant_t::header_t::REPR_EXTN_BLOB:
       return variant.payload_.as_external_blob_data_;
-    case pton_variant_t::rtArenaBlob:
+    case pton_variant_t::header_t::REPR_ARNA_BLOB:
       return variant.payload_.as_arena_blob_->data();
     default:
       return NULL;
@@ -668,22 +668,22 @@ bool pton_sink_t::set(variant_t value) {
 
 bool pton_is_integer(pton_variant_t variant) {
   pton_check_binary_version(variant);
-  return variant.header_.repr_tag_ == pton_variant_t::rtInteger;
+  return variant.header_.repr_tag_ == pton_variant_t::header_t::REPR_INT64;
 }
 
 bool pton_is_array(pton_variant_t variant) {
   pton_check_binary_version(variant);
-  return variant.header_.repr_tag_ == pton_variant_t::rtArenaArray;
+  return variant.header_.repr_tag_ == pton_variant_t::header_t::REPR_ARNA_ARRAY;
 }
 
 bool pton_is_map(pton_variant_t variant) {
   pton_check_binary_version(variant);
-  return variant.header_.repr_tag_ == pton_variant_t::rtArenaMap;
+  return variant.header_.repr_tag_ == pton_variant_t::header_t::REPR_ARNA_MAP;
 }
 
 bool pton_bool_value(pton_variant_t variant) {
   pton_check_binary_version(variant);
-  return variant.header_.repr_tag_ == pton_variant_t::rtTrue;
+  return variant.header_.repr_tag_ == pton_variant_t::header_t::REPR_TRUE;
 }
 
 int64_t pton_int64_value(pton_variant_t variant) {
@@ -692,35 +692,35 @@ int64_t pton_int64_value(pton_variant_t variant) {
 }
 
 pton_variant_t pton_null() {
-  pton_variant_t result = VARIANT_INIT(pton_variant_t::rtNull, 0);
+  pton_variant_t result = VARIANT_INIT(pton_variant_t::header_t::REPR_NULL, 0);
   return result;
 }
 
 pton_variant_t pton_true() {
-  pton_variant_t result = VARIANT_INIT(pton_variant_t::rtTrue, 0);
+  pton_variant_t result = VARIANT_INIT(pton_variant_t::header_t::REPR_TRUE, 0);
   return result;
 }
 
 pton_variant_t pton_false() {
-  pton_variant_t result = VARIANT_INIT(pton_variant_t::rtFalse, 0);
+  pton_variant_t result = VARIANT_INIT(pton_variant_t::header_t::REPR_FALSE, 0);
   return result;
 }
 
 pton_variant_t pton_bool(bool value) {
   pton_variant_t result = VARIANT_INIT(
-      value ? pton_variant_t::rtTrue : pton_variant_t::rtFalse,
+      value ? pton_variant_t::header_t::REPR_TRUE : pton_variant_t::header_t::REPR_FALSE,
       0);
   return result;
 }
 
 pton_variant_t pton_integer(int64_t value) {
-  pton_variant_t result = VARIANT_INIT(pton_variant_t::rtInteger, 0);
+  pton_variant_t result = VARIANT_INIT(pton_variant_t::header_t::REPR_INT64, 0);
   result.payload_.as_int64_ = value;
   return result;
 }
 
 pton_variant_t pton_string(const char *chars, uint32_t length) {
-  pton_variant_t result = VARIANT_INIT(pton_variant_t::rtExternalString,
+  pton_variant_t result = VARIANT_INIT(pton_variant_t::header_t::REPR_EXTN_STRING,
       length);
   result.payload_.as_external_string_chars_ = chars;
   return result;
@@ -731,7 +731,7 @@ pton_variant_t pton_c_str(const char *chars) {
 }
 
 pton_variant_t pton_blob(const void *data, uint32_t size) {
-  pton_variant_t result = VARIANT_INIT(pton_variant_t::rtExternalBlob,
+  pton_variant_t result = VARIANT_INIT(pton_variant_t::header_t::REPR_EXTN_BLOB,
       size);
   result.payload_.as_external_blob_data_ = data;
   return result;

@@ -171,19 +171,19 @@ void VariantWriter::flush(BinaryWriter *writer) {
 
 void VariantWriter::encode(variant_t value) {
   switch (value.type()) {
-    case pton_variant_t::vtArray:
+    case PTON_ARRAY:
       encode_array(array_t(value));
       break;
-    case pton_variant_t::vtMap:
+    case PTON_MAP:
       encode_map(map_t(value));
       break;
-    case pton_variant_t::vtBool:
+    case PTON_BOOL:
       assm()->emit_bool(value.bool_value());
       break;
-    case pton_variant_t::vtInteger:
+    case PTON_INTEGER:
       assm()->emit_int64(value.integer_value());
       break;
-    case pton_variant_t::vtNull:
+    case PTON_NULL:
     default:
       assm()->emit_null();
       break;
