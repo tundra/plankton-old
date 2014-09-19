@@ -81,3 +81,7 @@ TEST(variant_cpp, blob) {
   ASSERT_EQ(10, var.blob_size());
   ASSERT_TRUE(var.blob_data() == data);
 }
+
+TEST(variant_cpp, size) {
+  ASSERT_TRUE(sizeof(variant_t) <= (3 * WORD_SIZE));
+}

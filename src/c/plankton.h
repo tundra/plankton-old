@@ -17,6 +17,8 @@ struct pton_arena_value_t;
 struct pton_assembler_t;
 struct pton_sink_t;
 
+// The contents of a variant. This is the part that changes depending on the
+// type of the variant.
 union pton_variant_payload_t {
   int64_t as_integer_;
   struct {
@@ -34,6 +36,9 @@ union pton_variant_payload_t {
   pton_arena_blob_t *as_arena_blob_;
 };
 
+// A value that encodes a value and the value's type. It provides a uniform
+// interface that abstracts over all the different types that can be encoded
+// to and decoded from plankton.
 struct pton_variant_t {
   // Tags that identify the internal representation of variants.
   enum repr_tag_t {

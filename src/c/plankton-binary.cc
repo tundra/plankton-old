@@ -8,6 +8,8 @@
 
 using namespace plankton;
 
+// Implementation of the type declared in the C header. This is the actual
+// assembler implementation, the C++ wrapper delegates to this one.
 struct pton_assembler_t : public BinaryImplUtils {
 public:
   // Write the given value to the stream.
@@ -137,6 +139,10 @@ BinaryWriter::~BinaryWriter() {
   bytes_ = NULL;
 }
 
+// Utility that holds the state used when encoding a variant as plankton. The
+// difference between this and a BinaryWriter is that the binary writer's
+// lifetime is controlled by the client, the variant writer is created to write
+// one variant and then torn down.
 class VariantWriter {
 public:
   VariantWriter(Assembler *assm) : assm_(assm) { }
