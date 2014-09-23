@@ -158,17 +158,12 @@ bool pton_assembler_t::write_int64(int64_t value) {
 }
 
 bool pton_assembler_t::write_uint64(uint64_t value) {
-  if (value >= 0x80) {
-    write_byte((value & 0x7F) | 0x80);
-    uint64_t current = (value >> 7) - 1;
-    while (current >= 0x80) {
-      write_byte((current & 0x7F) | 0x80);
-      current = (current >> 7) - 1;
-    }
-    write_byte(current);
-  } else {
-    write_byte(value);
+  uint64_t current = value;
+  while (current >= 0x80) {
+    write_byte((current & 0x7F) | 0x80);
+    current = (current >> 7) - 1;
   }
+  write_byte(current);
   return true;
 }
 
@@ -404,7 +399,7 @@ uint64_t BinaryReaderImpl::read_uint64() {
     uint64_t result = (next & 0x7F);
     uint64_t offset = 7;
     while (has_more()) {
-      uint8_t next = read_byte();
+      next = read_byte();
       uint64_t payload = ((next & 0x7F) + 1);
       result = result + (payload << offset);
       if (next < 0x80)

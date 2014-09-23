@@ -72,12 +72,10 @@ class EncodingAssembler(object):
     # Writes a naked unsigned int32.
   def _encode_uint32(self, value):
     assert value >= 0
-    while value > 0x7F:
-      part = value & 0x7F
-      self._add_byte(part | 0x80)
-      value = value >> 7
+    while value >= 0x80:
+      self._add_byte((value & 0x7F) | 0x80)
+      value = (value >> 7) - 1
     self._add_byte(value)
-
 
 # Encapsulates state relevant to writing plankton data.
 class DataOutputStream(object):
@@ -243,14 +241,19 @@ class DataInputStream(object):
 
   # Reads a naked unsigned from the stream.
   def _decode_uint32(self):
-    current = 0xFF
-    result = 0
-    offset = 0
-    while (current & 0x80) != 0:
-      current = self._get_byte()
-      result = result | ((current & 0x7f) << offset)
-      offset += 7
-    return result
+    next = self._get_byte()
+    if next >= 0x80:
+      result = (next & 0x7F)
+      offset = 7
+      while True:
+        next = self._get_byte()
+        payload = (next & 0x7F) + 1
+        result = result + (payload << offset)
+        if next < 0x80:
+          return result
+        offset += 7
+    else:
+      return next
 
   # Reads a naked integer from the stream.
   def _decode_int32(self):
