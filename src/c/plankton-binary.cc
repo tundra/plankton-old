@@ -37,7 +37,7 @@ public:
 
   bool emit_reference(uint64_t offset);
 
-  memory_block_t flush();
+  memory_block_t peek_code();
 
 private:
   // Write a single byte to the stream.
@@ -132,15 +132,12 @@ bool pton_assembler_emit_reference(pton_assembler_t *assm, uint64_t offset) {
   return assm->emit_reference(offset);
 }
 
-memory_block_t pton_assembler_t::flush() {
-  return new_memory_block(bytes_.release(), bytes_.length());
+memory_block_t pton_assembler_t::peek_code() {
+  return new_memory_block(*bytes_, bytes_.length());
 }
 
-bool pton_assembler_flush(pton_assembler_t *assm, uint8_t **memory_out, size_t *size_out) {
-  memory_block_t data = assm->flush();
-  *memory_out = static_cast<uint8_t*>(data.memory);
-  *size_out = data.size;
-  return true;
+memory_block_t pton_assembler_peek_code(pton_assembler_t *assm) {
+  return assm->peek_code();
 }
 
 void pton_dispose_assembler(pton_assembler_t *assm) {
@@ -203,9 +200,10 @@ private:
 };
 
 void VariantWriter::flush(BinaryWriter *writer) {
-  memory_block_t memory = assm()->flush();
-  writer->size_ = memory.size;
-  writer->bytes_ = static_cast<uint8_t*>(memory.memory);
+  memory_block_t live = assm()->peek_code();
+  writer->size_ = live.size;
+  writer->bytes_ = new uint8_t[live.size];
+  memcpy(writer->bytes_, live.memory, live.size);
 }
 
 void VariantWriter::encode(variant_t value) {

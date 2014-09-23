@@ -6,6 +6,7 @@
 #ifndef _PLANKTON_H
 #define _PLANKTON_H
 
+#include "utils/alloc.h"
 #include "stdc.h"
 
 typedef struct pton_arena_array_t pton_arena_array_t;
@@ -261,10 +262,9 @@ bool pton_assembler_emit_utf8(pton_assembler_t *assm, const char *chars,
 // Writes a reference to the previously seen object at the given offset.
 bool pton_assembler_emit_reference(pton_assembler_t *assm, uint64_t offset);
 
-// Flushes the given assembler, writing the output into the given parameters.
-// The caller assumes ownership of the returned array and is responsible for
-// freeing it. This doesn't free the assembler, it must still be disposed with
-// pton_dispose_assembler.
-bool pton_assembler_flush(pton_assembler_t *assm, uint8_t **memory_out, size_t *size_out);
+// Returns the code written by the assembler. The result is still owned by the
+// assembler and any further modification invalidates a previously peeked
+// result. Typically you'll want to immediately copy the data away.
+memory_block_t pton_assembler_peek_code(pton_assembler_t *assm);
 
 #endif // _PLANKTON_H

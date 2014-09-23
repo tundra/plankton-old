@@ -389,12 +389,7 @@ public:
   // The caller assumes ownership of the returned array and is responsible for
   // freeing it. This doesn't free the assembler, it must still be disposed with
   // pton_dispose_assembler.
-  memory_block_t flush() {
-    uint8_t *memory = 0;
-    size_t size = 0;
-    pton_assembler_flush(assm_, &memory, &size);
-    return new_memory_block(memory, size);
-  }
+  memory_block_t peek_code() { return pton_assembler_peek_code(assm_); }
 
 private:
   pton_assembler_t *assm_;
