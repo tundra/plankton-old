@@ -35,19 +35,19 @@ typedef enum pton_type_t {
 // to and decoded from plankton.
 typedef struct {
   // The header of the variant. This part is the same in all variants.
-  struct header_t {
+  struct pton_variant_header_t {
     // The tag that identifies what kind of variant we're dealing with.
-    enum repr_tag_t {
-        REPR_INT64 = 0x10,
-        REPR_EXTN_STRING = 0x20,
-        REPR_ARNA_STRING = 0x21,
-        REPR_EXTN_BLOB = 0x30,
-        REPR_ARNA_BLOB = 0x31,
-        REPR_NULL = 0x40,
-        REPR_TRUE = 0x50,
-        REPR_FALSE = 0x51,
-        REPR_ARNA_ARRAY = 0x60,
-        REPR_ARNA_MAP = 0x70
+    enum pton_variant_repr_tag_t {
+        PTON_REPR_INT64 = 0x10,
+        PTON_REPR_EXTN_STRING = 0x20,
+        PTON_REPR_ARNA_STRING = 0x21,
+        PTON_REPR_EXTN_BLOB = 0x30,
+        PTON_REPR_ARNA_BLOB = 0x31,
+        PTON_REPR_NULL = 0x40,
+        PTON_REPR_TRUE = 0x50,
+        PTON_REPR_FALSE = 0x51,
+        PTON_REPR_ARNA_ARRAY = 0x60,
+        PTON_REPR_ARNA_MAP = 0x70
     } repr_tag_ IF_MSVC(, : 8);
     // A tag used to identify the version of plankton that produced this value.
     // All variants returned from a binary plankton implementation will have the
@@ -266,5 +266,37 @@ bool pton_assembler_emit_reference(pton_assembler_t *assm, uint64_t offset);
 // assembler and any further modification invalidates a previously peeked
 // result. Typically you'll want to immediately copy the data away.
 memory_block_t pton_assembler_peek_code(pton_assembler_t *assm);
+
+// Describes an individual binary plankton code instruction.
+typedef struct {
+  enum pton_instr_opcode_t {
+    PTON_OPCODE_INT64,
+    PTON_OPCODE_UTF8,
+    PTON_OPCODE_BEGIN_ARRAY,
+    PTON_OPCODE_BEGIN_MAP,
+    PTON_OPCODE_NULL,
+    PTON_OPCODE_BOOL,
+    PTON_OPCODE_BEGIN_OBJECT,
+    PTON_OPCODE_REFERENCE,
+    PTON_OPCODE_BEGIN_ENVIRONMENT_REFERENCE
+  } opcode;
+  size_t size;
+  union pton_instr_payload_t {
+    bool bool_value;
+    int64_t int64_value;
+    uint64_t array_length;
+    uint64_t map_size;
+    struct {
+      uint64_t length;
+      uint8_t *contents;
+    } string_data;
+    uint64_t reference_offset;
+  } payload;
+} pton_instr_t;
+
+// Decodes the plankton instruction starting at the given code pointer and
+// extending no more than the given size. The output is written into the output
+// parameter. Returns true if disassembling succeeded, false if not.
+bool pton_decode_next_instruction(uint8_t *code, size_t size, pton_instr_t *instr_out);
 
 #endif // _PLANKTON_H

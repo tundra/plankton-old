@@ -25,7 +25,7 @@ public:
     boFalse = 6,
     boObject = 7,
     boReference = 8,
-    boEnvironmentReference = 9
+    boBeginEnvironmentReference = 9
   };
 };
 

@@ -38,7 +38,7 @@ bool variant_t::bool_value() const {
 }
 
 variant_t::operator bool() const {
-  return repr_tag() != pton_variant_t::header_t::REPR_NULL;
+  return repr_tag() != header_t::PTON_REPR_NULL;
 }
 
 // Is this value an integer?

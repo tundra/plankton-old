@@ -61,8 +61,9 @@ private:
 // array_t::length. Semantically this is equivalent but it makes your
 // assumptions clear and the code more concise.
 class variant_t {
-private:
 public:
+  typedef pton_variant_t::pton_variant_header_t header_t;
+
   // Initializes a variant representing null.
   inline variant_t() : value_(pton_null()) { }
 
@@ -235,7 +236,7 @@ protected:
   friend class sink_t;
   pton_variant_t value_;
 
-  typedef pton_variant_t::header_t::repr_tag_t repr_tag_t;
+  typedef pton_variant_t::pton_variant_header_t::pton_variant_repr_tag_t repr_tag_t;
 
   // Convenience accessor for the representation tag.
   repr_tag_t repr_tag() const { return value_.header_.repr_tag_; }

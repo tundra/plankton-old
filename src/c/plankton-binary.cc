@@ -85,7 +85,7 @@ bool pton_assembler_begin_object(pton_assembler_t *assm) {
 }
 
 bool pton_assembler_t::begin_environment_reference() {
-  return write_byte(boEnvironmentReference);
+  return write_byte(boBeginEnvironmentReference);
 }
 
 bool pton_assembler_begin_environment_reference(pton_assembler_t *assm) {
@@ -265,23 +265,11 @@ private:
   // Returns true iff there are more bytes to return.
   bool has_more() { return cursor_ < size_; }
 
-  // Advances past and returns the current byte.
-  uint8_t read_byte() { return data_[cursor_++]; }
-
-  // Advances past and returns the current varint encoded unsigned int64.
-  uint64_t read_uint64();
-
-  // Advances past and returns the current varint encoded signed int64.
-  int64_t read_int64();
-
-  // Read a tagged integer's payload.
-  bool decode_integer(variant_t *result_out);
-
   // Read an array's payload.
-  bool decode_array(variant_t *result_out);
+  bool decode_array(uint64_t length, variant_t *result_out);
 
   // Read a map's payload.
-  bool decode_map(variant_t *result_out);
+  bool decode_map(uint64_t size, variant_t *result_out);
 
   // Succeeds parsing of some expression, returning true.
   bool succeed(variant_t value, variant_t *out);
@@ -298,65 +286,100 @@ BinaryReaderImpl::BinaryReaderImpl(const void *data, size_t size, BinaryReader *
   , data_(static_cast<const uint8_t*>(data))
   , reader_(reader) { }
 
-bool BinaryReaderImpl::decode(variant_t *result_out) {
+// Utility for decoding an individual instruction.
+class InstrDecoder {
+public:
+  InstrDecoder(uint8_t *data, size_t size) : data_(data), size_(size), cursor_(0) { }
+
+  // Returns true iff there are more bytes to return.
+  bool has_more() { return cursor_ < size_; }
+
+  // Returns true iff this decode has data enough that a block of the given size
+  // can be read.
+  bool has_data(size_t required) { return (cursor_ + required) <= size_; }
+
+  // Advances past and returns the current byte.
+  uint8_t read_byte() { return data_[cursor_++]; }
+
+  bool decode(pton_instr_t *instr_out);
+
+  bool decode_int64(int64_t *result_out);
+
+  bool decode_uint64(uint64_t *result_out);
+
+private:
+  uint8_t *data_;
+  size_t size_;
+  size_t cursor_;
+};
+
+bool InstrDecoder::decode(pton_instr_t *instr_out) {
   if (!has_more())
     return false;
   uint8_t opcode = read_byte();
   switch (opcode) {
-    case boTrue:
-      return succeed(variant_t::yes(), result_out);
-    case boFalse:
-      return succeed(variant_t::no(), result_out);
-    case boNull:
-      return succeed(variant_t::null(), result_out);
-    case boInteger:
-      return decode_integer(result_out);
-    case boArray:
-      return decode_array(result_out);
-    case boMap:
-      return decode_map(result_out);
+    case BinaryImplUtils::boInteger:
+      if (!decode_int64(&instr_out->payload.int64_value))
+        return false;
+      instr_out->opcode = pton_instr_t::PTON_OPCODE_INT64;
+      break;
+    case BinaryImplUtils::boUtf8: {
+      uint64_t length = 0;
+      if (!decode_uint64(&length))
+        return false;
+      if (!has_data(length))
+        return false;
+      instr_out->opcode = pton_instr_t::PTON_OPCODE_UTF8;
+      instr_out->payload.string_data.length = length;
+      instr_out->payload.string_data.contents = data_ + cursor_;
+      cursor_ += length;
+      break;
+    }
+    case BinaryImplUtils::boArray:
+      if (!decode_uint64(&instr_out->payload.array_length))
+        return false;
+      instr_out->opcode = pton_instr_t::PTON_OPCODE_BEGIN_ARRAY;
+      break;
+    case BinaryImplUtils::boMap:
+      if (!decode_uint64(&instr_out->payload.map_size))
+        return false;
+      instr_out->opcode = pton_instr_t::PTON_OPCODE_BEGIN_MAP;
+      break;
+    case BinaryImplUtils::boNull:
+      instr_out->opcode = pton_instr_t::PTON_OPCODE_NULL;
+      instr_out->size = 1;
+      break;
+    case BinaryImplUtils::boTrue:
+    case BinaryImplUtils::boFalse:
+      instr_out->opcode = pton_instr_t::PTON_OPCODE_BOOL;
+      instr_out->payload.bool_value = (opcode == BinaryImplUtils::boTrue);
+      break;
+    case BinaryImplUtils::boObject:
+      instr_out->opcode = pton_instr_t::PTON_OPCODE_BEGIN_OBJECT;
+      break;
+    case BinaryImplUtils::boReference:
+      if (!decode_uint64(&instr_out->payload.reference_offset))
+        return false;
+      instr_out->opcode = pton_instr_t::PTON_OPCODE_REFERENCE;
+      break;
+    case BinaryImplUtils::boBeginEnvironmentReference:
+      instr_out->opcode = pton_instr_t::PTON_OPCODE_BEGIN_ENVIRONMENT_REFERENCE;
+      break;
     default:
+      fprintf(stderr, "Unknown instruction %i\n", opcode);
+      fflush(stderr);
       return false;
   }
+  instr_out->size = cursor_;
+  return true;
 }
 
-bool BinaryReaderImpl::decode_integer(variant_t *result_out) {
-  int64_t value = read_int64();
-  return succeed(variant_t::integer(value), result_out);
-}
-
-bool BinaryReaderImpl::decode_array(variant_t *result_out) {
-  uint64_t length = read_uint64();
-  array_t result = reader_->arena_->new_array(length);
-  for (size_t i = 0; i < length; i++) {
-    variant_t elm;
-    if (!decode(&elm))
-      return false;
-    result.add(elm);
-  }
-  result.ensure_frozen();
-  return succeed(result, result_out);
-}
-
-bool BinaryReaderImpl::decode_map(variant_t *result_out) {
-  uint64_t size = read_uint64();
-  map_t result = reader_->arena_->new_map();
-  for (size_t i = 0; i < size; i++) {
-    variant_t key;
-    if (!decode(&key))
-      return false;
-    variant_t value;
-    if (!decode(&value))
-      return false;
-    result.set(key, value);
-  }
-  result.ensure_frozen();
-  return succeed(result, result_out);
-}
-
-int64_t BinaryReaderImpl::read_int64() {
-  uint64_t zigzag = read_uint64();
-  return (zigzag >> 1) ^ (-(zigzag & 1));
+bool InstrDecoder::decode_int64(int64_t *result_out) {
+  uint64_t zigzag = 0;
+  if (!decode_uint64(&zigzag))
+    return false;
+  *result_out = (zigzag >> 1) ^ (-(zigzag & 1));
+  return true;
 }
 
 // The wire encoding of unsigned integers is similar to protobuf varints with
@@ -389,19 +412,74 @@ int64_t BinaryReaderImpl::read_int64() {
 // This is also slightly more space efficient -- without the bias two bytes will
 // hold up to 16383, with the bias it's 16511, but that's in the order of less
 // than 1% so it hardly matters.
-uint64_t BinaryReaderImpl::read_uint64() {
+bool InstrDecoder::decode_uint64(uint64_t *result_out) {
   if (!has_more())
-    return 0;
+    return false;
   uint8_t next = read_byte();
   uint64_t result = (next & 0x7F);
   uint64_t offset = 7;
-  while (next >= 0x80 && has_more()) {
+  while (next >= 0x80) {
+    if (!has_more())
+      return false;
     next = read_byte();
     uint64_t payload = ((next & 0x7F) + 1);
     result = result + (payload << offset);
     offset += 7;
   }
-  return result;
+  *result_out = result;
+  return true;
+}
+
+
+bool BinaryReaderImpl::decode(variant_t *result_out) {
+  if (!has_more())
+    return false;
+  pton_instr_t instr;
+  if (!pton_decode_next_instruction(const_cast<uint8_t*>(data_ + cursor_),
+      size_ - cursor_, &instr))
+    return false;
+  cursor_ += instr.size;
+  switch (instr.opcode) {
+    case pton_instr_t::PTON_OPCODE_INT64:
+      return succeed(variant_t::integer(instr.payload.int64_value), result_out);
+    case pton_instr_t::PTON_OPCODE_BEGIN_ARRAY:
+      return decode_array(instr.payload.array_length, result_out);
+    case pton_instr_t::PTON_OPCODE_BEGIN_MAP:
+      return decode_map(instr.payload.map_size, result_out);
+    case pton_instr_t::PTON_OPCODE_NULL:
+      return succeed(variant_t::null(), result_out);
+    case pton_instr_t::PTON_OPCODE_BOOL:
+      return succeed(variant_t::boolean(instr.payload.bool_value), result_out);
+    default:
+      return false;
+  }
+}
+
+bool BinaryReaderImpl::decode_array(uint64_t length, variant_t *result_out) {
+  array_t result = reader_->arena_->new_array(length);
+  for (size_t i = 0; i < length; i++) {
+    variant_t elm;
+    if (!decode(&elm))
+      return false;
+    result.add(elm);
+  }
+  result.ensure_frozen();
+  return succeed(result, result_out);
+}
+
+bool BinaryReaderImpl::decode_map(uint64_t size, variant_t *result_out) {
+  map_t result = reader_->arena_->new_map();
+  for (size_t i = 0; i < size; i++) {
+    variant_t key;
+    if (!decode(&key))
+      return false;
+    variant_t value;
+    if (!decode(&value))
+      return false;
+    result.set(key, value);
+  }
+  result.ensure_frozen();
+  return succeed(result, result_out);
 }
 
 bool BinaryReaderImpl::succeed(variant_t value, variant_t *out) {
@@ -420,3 +498,8 @@ variant_t BinaryReader::parse(const void *data, size_t size) {
 }
 
 } // namespace plankton
+
+bool pton_decode_next_instruction(uint8_t *code, size_t size, pton_instr_t *instr_out) {
+  InstrDecoder in(code, size);
+  return in.decode(instr_out);
+}
