@@ -70,3 +70,9 @@ TEST(variant_c, blob) {
   ASSERT_EQ(10, pton_blob_size(var));
   ASSERT_TRUE(pton_blob_data(var) == data);
 }
+
+TEST(variant_c, string_encoding) {
+  pton_variant_t variant = pton_c_str("foo");
+  pton_variant_t utf8 = pton_c_str("utf-8");
+  ASSERT_TRUE(pton_variants_equal(utf8, pton_string_encoding(variant)));
+}

@@ -81,8 +81,12 @@ TEST(arena_cpp, map) {
 
 TEST(arena_cpp, mutstring) {
   arena_t arena;
-  variant_t var = arena.new_string(3);
-  ASSERT_FALSE(var.is_frozen());
+  plankton::string_t varu8 = arena.new_string(3);
+  ASSERT_FALSE(varu8.is_frozen());
+  ASSERT_TRUE(varu8.encoding() == variant_t::default_string_encoding());
+  plankton::string_t varai = arena.new_string(3, "ascii");
+  ASSERT_FALSE(varai.is_frozen());
+  ASSERT_TRUE(varai.encoding() == variant_t("ascii"));
 }
 
 TEST(arena_cpp, sink) {

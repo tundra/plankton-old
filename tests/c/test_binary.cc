@@ -96,3 +96,19 @@ TEST(binary, map) {
   ASSERT_TRUE(map.set(8, inner));
   CHECK_BINARY(map);
 }
+
+TEST(binary, strings) {
+  CHECK_BINARY("");
+  CHECK_BINARY(variant_t::string("foo", 2));
+  CHECK_BINARY(variant_t::string("\0\0\0", 3));
+}
+
+TEST(binary, string_encodings) {
+  arena_t arena;
+  variant_t str = arena.new_string("foo", 3, "test-encoding");
+  BinaryWriter writer;
+  writer.write(str);
+  BinaryReader reader(&arena);
+  variant_t decoded = reader.parse(*writer, writer.size());
+  ASSERT_TRUE(decoded.string_encoding() == variant_t("test-encoding"));
+}

@@ -33,7 +33,9 @@ public:
 
   bool emit_int64(int64_t value);
 
-  bool emit_utf8(const char *chars, uint32_t length);
+  bool emit_default_string(const char *chars, uint32_t length);
+
+  bool begin_string_with_encoding(const void *chars, uint32_t length);
 
   bool emit_reference(uint64_t offset);
 
@@ -112,16 +114,28 @@ bool pton_assembler_emit_int64(pton_assembler_t *assm, int64_t value) {
   return assm->emit_int64(value);
 }
 
-bool pton_assembler_t::emit_utf8(const char *chars, uint32_t length) {
-  write_byte(boUtf8);
+bool pton_assembler_t::emit_default_string(const char *chars, uint32_t length) {
+  write_byte(boDefaultString);
   write_uint64(length);
   bytes_.write(reinterpret_cast<const uint8_t*>(chars), length);
   return true;
 }
 
-bool pton_assembler_emit_utf8(pton_assembler_t *assm, const char *chars,
+bool pton_assembler_emit_default_string(pton_assembler_t *assm, const char *chars,
     uint32_t length) {
-  return assm->emit_utf8(chars, length);
+  return assm->emit_default_string(chars, length);
+}
+
+bool pton_assembler_t::begin_string_with_encoding(const void *chars, uint32_t length) {
+  write_byte(boBeginStringWithEncoding);
+  write_uint64(length);
+  bytes_.write(static_cast<const uint8_t*>(chars), length);
+  return true;
+}
+
+bool pton_assembler_begin_string_with_encoding(pton_assembler_t *assm,
+    void *chars, uint32_t length) {
+  return assm->begin_string_with_encoding(chars, length);
 }
 
 bool pton_assembler_t::emit_reference(uint64_t offset) {
@@ -192,6 +206,8 @@ public:
 
   void encode_array(array_t value);
 
+  void encode_string(string_t value);
+
   void encode_map(map_t value);
 
 private:
@@ -211,6 +227,9 @@ void VariantWriter::encode(variant_t value) {
     case PTON_ARRAY:
       encode_array(array_t(value));
       break;
+    case PTON_STRING:
+      encode_string(string_t(value));
+      break;
     case PTON_MAP:
       encode_map(map_t(value));
       break;
@@ -224,6 +243,17 @@ void VariantWriter::encode(variant_t value) {
     default:
       assm()->emit_null();
       break;
+  }
+}
+
+void VariantWriter::encode_string(string_t value) {
+  size_t length = value.length();
+  variant_t encoding = value.encoding();
+  if (encoding == variant_t::default_string_encoding()) {
+    assm()->emit_default_string(value.chars(), length);
+  } else {
+    assm()->begin_string_with_encoding(value.chars(), length);
+    encode(encoding);
   }
 }
 
@@ -270,6 +300,12 @@ private:
 
   // Read a map's payload.
   bool decode_map(uint64_t size, variant_t *result_out);
+
+  // Convert default-encoding string data into a string variant.
+  bool decode_default_string(pton_instr_t *instr, variant_t *result_out);
+
+  // Convert a custom-encoding string data into a string variant.
+  bool decode_string_with_encoding(pton_instr_t *instr, variant_t *result_out);
 
   // Succeeds parsing of some expression, returning true.
   bool succeed(variant_t value, variant_t *out);
@@ -323,15 +359,27 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
         return false;
       instr_out->opcode = pton_instr_t::PTON_OPCODE_INT64;
       break;
-    case BinaryImplUtils::boUtf8: {
+    case BinaryImplUtils::boDefaultString: {
       uint64_t length = 0;
       if (!decode_uint64(&length))
         return false;
       if (!has_data(length))
         return false;
-      instr_out->opcode = pton_instr_t::PTON_OPCODE_UTF8;
-      instr_out->payload.string_data.length = length;
-      instr_out->payload.string_data.contents = data_ + cursor_;
+      instr_out->opcode = pton_instr_t::PTON_OPCODE_DEFAULT_STRING;
+      instr_out->payload.default_string_data.length = length;
+      instr_out->payload.default_string_data.contents = data_ + cursor_;
+      cursor_ += length;
+      break;
+    }
+    case BinaryImplUtils::boBeginStringWithEncoding: {
+      uint64_t length = 0;
+      if (!decode_uint64(&length))
+        return false;
+      if (!has_data(length))
+        return false;
+      instr_out->opcode = pton_instr_t::PTON_OPCODE_BEGIN_STRING_WITH_ENCODING;
+      instr_out->payload.string_with_encoding_data.length = length;
+      instr_out->payload.string_with_encoding_data.contents = data_ + cursor_;
       cursor_ += length;
       break;
     }
@@ -442,6 +490,10 @@ bool BinaryReaderImpl::decode(variant_t *result_out) {
   switch (instr.opcode) {
     case pton_instr_t::PTON_OPCODE_INT64:
       return succeed(variant_t::integer(instr.payload.int64_value), result_out);
+    case pton_instr_t::PTON_OPCODE_DEFAULT_STRING:
+      return decode_default_string(&instr, result_out);
+    case pton_instr_t::PTON_OPCODE_BEGIN_STRING_WITH_ENCODING:
+      return decode_string_with_encoding(&instr, result_out);
     case pton_instr_t::PTON_OPCODE_BEGIN_ARRAY:
       return decode_array(instr.payload.array_length, result_out);
     case pton_instr_t::PTON_OPCODE_BEGIN_MAP:
@@ -453,6 +505,27 @@ bool BinaryReaderImpl::decode(variant_t *result_out) {
     default:
       return false;
   }
+}
+
+bool BinaryReaderImpl::decode_default_string(pton_instr_t *instr, variant_t *result_out) {
+  uint8_t *chars = instr->payload.default_string_data.contents;
+  uint64_t size = instr->payload.default_string_data.length;
+  string_t result = reader_->arena_->new_string(size);
+  memcpy(const_cast<char*>(result.chars()), chars, size);
+  result.ensure_frozen();
+  return succeed(result, result_out);
+}
+
+bool BinaryReaderImpl::decode_string_with_encoding(pton_instr_t *instr, variant_t *result_out) {
+  variant_t encoding;
+  if (!decode(&encoding))
+    return false;
+  uint8_t *chars = instr->payload.string_with_encoding_data.contents;
+  uint64_t size = instr->payload.string_with_encoding_data.length;
+  string_t result = reader_->arena_->new_string(size, encoding);
+  memcpy(const_cast<char*>(result.chars()), chars, size);
+  result.ensure_frozen();
+  return succeed(result, result_out);
 }
 
 bool BinaryReaderImpl::decode_array(uint64_t length, variant_t *result_out) {

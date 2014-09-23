@@ -76,17 +76,20 @@ private:
 
 struct pton_arena_string_t : public pton_arena_value_t {
 public:
-  pton_arena_string_t(char *chars, uint32_t length, bool is_frozen);
+  pton_arena_string_t(char *chars, uint32_t length, variant_t encoding, bool is_frozen);
 
   uint32_t length() { return length_; }
 
   const char *chars() { return chars_; }
+
+  variant_t encoding() { return encoding_; }
 
   bool set(uint32_t index, char c);
 
 private:
   char *chars_;
   uint32_t length_;
+  variant_t encoding_;
 };
 
 struct pton_arena_blob_t : public pton_arena_value_t {
@@ -188,11 +191,17 @@ string_t pton_arena_t::new_string(const char *str) {
 }
 
 string_t pton_arena_t::new_string(const char *str, uint32_t length) {
+  return new_string(str, length, variant_t::default_string_encoding());
+}
+
+string_t pton_arena_t::new_string(const void *str, uint32_t length,
+    variant_t encoding) {
   pton_arena_string_t *data = alloc_value<pton_arena_string_t>();
   char *own_str = alloc_values<char>(length + 1);
   memcpy(own_str, str, length);
   own_str[length] = '\0';
-  variant_t result(header_t::PTON_REPR_ARNA_STRING, new (data) pton_arena_string_t(own_str, length, true));
+  variant_t result(header_t::PTON_REPR_ARNA_STRING, new (data) pton_arena_string_t(
+      own_str, length, encoding, true));
   return string_t(result);
 }
 
@@ -201,10 +210,15 @@ pton_variant_t pton_new_string(pton_arena_t *arena, const char *str, uint32_t le
 }
 
 string_t pton_arena_t::new_string(uint32_t length) {
+  return new_string(length, variant_t::default_string_encoding());
+}
+
+string_t pton_arena_t::new_string(uint32_t length, variant_t encoding) {
   pton_arena_string_t *data = alloc_value<pton_arena_string_t>();
   char *own_str = alloc_values<char>(length + 1);
   memset(own_str, '\0', length + 1);
-  variant_t result(header_t::PTON_REPR_ARNA_STRING, new (data) pton_arena_string_t(own_str, length, false));
+  variant_t result(header_t::PTON_REPR_ARNA_STRING, new (data) pton_arena_string_t(
+      own_str, length, encoding, false));
   return string_t(result);
 }
 
@@ -345,6 +359,10 @@ void variant_t::ensure_frozen() {
 
 variant_t variant_t::blob(const void *data, uint32_t size) {
   return variant_t(pton_blob(data, size));
+}
+
+variant_t variant_t::default_string_encoding() {
+  return variant_t("utf-8");
 }
 
 array_t::array_t(variant_t variant) : variant_t() {
@@ -533,6 +551,22 @@ const char *pton_string_chars(pton_variant_t variant) {
   }
 }
 
+variant_t variant_t::string_encoding() const {
+  return pton_string_encoding(value_);
+}
+
+pton_variant_t pton_string_encoding(pton_variant_t variant) {
+  pton_check_binary_version(variant);
+  switch (variant.header_.repr_tag_) {
+    case header_t::PTON_REPR_EXTN_STRING:
+      return variant_t::default_string_encoding().to_c();
+    case header_t::PTON_REPR_ARNA_STRING:
+      return variant.payload_.as_arena_string_->encoding().to_c();
+    default:
+      return pton_null();
+  }
+}
+
 const char *variant_t::string_chars() const {
   return pton_string_chars(value_);
 }
@@ -558,9 +592,11 @@ string_t::string_t(variant_t variant) {
     *static_cast<variant_t*>(this) = variant;
 }
 
-pton_arena_string_t::pton_arena_string_t(char *chars, uint32_t length, bool is_frozen)
+pton_arena_string_t::pton_arena_string_t(char *chars, uint32_t length,
+    variant_t encoding, bool is_frozen)
   : chars_(chars)
-  , length_(length) {
+  , length_(length)
+  , encoding_(encoding) {
   is_frozen_ = is_frozen;
 }
 

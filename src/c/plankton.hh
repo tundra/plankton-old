@@ -133,6 +133,9 @@ public:
   // Returns the characters of this string if it is a string, otherwise NULL.
   const char *string_chars() const;
 
+  // Returns this string's encoding if this is a string, otherwise null.
+  variant_t string_encoding() const;
+
   // Returns the index'th character in this string if this is a string with
   // at least index characters, otherwise 0.
   char string_get(uint32_t index) const;
@@ -232,6 +235,8 @@ public:
 
   inline pton_variant_t to_c() { return value_; }
 
+  static variant_t default_string_encoding();
+
 protected:
   friend class sink_t;
   pton_variant_t value_;
@@ -305,6 +310,11 @@ public:
 
   // Returns the length of this string if it is a string, otherwise 0.
   uint32_t length() const { return string_length(); }
+
+  // Returns this string's character encoding.
+  variant_t encoding() const { return string_encoding(); }
+
+  const char *chars() const { return string_chars(); }
 
   // Returns the index'th character in this string if this is a string with
   // at least index characters, otherwise 0.
@@ -385,6 +395,15 @@ public:
 
   // Writes an int64 with the given value.
   bool emit_int64(int64_t value) { return pton_assembler_emit_int64(assm_, value); }
+
+  bool emit_default_string(const char *chars, uint32_t length) {
+    return pton_assembler_emit_default_string(assm_, chars, length);
+  }
+
+  bool begin_string_with_encoding(const void *chars, uint32_t length) {
+    return pton_assembler_begin_string_with_encoding(assm_, const_cast<void*>(chars),
+        length);
+  }
 
   // Flushes the given assembler, writing the output into the given parameters.
   // The caller assumes ownership of the returned array and is responsible for
@@ -513,17 +532,30 @@ public:
   // The length of the string is determined using strlen.
   plankton::string_t new_string(const char *str);
 
-  // Creates and returns a new variant string. The string is fully owned by
-  // the arena so the character array can be disposed after this call returns.
+  // Creates and returns a new variant string with the default encoding. The
+  // string is fully owned by the arena so the character array can be disposed
+  // after this call returns.
   plankton::string_t new_string(const char *str, uint32_t length);
 
-  // Creates and returns a new mutable variant string of the given length,
-  // initialized to all '\0's. Note that this doesn't mean that the string is
-  // initially empty. Variant strings can handle null characters so what you
-  // get is a 'length' long string where all the characters are null. The null
-  // terminator is implicitly allocated in addition to the requested length, so
-  // you only need to worry about the non-null characters.
+  // Creates and returns a new variant string with the given encoding. The
+  // string is fully owned by the arena so the character array can be disposed
+  // after this call returns.
+  plankton::string_t new_string(const void *str, uint32_t length,
+      plankton::variant_t encoding);
+
+  // Creates and returns a new mutable variant string of the given length with
+  // the default encoding, initialized to all '\0's. See the new_string method
+  // that takes an explicit encoding for more details.
   plankton::string_t new_string(uint32_t length);
+
+  // Creates and returns a new mutable variant string of the given length with
+  // the given encoding, initialized to all '\0's. Note that this doesn't mean
+  // that the string is initially empty. Variant strings can handle null
+  // characters so what you get is a 'length' long string where all the
+  // characters are null. The null terminator is implicitly allocated in
+  // addition to the requested length, so you only need to worry about the
+  // non-null characters.
+  plankton::string_t new_string(uint32_t length, plankton::variant_t encoding);
 
   // Creates and returns a new variant blob. The contents it copied into this
   // arena so the data array can be disposed after this call returns.

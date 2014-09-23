@@ -17,7 +17,7 @@ public:
   // Opcode values.
   enum opcode_t {
     boInteger = 0,
-    boUtf8 = 1,
+    boDefaultString = 1,
     boArray = 2,
     boMap = 3,
     boNull = 4,
@@ -25,7 +25,8 @@ public:
     boFalse = 6,
     boObject = 7,
     boReference = 8,
-    boBeginEnvironmentReference = 9
+    boBeginEnvironmentReference = 9,
+    boBeginStringWithEncoding = 10
   };
 };
 

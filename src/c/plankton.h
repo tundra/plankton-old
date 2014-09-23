@@ -136,6 +136,9 @@ uint32_t pton_string_length(pton_variant_t variant);
 // Returns the characters of this string if it is a string, otherwise NULL.
 const char *pton_string_chars(pton_variant_t variant);
 
+// Returns the encoding of the given string if it is a string, otherwise null.
+pton_variant_t pton_string_encoding(pton_variant_t variant);
+
 // If this variant is a blob, returns the number of bytes. If not, returns 0.
 uint32_t pton_blob_size(pton_variant_t variant);
 
@@ -206,6 +209,10 @@ pton_variant_t pton_new_string(pton_arena_t *arena, const char *str, uint32_t le
 // you only need to worry about the non-null characters.
 pton_variant_t pton_new_mutable_string(pton_arena_t *arena, uint32_t size);
 
+// Constructor for string-valued variants with an explicitly given encoding.
+pton_variant_t pton_new_string_with_encoding(pton_arena_t *arena,
+    const void *chars, uint32_t length, pton_variant_t encoding);
+
 // Creates and returns a new mutable array value.
 pton_variant_t pton_new_array(pton_arena_t *arena);
 
@@ -256,8 +263,12 @@ bool pton_assembler_emit_null(pton_assembler_t *assm);
 bool pton_assembler_emit_int64(pton_assembler_t *assm, int64_t value);
 
 // Writes an utf8-encoded string.
-bool pton_assembler_emit_utf8(pton_assembler_t *assm, const char *chars,
+bool pton_assembler_emit_default_string(pton_assembler_t *assm, const char *chars,
     uint32_t length);
+
+// Writes the payload part of a string with an explicit encoding.
+bool pton_assembler_begin_string_with_encoding(pton_assembler_t *assm,
+    void *chars, uint32_t length);
 
 // Writes a reference to the previously seen object at the given offset.
 bool pton_assembler_emit_reference(pton_assembler_t *assm, uint64_t offset);
@@ -271,7 +282,8 @@ memory_block_t pton_assembler_peek_code(pton_assembler_t *assm);
 typedef struct {
   enum pton_instr_opcode_t {
     PTON_OPCODE_INT64,
-    PTON_OPCODE_UTF8,
+    PTON_OPCODE_DEFAULT_STRING,
+    PTON_OPCODE_BEGIN_STRING_WITH_ENCODING,
     PTON_OPCODE_BEGIN_ARRAY,
     PTON_OPCODE_BEGIN_MAP,
     PTON_OPCODE_NULL,
@@ -289,7 +301,11 @@ typedef struct {
     struct {
       uint64_t length;
       uint8_t *contents;
-    } string_data;
+    } default_string_data;
+    struct {
+      uint64_t length;
+      uint8_t *contents;
+    } string_with_encoding_data;
     uint64_t reference_offset;
   } payload;
 } pton_instr_t;
