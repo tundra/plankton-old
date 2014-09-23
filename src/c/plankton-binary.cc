@@ -395,21 +395,15 @@ uint64_t BinaryReaderImpl::read_uint64() {
   if (!has_more())
     return 0;
   uint8_t next = read_byte();
-  if (next >= 0x80) {
-    uint64_t result = (next & 0x7F);
-    uint64_t offset = 7;
-    while (has_more()) {
-      next = read_byte();
-      uint64_t payload = ((next & 0x7F) + 1);
-      result = result + (payload << offset);
-      if (next < 0x80)
-        return result;
-      offset += 7;
-    }
-    return result;
-  } else {
-    return next;
+  uint64_t result = (next & 0x7F);
+  uint64_t offset = 7;
+  while (next >= 0x80 && has_more()) {
+    next = read_byte();
+    uint64_t payload = ((next & 0x7F) + 1);
+    result = result + (payload << offset);
+    offset += 7;
   }
+  return result;
 }
 
 bool BinaryReaderImpl::succeed(variant_t value, variant_t *out) {

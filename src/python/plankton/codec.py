@@ -238,22 +238,17 @@ class DataInputStream(object):
     else:
       return str(tag)
 
-
   # Reads a naked unsigned from the stream.
   def _decode_uint32(self):
     next = self._get_byte()
-    if next >= 0x80:
-      result = (next & 0x7F)
-      offset = 7
-      while True:
-        next = self._get_byte()
-        payload = (next & 0x7F) + 1
-        result = result + (payload << offset)
-        if next < 0x80:
-          return result
-        offset += 7
-    else:
-      return next
+    result = (next & 0x7F)
+    offset = 7
+    while next >= 0x80:
+      next = self._get_byte()
+      payload = (next & 0x7F) + 1
+      result = result + (payload << offset)
+      offset += 7
+    return result
 
   # Reads a naked integer from the stream.
   def _decode_int32(self):
