@@ -103,6 +103,13 @@ TEST(binary, strings) {
   CHECK_BINARY(variant_t::string("\0\0\0", 3));
 }
 
+TEST(binary, ids) {
+  CHECK_BINARY(variant_t::id64(0xFABACAEA));
+  CHECK_BINARY(variant_t::id32(0xFABACAEA));
+  CHECK_BINARY(variant_t::id64(0));
+  CHECK_BINARY(variant_t::id64(-1));
+}
+
 TEST(binary, string_encodings) {
   arena_t arena;
   variant_t str = arena.new_string("foo", 3, "test-encoding");

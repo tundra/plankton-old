@@ -59,6 +59,16 @@ TEST(variant_cpp, equality) {
   ASSERT_TRUE(a0 == a0);
   array_t a1 = arena.new_array();
   ASSERT_FALSE(a0 == a1);
+  variant_t id0 = variant_t::id64(0xDEADBEEF);
+  ASSERT_TRUE(id0 == id0);
+  ASSERT_FALSE(id0 == variant_t::null());
+  ASSERT_FALSE(id0 == variant_t::no());
+  ASSERT_FALSE(id0 == z0);
+  variant_t id1 = variant_t::id64(0xDEADBEF0);
+  ASSERT_FALSE(id0 == id1);
+  variant_t id2 = variant_t::id32(0xDEADBEEF);
+  ASSERT_TRUE(id0.id64_value() == id2.id64_value());
+  ASSERT_FALSE(id0 == id2);
 }
 
 TEST(variant_cpp, as_bool) {
@@ -86,4 +96,12 @@ TEST(variant_cpp, size) {
   // TODO: fix this such that msvc also gets to use compact variants.
   IF_MSVC(return,);
   ASSERT_TRUE(sizeof(variant_t) <= (2 * sizeof(int64_t)));
+}
+
+TEST(variant_cpp, id64) {
+  variant_t var = variant_t::id64(0xFABACAEA);
+  ASSERT_TRUE(var.type() == PTON_ID);
+  ASSERT_TRUE(var.is_frozen());
+  ASSERT_EQ(64, var.id_size());
+  ASSERT_EQ(0xFABACAEA, var.id64_value());
 }

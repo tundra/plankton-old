@@ -83,6 +83,9 @@ private:
   // Writes a map value.
   void write_map(map_t map);
 
+  // Writes the given identity token.
+  void write_id(uint32_t size, uint64_t value);
+
   // Ensures that the buffer has enough capacity to hold the given number of
   // additional characters.
   void ensure_capacity(size_t size);
@@ -127,6 +130,9 @@ void TextWriterImpl::write(variant_t value) {
       break;
     case PTON_STRING:
       write_string(value.string_chars(), value.string_length());
+      break;
+    case PTON_ID:
+      write_id(value.id_size(), value.id64_value());
       break;
     case PTON_BLOB:
       write_blob(value.blob_data(), value.blob_size());
@@ -376,6 +382,28 @@ void TextWriterImpl::write_map(map_t map) {
   if (is_long)
     deindent();
   write_raw_char('}');
+}
+
+void TextWriterImpl::write_id(uint32_t size, uint64_t value) {
+  char chars[64];
+  switch (size) {
+    case 64:
+      sprintf(chars, "~%016lx", value);
+      break;
+    case 32:
+      sprintf(chars, "~%08lx", value);
+      break;
+    case 16:
+      sprintf(chars, "~%04lx", value);
+      break;
+    case 8:
+      sprintf(chars, "~%02lx", value);
+      break;
+    default:
+      sprintf(chars, "~%i:%lx", size, value);
+      break;
+  }
+  write_raw_string(chars);
 }
 
 void TextWriterImpl::flush(TextWriter *writer) {

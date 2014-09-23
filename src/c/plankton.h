@@ -27,7 +27,8 @@ typedef enum pton_type_t {
   PTON_NULL = 0x04,
   PTON_BOOL = 0x05,
   PTON_ARRAY = 0x06,
-  PTON_MAP = 0x07
+  PTON_MAP = 0x07,
+  PTON_ID = 0x08
 } pton_type_t;
 
 // A value that encodes a value and the value's type. It provides a uniform
@@ -47,7 +48,8 @@ typedef struct {
         PTON_REPR_TRUE = 0x50,
         PTON_REPR_FALSE = 0x51,
         PTON_REPR_ARNA_ARRAY = 0x60,
-        PTON_REPR_ARNA_MAP = 0x70
+        PTON_REPR_ARNA_MAP = 0x70,
+        PTON_REPR_INLN_ID = 0x80
     } repr_tag_ IF_MSVC(, : 8);
     // A tag used to identify the version of plankton that produced this value.
     // All variants returned from a binary plankton implementation will have the
@@ -67,6 +69,7 @@ typedef struct {
   // type of the variant.
   union payload_t {
     int64_t as_int64_;
+    uint64_t as_inline_id_;
     pton_arena_value_t *as_arena_value_;
     pton_arena_array_t *as_arena_array_;
     pton_arena_map_t *as_arena_map_;
@@ -90,8 +93,17 @@ pton_variant_t pton_false();
 // Returns a variant representing the given boolean.
 pton_variant_t pton_bool(bool value);
 
-// Initializes a variant representing an integer with the given value.
+// Returns a variant representing an integer with the given value.
 pton_variant_t pton_integer(int64_t value);
+
+// Returns a variant representing a 64-bit identity token.
+pton_variant_t pton_id64(uint64_t value);
+
+// Returns a variant representing a 32-bit identity token.
+pton_variant_t pton_id32(uint32_t value);
+
+// Returns a variant representing an identity token.
+pton_variant_t pton_id(uint32_t size, uint64_t value);
 
 // Constructor for string-valued variants. Note that the variant does not take
 // ownership of the string so it must stay alive as long as the variant does.
@@ -118,6 +130,9 @@ bool pton_is_array(pton_variant_t variant);
 
 // Is this value a map?
 bool pton_is_map(pton_variant_t variant);
+
+// Is this an identity token?
+bool pton_is_id(pton_variant_t variant);
 
 // Returns the value of the given boolean if it is a boolean, otherwise false.
 // In other words, true iff the value is the boolean true value.
@@ -168,6 +183,17 @@ bool pton_map_set(pton_variant_t variant, pton_variant_t key, pton_variant_t val
 // Returns the mapping for the given key in the given map if this contains the
 // key, otherwise null.
 pton_variant_t pton_map_get(pton_variant_t variant, pton_variant_t key);
+
+// Returns a 64-bit identity token with the given value.
+pton_variant_t pton_id64(uint64_t value);
+
+// Returns the value of a 64-bit identity token. Returns 0 if this is not a
+// token or a token larger than 64 bits.
+uint64_t pton_id64_value(pton_variant_t variant);
+
+// Returns the size in bits of the given identity token or 0 if it's not a
+// token.
+uint32_t pton_id_size(pton_variant_t variant);
 
 // Returns true iff the value is locally immutable. Note that even if this
 // returns true it doesn't mean that nothing about this value can change -- it
@@ -270,6 +296,10 @@ bool pton_assembler_emit_default_string(pton_assembler_t *assm, const char *char
 bool pton_assembler_begin_string_with_encoding(pton_assembler_t *assm,
     void *chars, uint32_t length);
 
+// Writes an (up to) 64-bit identity token.
+bool pton_assembler_emit_id64(pton_assembler_t *assm, uint32_t size,
+    uint64_t value);
+
 // Writes a reference to the previously seen object at the given offset.
 bool pton_assembler_emit_reference(pton_assembler_t *assm, uint64_t offset);
 
@@ -282,6 +312,7 @@ memory_block_t pton_assembler_peek_code(pton_assembler_t *assm);
 typedef struct {
   enum pton_instr_opcode_t {
     PTON_OPCODE_INT64,
+    PTON_OPCODE_ID64,
     PTON_OPCODE_DEFAULT_STRING,
     PTON_OPCODE_BEGIN_STRING_WITH_ENCODING,
     PTON_OPCODE_BEGIN_ARRAY,
@@ -306,6 +337,10 @@ typedef struct {
       uint64_t length;
       uint8_t *contents;
     } string_with_encoding_data;
+    struct {
+      uint32_t size;
+      uint64_t value;
+    } id64;
     uint64_t reference_offset;
   } payload;
 } pton_instr_t;

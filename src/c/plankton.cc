@@ -306,6 +306,9 @@ bool pton_variants_equal(pton_variant_t a, pton_variant_t b) {
       return true;
     case PTON_BOOL:
       return a.header_.repr_tag_ == b.header_.repr_tag_;
+    case PTON_ID:
+      return a.header_.length_ == b.header_.length_
+          && a.payload_.as_inline_id_ == b.payload_.as_inline_id_;
     default:
       return false;
   }
@@ -324,6 +327,7 @@ bool pton_is_frozen(pton_variant_t variant) {
     case header_t::PTON_REPR_FALSE:
     case header_t::PTON_REPR_EXTN_STRING:
     case header_t::PTON_REPR_EXTN_BLOB:
+    case header_t::PTON_REPR_INLN_ID:
       return true;
     case header_t::PTON_REPR_ARNA_ARRAY:
     case header_t::PTON_REPR_ARNA_MAP:
@@ -467,6 +471,28 @@ pton_variant_t pton_map_get(pton_variant_t variant, pton_variant_t key) {
 
 variant_t variant_t::map_get(variant_t key) const {
   return pton_map_get(value_, key.value_);
+}
+
+uint64_t pton_id64_value(pton_variant_t variant) {
+  pton_check_binary_version(variant);
+  return pton_is_id(variant)
+      ? variant.payload_.as_inline_id_
+      : 0;
+}
+
+uint64_t variant_t::id64_value() const {
+  return pton_id64_value(value_);
+}
+
+uint32_t pton_id_size(pton_variant_t variant) {
+  pton_check_binary_version(variant);
+  return pton_is_id(variant)
+      ? variant.header_.length_
+      : 0;
+}
+
+uint32_t variant_t::id_size() const {
+  return pton_id_size(value_);
 }
 
 map_iterator_t variant_t::map_iter() const {
@@ -719,6 +745,11 @@ bool pton_is_map(pton_variant_t variant) {
   return variant.header_.repr_tag_ == header_t::PTON_REPR_ARNA_MAP;
 }
 
+bool pton_is_id(pton_variant_t variant) {
+  pton_check_binary_version(variant);
+  return variant.header_.repr_tag_ == header_t::PTON_REPR_INLN_ID;
+}
+
 bool pton_bool_value(pton_variant_t variant) {
   pton_check_binary_version(variant);
   return variant.header_.repr_tag_ == header_t::PTON_REPR_TRUE;
@@ -769,9 +800,26 @@ pton_variant_t pton_c_str(const char *chars) {
 }
 
 pton_variant_t pton_blob(const void *data, uint32_t size) {
-  pton_variant_t result = VARIANT_INIT(pton_variant_t::pton_variant_header_t::PTON_REPR_EXTN_BLOB,
+  pton_variant_t result = VARIANT_INIT(header_t::PTON_REPR_EXTN_BLOB,
       size);
   result.payload_.as_external_blob_data_ = data;
   return result;
 }
 
+pton_variant_t pton_id64(uint64_t value) {
+  pton_variant_t result = VARIANT_INIT(header_t::PTON_REPR_INLN_ID, 64);
+  result.payload_.as_inline_id_ = value;
+  return result;
+}
+
+pton_variant_t pton_id32(uint32_t value) {
+  pton_variant_t result = VARIANT_INIT(header_t::PTON_REPR_INLN_ID, 32);
+  result.payload_.as_inline_id_ = value;
+  return result;
+}
+
+pton_variant_t pton_id(uint32_t size, uint64_t value) {
+  pton_variant_t result = VARIANT_INIT(header_t::PTON_REPR_INLN_ID, size);
+  result.payload_.as_inline_id_ = value;
+  return result;
+}

@@ -37,6 +37,8 @@ public:
 
   bool begin_string_with_encoding(const void *chars, uint32_t length);
 
+  bool emit_id64(uint32_t size, uint64_t value);
+
   bool emit_reference(uint64_t offset);
 
   memory_block_t peek_code();
@@ -136,6 +138,44 @@ bool pton_assembler_t::begin_string_with_encoding(const void *chars, uint32_t le
 bool pton_assembler_begin_string_with_encoding(pton_assembler_t *assm,
     void *chars, uint32_t length) {
   return assm->begin_string_with_encoding(chars, length);
+}
+
+bool pton_assembler_t::emit_id64(uint32_t size, uint64_t value) {
+  write_byte(boId);
+  switch (size) {
+    case 64: case 32: case 16: case 8:
+      write_byte(size >> 3);
+      break;
+    default:
+      return false;
+  }
+  switch (size) {
+    case 64: {
+      bytes_.write(reinterpret_cast<uint8_t*>(&value), 8);
+      break;
+    }
+    case 32: {
+      uint32_t smaller_value = value;
+      bytes_.write(reinterpret_cast<uint8_t*>(&smaller_value), 4);
+      break;
+    }
+    case 16: {
+      uint16_t smaller_value = value;
+      bytes_.write(reinterpret_cast<uint8_t*>(&smaller_value), 2);
+      break;
+    }
+    case 8: {
+      uint8_t smaller_value = value;
+      bytes_.write(reinterpret_cast<uint8_t*>(&smaller_value), 1);
+      break;
+    }
+  }
+  return true;
+}
+
+bool pton_assembler_emit_id64(pton_assembler_t *assm, uint32_t size,
+    uint64_t value) {
+  return assm->emit_id64(size, value);
 }
 
 bool pton_assembler_t::emit_reference(uint64_t offset) {
@@ -239,6 +279,9 @@ void VariantWriter::encode(variant_t value) {
     case PTON_INTEGER:
       assm()->emit_int64(value.integer_value());
       break;
+    case PTON_ID:
+      assm()->emit_id64(value.id_size(), value.id64_value());
+      break;
     case PTON_NULL:
     default:
       assm()->emit_null();
@@ -337,6 +380,14 @@ public:
   // Advances past and returns the current byte.
   uint8_t read_byte() { return data_[cursor_++]; }
 
+  bool read_bytes(uint8_t *dest, size_t size) {
+    if (!has_data(size))
+      return false;
+    memcpy(dest, data_ + cursor_, size);
+    cursor_ += size;
+    return true;
+  }
+
   bool decode(pton_instr_t *instr_out);
 
   bool decode_int64(int64_t *result_out);
@@ -413,6 +464,43 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
     case BinaryImplUtils::boBeginEnvironmentReference:
       instr_out->opcode = pton_instr_t::PTON_OPCODE_BEGIN_ENVIRONMENT_REFERENCE;
       break;
+    case BinaryImplUtils::boId: {
+      if (!has_more())
+        return false;
+      uint8_t size = read_byte() << 3;
+      uint64_t value = 0;
+      switch (size) {
+        case 64: {
+          if (!read_bytes(reinterpret_cast<uint8_t*>(&value), 8))
+            return false;
+          break;
+        }
+        case 32: {
+          uint32_t smaller_value = 0;
+          if (!read_bytes(reinterpret_cast<uint8_t*>(&smaller_value), 4))
+            return false;
+          value = smaller_value;
+          break;
+        }
+        case 16: {
+          uint16_t smaller_value = 0;
+          if (!read_bytes(reinterpret_cast<uint8_t*>(&smaller_value), 2))
+            return false;
+          value = smaller_value;
+          break;
+        }
+        case 8: {
+          value = read_byte();
+          break;
+        }
+        default:
+          return false;
+      }
+      instr_out->payload.id64.value = value;
+      instr_out->payload.id64.size = size;
+      instr_out->opcode = pton_instr_t::PTON_OPCODE_ID64;
+      break;
+    }
     default:
       fprintf(stderr, "Unknown instruction %i\n", opcode);
       fflush(stderr);
@@ -502,6 +590,9 @@ bool BinaryReaderImpl::decode(variant_t *result_out) {
       return succeed(variant_t::null(), result_out);
     case pton_instr_t::PTON_OPCODE_BOOL:
       return succeed(variant_t::boolean(instr.payload.bool_value), result_out);
+    case pton_instr_t::PTON_OPCODE_ID64:
+      return succeed(variant_t::id(instr.payload.id64.size, instr.payload.id64.value),
+          result_out);
     default:
       return false;
   }

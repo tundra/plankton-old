@@ -86,6 +86,15 @@ public:
   // otherwise. Called 'boolean' because 'bool' has a tendency to be taken.
   static inline variant_t boolean(int value) { return variant_t(pton_bool(value)); }
 
+  // Returns a variant representing a 64-bit identity token.
+  static inline variant_t id64(uint64_t value) { return variant_t(pton_id64(value)); }
+
+  // Returns a variant representing a 32-bit identity token.
+  static inline variant_t id32(uint32_t value) { return variant_t(pton_id32(value)); }
+
+  // Returns a variant representing a 32-bit identity token.
+  static inline variant_t id(uint32_t size, uint64_t value) { return variant_t(pton_id(size, value)); }
+
   // Initializes a variant representing an integer with the given value. Note
   // that this is funky when used with a literal 0 because it also matches the
   // pointer constructors.
@@ -185,6 +194,13 @@ public:
   // empty iterator. The first call to advance will yield the first mapping, if
   // there is one.
   map_iterator_t map_iter() const;
+
+  // Returns the size in bits of this id value or 0 if this is not an id.
+  uint32_t id_size() const;
+
+  // Returns the value of a 64-bit id or 0 if this is not an id of at most 64
+  // bits.
+  uint64_t id64_value() const;
 
   // Returns the value of this boolean if it is a boolean, otherwise false. In
   // other words, true iff this is the boolean true value. Note that this is
@@ -403,6 +419,10 @@ public:
   bool begin_string_with_encoding(const void *chars, uint32_t length) {
     return pton_assembler_begin_string_with_encoding(assm_, const_cast<void*>(chars),
         length);
+  }
+
+  bool emit_id64(uint32_t size, uint64_t value) {
+    return pton_assembler_emit_id64(assm_, size, value);
   }
 
   // Flushes the given assembler, writing the output into the given parameters.
