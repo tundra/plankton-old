@@ -67,7 +67,7 @@ typedef struct {
 
   // The contents of a variant. This is the part that changes depending on the
   // type of the variant.
-  union payload_t {
+  union pton_variant_payload_t {
     int64_t as_int64_;
     uint64_t as_inline_id_;
     pton_arena_value_t *as_arena_value_;
@@ -150,6 +150,10 @@ uint32_t pton_string_length(pton_variant_t variant);
 
 // Returns the characters of this string if it is a string, otherwise NULL.
 const char *pton_string_chars(pton_variant_t variant);
+
+// Returns the backing character array of this string if it is a mutable string,
+// otherwise NULL.
+char *pton_string_mutable_chars(pton_variant_t variant);
 
 // Returns the encoding of the given string if it is a string, otherwise null.
 pton_variant_t pton_string_encoding(pton_variant_t variant);
@@ -294,7 +298,7 @@ bool pton_assembler_emit_default_string(pton_assembler_t *assm, const char *char
 
 // Writes the payload part of a string with an explicit encoding.
 bool pton_assembler_begin_string_with_encoding(pton_assembler_t *assm,
-    void *chars, uint32_t length);
+    const void *chars, uint32_t length);
 
 // Writes an (up to) 64-bit identity token.
 bool pton_assembler_emit_id64(pton_assembler_t *assm, uint32_t size,
@@ -331,11 +335,11 @@ typedef struct {
     uint64_t map_size;
     struct {
       uint64_t length;
-      uint8_t *contents;
+      const uint8_t *contents;
     } default_string_data;
     struct {
       uint64_t length;
-      uint8_t *contents;
+      const uint8_t *contents;
     } string_with_encoding_data;
     struct {
       uint32_t size;
@@ -348,6 +352,7 @@ typedef struct {
 // Decodes the plankton instruction starting at the given code pointer and
 // extending no more than the given size. The output is written into the output
 // parameter. Returns true if disassembling succeeded, false if not.
-bool pton_decode_next_instruction(uint8_t *code, size_t size, pton_instr_t *instr_out);
+bool pton_decode_next_instruction(const uint8_t *code, size_t size,
+    pton_instr_t *instr_out);
 
 #endif // _PLANKTON_H

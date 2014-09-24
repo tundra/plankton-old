@@ -136,7 +136,7 @@ bool pton_assembler_t::begin_string_with_encoding(const void *chars, uint32_t le
 }
 
 bool pton_assembler_begin_string_with_encoding(pton_assembler_t *assm,
-    void *chars, uint32_t length) {
+    const void *chars, uint32_t length) {
   return assm->begin_string_with_encoding(chars, length);
 }
 
@@ -368,7 +368,10 @@ BinaryReaderImpl::BinaryReaderImpl(const void *data, size_t size, BinaryReader *
 // Utility for decoding an individual instruction.
 class InstrDecoder {
 public:
-  InstrDecoder(uint8_t *data, size_t size) : data_(data), size_(size), cursor_(0) { }
+  InstrDecoder(const uint8_t *data, size_t size)
+    : data_(data)
+    , size_(size)
+    , cursor_(0) { }
 
   // Returns true iff there are more bytes to return.
   bool has_more() { return cursor_ < size_; }
@@ -395,7 +398,7 @@ public:
   bool decode_uint64(uint64_t *result_out);
 
 private:
-  uint8_t *data_;
+  const uint8_t *data_;
   size_t size_;
   size_t cursor_;
 };
@@ -571,8 +574,7 @@ bool BinaryReaderImpl::decode(variant_t *result_out) {
   if (!has_more())
     return false;
   pton_instr_t instr;
-  if (!pton_decode_next_instruction(const_cast<uint8_t*>(data_ + cursor_),
-      size_ - cursor_, &instr))
+  if (!pton_decode_next_instruction(data_ + cursor_, size_ - cursor_, &instr))
     return false;
   cursor_ += instr.size;
   switch (instr.opcode) {
@@ -599,10 +601,10 @@ bool BinaryReaderImpl::decode(variant_t *result_out) {
 }
 
 bool BinaryReaderImpl::decode_default_string(pton_instr_t *instr, variant_t *result_out) {
-  uint8_t *chars = instr->payload.default_string_data.contents;
+  const uint8_t *chars = instr->payload.default_string_data.contents;
   uint64_t size = instr->payload.default_string_data.length;
   string_t result = reader_->arena_->new_string(size);
-  memcpy(const_cast<char*>(result.chars()), chars, size);
+  memcpy(result.mutable_chars(), chars, size);
   result.ensure_frozen();
   return succeed(result, result_out);
 }
@@ -611,10 +613,10 @@ bool BinaryReaderImpl::decode_string_with_encoding(pton_instr_t *instr, variant_
   variant_t encoding;
   if (!decode(&encoding))
     return false;
-  uint8_t *chars = instr->payload.string_with_encoding_data.contents;
+  const uint8_t *chars = instr->payload.string_with_encoding_data.contents;
   uint64_t size = instr->payload.string_with_encoding_data.length;
   string_t result = reader_->arena_->new_string(size, encoding);
-  memcpy(const_cast<char*>(result.chars()), chars, size);
+  memcpy(result.mutable_chars(), chars, size);
   result.ensure_frozen();
   return succeed(result, result_out);
 }
@@ -663,7 +665,7 @@ variant_t BinaryReader::parse(const void *data, size_t size) {
 
 } // namespace plankton
 
-bool pton_decode_next_instruction(uint8_t *code, size_t size, pton_instr_t *instr_out) {
+bool pton_decode_next_instruction(const uint8_t *code, size_t size, pton_instr_t *instr_out) {
   InstrDecoder in(code, size);
   return in.decode(instr_out);
 }

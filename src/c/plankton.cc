@@ -84,8 +84,6 @@ public:
 
   variant_t encoding() { return encoding_; }
 
-  bool set(uint32_t index, char c);
-
 private:
   char *chars_;
   uint32_t length_;
@@ -577,6 +575,12 @@ const char *pton_string_chars(pton_variant_t variant) {
   }
 }
 
+char *pton_string_mutable_chars(pton_variant_t variant) {
+  return pton_is_frozen(variant)
+      ? NULL
+      : const_cast<char*>(pton_string_chars(variant));
+}
+
 variant_t variant_t::string_encoding() const {
   return pton_string_encoding(value_);
 }
@@ -597,20 +601,8 @@ const char *variant_t::string_chars() const {
   return pton_string_chars(value_);
 }
 
-char variant_t::string_get(uint32_t index) const {
-  if (index >= string_length())
-    // Only real strings have nonzero length so this all non-strings end up
-    // here.
-    return 0;
-  return string_chars()[index];
-}
-
-bool variant_t::string_set(uint32_t index, char c) {
-  if (is_frozen() || index >= string_length())
-    // Only strings have nonzero length and only arena strings can be mutable
-    // so this handles all other cases.
-    return false;
-  return payload()->as_arena_string_->set(index, c);
+char *variant_t::string_mutable_chars() const {
+  return pton_string_mutable_chars(value_);
 }
 
 string_t::string_t(variant_t variant) {
@@ -624,13 +616,6 @@ pton_arena_string_t::pton_arena_string_t(char *chars, uint32_t length,
   , length_(length)
   , encoding_(encoding) {
   is_frozen_ = is_frozen;
-}
-
-bool pton_arena_string_t::set(uint32_t index, char c) {
-  if (index >= length_ || is_frozen_)
-    return false;
-  chars_[index] = c;
-  return true;
 }
 
 pton_arena_blob_t::pton_arena_blob_t(void *data, uint32_t size, bool is_frozen)

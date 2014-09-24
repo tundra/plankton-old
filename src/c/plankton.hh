@@ -142,16 +142,10 @@ public:
   // Returns the characters of this string if it is a string, otherwise NULL.
   const char *string_chars() const;
 
+  char *string_mutable_chars() const;
+
   // Returns this string's encoding if this is a string, otherwise null.
   variant_t string_encoding() const;
-
-  // Returns the index'th character in this string if this is a string with
-  // at least index characters, otherwise 0.
-  char string_get(uint32_t index) const;
-
-  // Sets the index'th character if this is a mutable string with at least
-  // index characters. Returns true if setting succeeded.
-  bool string_set(uint32_t index, char value);
 
   // If this variant is a blob, returns the number of bytes. If not, returns 0.
   uint32_t blob_size() const;
@@ -262,9 +256,9 @@ protected:
   // Convenience accessor for the representation tag.
   repr_tag_t repr_tag() const { return value_.header_.repr_tag_; }
 
-  pton_variant_t::payload_t *payload() { return &value_.payload_; }
+  pton_variant_t::pton_variant_payload_t *payload() { return &value_.payload_; }
 
-  const pton_variant_t::payload_t *payload() const { return &value_.payload_; }
+  const pton_variant_t::pton_variant_payload_t *payload() const { return &value_.payload_; }
 
 private:
   friend struct ::pton_arena_t;
@@ -330,15 +324,12 @@ public:
   // Returns this string's character encoding.
   variant_t encoding() const { return string_encoding(); }
 
+  // Returns this string's characters.
   const char *chars() const { return string_chars(); }
 
-  // Returns the index'th character in this string if this is a string with
-  // at least index characters, otherwise 0.
-  char get(uint32_t index) const { return string_get(index); }
-
-  // Sets the index'th character if this is a mutable string with at least
-  // index characters. Returns true if setting succeeded.
-  bool set(uint32_t index, char c) { return string_set(index, c); }
+  // If this string is mutable, returns the mutable backing array. Otherwise
+  // return NULL.
+  char *mutable_chars() { return string_mutable_chars(); }
 };
 
 // A variant that represents a blob. A blob can be either an actual blob or
@@ -412,15 +403,17 @@ public:
   // Writes an int64 with the given value.
   bool emit_int64(int64_t value) { return pton_assembler_emit_int64(assm_, value); }
 
+  // Writes a string with the default encoding.
   bool emit_default_string(const char *chars, uint32_t length) {
     return pton_assembler_emit_default_string(assm_, chars, length);
   }
 
+  // Writes the header for a string with a custom encoding.
   bool begin_string_with_encoding(const void *chars, uint32_t length) {
-    return pton_assembler_begin_string_with_encoding(assm_, const_cast<void*>(chars),
-        length);
+    return pton_assembler_begin_string_with_encoding(assm_, chars, length);
   }
 
+  // Writes an identity token.
   bool emit_id64(uint32_t size, uint64_t value) {
     return pton_assembler_emit_id64(assm_, size, value);
   }
