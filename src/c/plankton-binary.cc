@@ -411,7 +411,7 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
     case BinaryImplUtils::boInteger:
       if (!decode_int64(&instr_out->payload.int64_value))
         return false;
-      instr_out->opcode = pton_instr_t::PTON_OPCODE_INT64;
+      instr_out->opcode = PTON_OPCODE_INT64;
       break;
     case BinaryImplUtils::boDefaultString: {
       uint64_t length = 0;
@@ -419,7 +419,7 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
         return false;
       if (!has_data(length))
         return false;
-      instr_out->opcode = pton_instr_t::PTON_OPCODE_DEFAULT_STRING;
+      instr_out->opcode = PTON_OPCODE_DEFAULT_STRING;
       instr_out->payload.default_string_data.length = length;
       instr_out->payload.default_string_data.contents = data_ + cursor_;
       cursor_ += length;
@@ -431,7 +431,7 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
         return false;
       if (!has_data(length))
         return false;
-      instr_out->opcode = pton_instr_t::PTON_OPCODE_BEGIN_STRING_WITH_ENCODING;
+      instr_out->opcode = PTON_OPCODE_BEGIN_STRING_WITH_ENCODING;
       instr_out->payload.string_with_encoding_data.length = length;
       instr_out->payload.string_with_encoding_data.contents = data_ + cursor_;
       cursor_ += length;
@@ -440,32 +440,32 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
     case BinaryImplUtils::boArray:
       if (!decode_uint64(&instr_out->payload.array_length))
         return false;
-      instr_out->opcode = pton_instr_t::PTON_OPCODE_BEGIN_ARRAY;
+      instr_out->opcode = PTON_OPCODE_BEGIN_ARRAY;
       break;
     case BinaryImplUtils::boMap:
       if (!decode_uint64(&instr_out->payload.map_size))
         return false;
-      instr_out->opcode = pton_instr_t::PTON_OPCODE_BEGIN_MAP;
+      instr_out->opcode = PTON_OPCODE_BEGIN_MAP;
       break;
     case BinaryImplUtils::boNull:
-      instr_out->opcode = pton_instr_t::PTON_OPCODE_NULL;
+      instr_out->opcode = PTON_OPCODE_NULL;
       instr_out->size = 1;
       break;
     case BinaryImplUtils::boTrue:
     case BinaryImplUtils::boFalse:
-      instr_out->opcode = pton_instr_t::PTON_OPCODE_BOOL;
+      instr_out->opcode = PTON_OPCODE_BOOL;
       instr_out->payload.bool_value = (opcode == BinaryImplUtils::boTrue);
       break;
     case BinaryImplUtils::boObject:
-      instr_out->opcode = pton_instr_t::PTON_OPCODE_BEGIN_OBJECT;
+      instr_out->opcode = PTON_OPCODE_BEGIN_OBJECT;
       break;
     case BinaryImplUtils::boReference:
       if (!decode_uint64(&instr_out->payload.reference_offset))
         return false;
-      instr_out->opcode = pton_instr_t::PTON_OPCODE_REFERENCE;
+      instr_out->opcode = PTON_OPCODE_REFERENCE;
       break;
     case BinaryImplUtils::boBeginEnvironmentReference:
-      instr_out->opcode = pton_instr_t::PTON_OPCODE_BEGIN_ENVIRONMENT_REFERENCE;
+      instr_out->opcode = PTON_OPCODE_BEGIN_ENVIRONMENT_REFERENCE;
       break;
     case BinaryImplUtils::boId: {
       if (!has_more())
@@ -501,7 +501,7 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
       }
       instr_out->payload.id64.value = value;
       instr_out->payload.id64.size = size;
-      instr_out->opcode = pton_instr_t::PTON_OPCODE_ID64;
+      instr_out->opcode = PTON_OPCODE_ID64;
       break;
     }
     default:
@@ -578,21 +578,21 @@ bool BinaryReaderImpl::decode(variant_t *result_out) {
     return false;
   cursor_ += instr.size;
   switch (instr.opcode) {
-    case pton_instr_t::PTON_OPCODE_INT64:
+    case PTON_OPCODE_INT64:
       return succeed(variant_t::integer(instr.payload.int64_value), result_out);
-    case pton_instr_t::PTON_OPCODE_DEFAULT_STRING:
+    case PTON_OPCODE_DEFAULT_STRING:
       return decode_default_string(&instr, result_out);
-    case pton_instr_t::PTON_OPCODE_BEGIN_STRING_WITH_ENCODING:
+    case PTON_OPCODE_BEGIN_STRING_WITH_ENCODING:
       return decode_string_with_encoding(&instr, result_out);
-    case pton_instr_t::PTON_OPCODE_BEGIN_ARRAY:
+    case PTON_OPCODE_BEGIN_ARRAY:
       return decode_array(instr.payload.array_length, result_out);
-    case pton_instr_t::PTON_OPCODE_BEGIN_MAP:
+    case PTON_OPCODE_BEGIN_MAP:
       return decode_map(instr.payload.map_size, result_out);
-    case pton_instr_t::PTON_OPCODE_NULL:
+    case PTON_OPCODE_NULL:
       return succeed(variant_t::null(), result_out);
-    case pton_instr_t::PTON_OPCODE_BOOL:
+    case PTON_OPCODE_BOOL:
       return succeed(variant_t::boolean(instr.payload.bool_value), result_out);
-    case pton_instr_t::PTON_OPCODE_ID64:
+    case PTON_OPCODE_ID64:
       return succeed(variant_t::id(instr.payload.id64.size, instr.payload.id64.value),
           result_out);
     default:

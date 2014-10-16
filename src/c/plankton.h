@@ -312,21 +312,23 @@ bool pton_assembler_emit_reference(pton_assembler_t *assm, uint64_t offset);
 // result. Typically you'll want to immediately copy the data away.
 memory_block_t pton_assembler_peek_code(pton_assembler_t *assm);
 
+typedef enum pton_instr_opcode_t {
+  PTON_OPCODE_INT64,
+  PTON_OPCODE_ID64,
+  PTON_OPCODE_DEFAULT_STRING,
+  PTON_OPCODE_BEGIN_STRING_WITH_ENCODING,
+  PTON_OPCODE_BEGIN_ARRAY,
+  PTON_OPCODE_BEGIN_MAP,
+  PTON_OPCODE_NULL,
+  PTON_OPCODE_BOOL,
+  PTON_OPCODE_BEGIN_OBJECT,
+  PTON_OPCODE_REFERENCE,
+  PTON_OPCODE_BEGIN_ENVIRONMENT_REFERENCE
+} pton_instr_opcode_t;
+
 // Describes an individual binary plankton code instruction.
 typedef struct {
-  enum pton_instr_opcode_t {
-    PTON_OPCODE_INT64,
-    PTON_OPCODE_ID64,
-    PTON_OPCODE_DEFAULT_STRING,
-    PTON_OPCODE_BEGIN_STRING_WITH_ENCODING,
-    PTON_OPCODE_BEGIN_ARRAY,
-    PTON_OPCODE_BEGIN_MAP,
-    PTON_OPCODE_NULL,
-    PTON_OPCODE_BOOL,
-    PTON_OPCODE_BEGIN_OBJECT,
-    PTON_OPCODE_REFERENCE,
-    PTON_OPCODE_BEGIN_ENVIRONMENT_REFERENCE
-  } opcode;
+  pton_instr_opcode_t opcode;
   size_t size;
   union pton_instr_payload_t {
     bool bool_value;
