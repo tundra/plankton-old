@@ -7,6 +7,7 @@ filenames = [
   "test_arena_c.cc",
   "test_arena_cpp.cc",
   "test_binary.cc",
+  "test_generic.cc",
   "test_text.cc",
   "test_variant_c.cc",
   "test_variant_cpp.cc",
@@ -26,6 +27,7 @@ test_library = get_group("library")
 for filename in filenames:
   source_file = c.get_source_file(filename)
   object_file = compile_test_file(source_file)
+  object_file.add_library_requirement(posix="yaml-cpp")
   test_library.add_member(object_file)
 
 main_file_names = [

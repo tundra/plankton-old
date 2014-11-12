@@ -1,0 +1,21 @@
+- test_case:
+  - test_type: datatypes
+  - value: 0
+    type: "int"
+  - value: ""
+    type: "string"
+  - value: ~
+    type: "null"
+  - value: Yes
+    type: "bool"
+  - value: No
+    type: "bool"
+
+- test_case:
+  - test_type: transcoding
+  - value: 0
+    binary: [0, 0]
+  - value: 1
+    binary: [0, 2]
+  - value: -1
+    binary: [0, 1]
