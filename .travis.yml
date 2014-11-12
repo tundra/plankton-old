@@ -14,7 +14,7 @@ matrix:
     - language: c
       compiler: clang
       script: mkmk init --config plankton.mkmk --noisy && ./build.sh all run-tests
-      install: source ./tools/enter-devenv.sh
+      install: source ./tools/enter-devenv.sh && sudo apt-get update && sudo apt-get install valgrind libyaml-cpp0.3-dev
     # Test with checks disabled.
     - languate: c
       compiler: clang

@@ -4,6 +4,8 @@
     type: "int"
   - value: ""
     type: "string"
+  - value: foo
+    type: "string"
   - value: ~
     type: "null"
   - value: Yes
