@@ -14,6 +14,7 @@ BEGIN_C_INCLUDES
 END_C_INCLUDES
 
 #include "callback.hh"
+#include <vector>
 
 namespace plankton {
 
@@ -21,6 +22,7 @@ typedef ::pton_arena_t arena_t;
 
 class variant_t;
 class sink_t;
+class disposable_t;
 
 // An iterator that allows you to scan through all the mappings in a map.
 class map_iterator_t {
@@ -626,12 +628,17 @@ private:
   // Allocates a raw block of memory.
   void *alloc_raw(uint32_t size);
 
+  // Adds a disposable value to the set of values to clean up on teardown.
+  void add_disposable(plankton::disposable_t *ptr);
+
   // Allocates the backing storage for a sink value.
   pton_sink_t *alloc_sink(plankton::sink_set_callback_t on_set);
 
-  size_t capacity_;
-  size_t used_;
-  uint8_t **blocks_;
+  // Values that must be explicitly disposed when tearing down this arena.
+  std::vector<plankton::disposable_t*> garbage_;
+
+  // The raw pages of memory allocated for this arena.
+  std::vector<uint8_t*> blocks_;
 };
 
 #endif // _PLANKTON_HH

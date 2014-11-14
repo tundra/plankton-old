@@ -66,10 +66,7 @@ bool variant_t::is_blob() const {
 
 } // namespace plankton
 
-pton_arena_t::pton_arena_t()
-  : capacity_(0)
-  , used_(0)
-  , blocks_(NULL) { }
+pton_arena_t::pton_arena_t() { }
 
 template <typename T>
 T *pton_arena_t::alloc_values(uint32_t elms) {

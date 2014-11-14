@@ -114,7 +114,14 @@ private:
   uint32_t size_;
 };
 
-struct pton_sink_t {
+// Generic interface for arena-allocated values that have a virtual destructor
+// that must be called on cleanup.
+class plankton::disposable_t {
+public:
+  virtual ~disposable_t() { };
+};
+
+struct pton_sink_t : public disposable_t {
 public:
   explicit pton_sink_t(pton_arena_t *origin, sink_set_callback_t on_set);
 
@@ -148,24 +155,22 @@ void pton_dispose_arena(pton_arena_t *arena) {
 }
 
 void *pton_arena_t::alloc_raw(uint32_t bytes) {
-  if (used_ == capacity_) {
-    // Expand capacity if necessary. This is also where we start since the
-    // initial used and capacity are 0.
-    capacity_ = ((capacity_ < 16) ? 16 : (capacity_ * 2));
-    uint8_t **new_blocks = new uint8_t*[capacity_];
-    memcpy(new_blocks, blocks_, sizeof(uint8_t*) * used_);
-    delete[] blocks_;
-    blocks_ = new_blocks;
-  }
   uint8_t *result = new uint8_t[bytes];
-  blocks_[used_++] = result;
+  blocks_.push_back(result);
   return result;
 }
 
+void pton_arena_t::add_disposable(plankton::disposable_t *ptr) {
+  garbage_.push_back(ptr);
+}
+
 pton_arena_t::~pton_arena_t() {
-  for (size_t i = 0; i < used_; i++)
+  for (size_t i = 0; i < garbage_.size(); i++) {
+    disposable_t *ptr = garbage_[i];
+    ptr->~disposable_t();
+  }
+  for (size_t i = 0; i < blocks_.size(); i++)
     delete[] blocks_[i];
-  delete[] blocks_;
 }
 
 array_t pton_arena_t::new_array() {
@@ -274,6 +279,10 @@ sink_t pton_arena_t::new_sink(variant_t *out) {
 
 pton_sink_t *pton_arena_t::alloc_sink(plankton::sink_set_callback_t on_set) {
   pton_sink_t *result = alloc_value<pton_sink_t>();
+  if (!on_set.is_empty())
+    // If there is a nontrivial callback we need to be sure it gets disposed on
+    // arena teardown.
+    add_disposable(result);
   return new (result) pton_sink_t(this, on_set);
 }
 
