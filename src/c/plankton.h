@@ -176,6 +176,10 @@ bool pton_array_add(pton_variant_t array, pton_variant_t value);
 // length or the variant is not an array.
 pton_variant_t pton_array_get(pton_variant_t variant, uint32_t index);
 
+// Adds an initially null value to this array, access to which is returned
+// as a sink so setting the sink will cause the array value to be set.
+pton_sink_t *pton_array_add_sink(pton_variant_t array);
+
 // Returns the number of mappings in this map, if this is a map, otherwise
 // 0.
 uint32_t pton_map_size(pton_variant_t variant);
@@ -183,6 +187,11 @@ uint32_t pton_map_size(pton_variant_t variant);
 // Adds a mapping from the given key to the given value if this map is
 // mutable. Returns true if setting succeeded.
 bool pton_map_set(pton_variant_t variant, pton_variant_t key, pton_variant_t value);
+
+// Adds a mapping from the given key to the given value if this map is
+// mutable. Returns true if setting succeeded.
+bool pton_map_set_sinks(pton_variant_t variant, pton_sink_t **key_out,
+    pton_sink_t **value_out);
 
 // Returns the mapping for the given key in the given map if this contains the
 // key, otherwise null.
@@ -258,6 +267,19 @@ pton_sink_t *pton_new_sink(pton_arena_t *arena);
 // Sets the value of this sink, if it hasn't already been set. Otherwise this
 // is a no-op. Returns whether the value was set.
 bool pton_sink_set(pton_sink_t *sink, pton_variant_t value);
+
+// If this sink has not already been assigned, creates an array, stores it as
+// the value of this sink, and returns it.
+pton_variant_t pton_sink_as_array(pton_sink_t *sink);
+
+// If this sink has not already been assigned, creates a map, stores it as the
+// value of this sink, and returns it.
+pton_variant_t pton_sink_as_map(pton_sink_t *sink);
+
+// Creates and returns a new sink that is independent from this one but whose
+// eventual value can be used to set this one. This can be useful in cases
+// where you need a utility sink for some sub-computation.
+pton_sink_t *pton_sink_new_sink(pton_sink_t *sink, pton_variant_t *out);
 
 // Returns the value stored in this sink. If the sink is empty the result is
 // null.

@@ -3,6 +3,7 @@
 
 #include "plankton-inl.hh"
 #include "stdc.h"
+#include "callback.hh"
 #include <new>
 
 using namespace plankton;
@@ -37,9 +38,13 @@ public:
 
   bool add(variant_t value);
 
+  pton_sink_t *add_sink();
+
   variant_t get(uint32_t index);
 
   uint32_t length() { return length_; }
+
+  bool set_from_sink(size_t index, variant_t value);
 
 private:
   friend struct pton_arena_t;
@@ -61,9 +66,15 @@ public:
 
   bool set(variant_t key, variant_t value);
 
+  bool set(pton_sink_t **key_out, pton_sink_t **value_out);
+
   variant_t get(variant_t key) const;
 
   uint32_t size() const { return size_; }
+
+  bool set_key_from_sink(size_t index, variant_t value);
+
+  bool set_value_from_sink(size_t index, variant_t value);
 
 private:
   friend class ::map_iterator_t;
@@ -105,9 +116,19 @@ private:
 
 struct pton_sink_t {
 public:
-  explicit pton_sink_t(pton_arena_t *origin);
+  explicit pton_sink_t(pton_arena_t *origin, sink_set_callback_t on_set);
 
+  // Sets this sink's value but only if the on_set callback returns true and
+  // the value hasn't already been set.
   bool set(variant_t value);
+
+  bool set_string(const char *chars, uint32_t length);
+
+  variant_t as_array();
+
+  variant_t as_map();
+
+  sink_t new_sink(variant_t *out);
 
   variant_t operator*();
 
@@ -115,6 +136,7 @@ private:
   bool is_empty_;
   variant_t value_;
   pton_arena_t *origin_;
+  sink_set_callback_t on_set_;
 };
 
 pton_arena_t *pton_new_arena() {
@@ -240,19 +262,24 @@ blob_t pton_arena_t::new_blob(uint32_t size) {
   return blob_t(result);
 }
 
-sink_t pton_arena_t::new_sink() {
-  pton_sink_t *data = alloc_sink();
+static bool set_variant_ptr(variant_t *out, variant_t value) {
+  *out = value;
+  return true;
+}
+
+sink_t pton_arena_t::new_sink(variant_t *out) {
+  pton_sink_t *data = alloc_sink(tclib::new_callback(set_variant_ptr, out));
   return sink_t(data);
 }
 
-pton_sink_t *pton_arena_t::alloc_sink() {
+pton_sink_t *pton_arena_t::alloc_sink(plankton::sink_set_callback_t on_set) {
   pton_sink_t *result = alloc_value<pton_sink_t>();
-  return new (result) pton_sink_t(this);
+  return new (result) pton_sink_t(this, on_set);
 }
 
 // Creates and returns a new sink value.
 pton_sink_t *pton_new_sink(pton_arena_t *arena) {
-  return arena->alloc_sink();
+  return arena->alloc_sink(tclib::empty_callback());
 }
 
 static void pton_check_binary_version(pton_variant_t variant) {
@@ -384,6 +411,21 @@ bool variant_t::array_add(variant_t value) {
   return pton_array_add(value_, value.value_);
 }
 
+pton_sink_t *pton_array_add_sink(pton_variant_t array) {
+  pton_check_binary_version(array);
+  if (!pton_is_array(array))
+    return NULL;
+  return array.payload_.as_arena_array_->add_sink();
+}
+
+sink_t variant_t::array_add_sink() {
+  return sink_t(pton_array_add_sink(value_));
+}
+
+sink_t array_t::add() {
+  return array_add_sink();
+}
+
 uint32_t pton_array_length(pton_variant_t variant) {
   pton_check_binary_version(variant);
   return pton_is_array(variant) ? variant.payload_.as_arena_array_->length() : 0;
@@ -428,6 +470,22 @@ bool pton_arena_array_t::add(variant_t value) {
   return true;
 }
 
+bool pton_arena_array_t::set_from_sink(size_t index, variant_t value) {
+  if (is_frozen())
+    return false;
+  elms_[index] = value;
+  return true;
+}
+
+pton_sink_t *pton_arena_array_t::add_sink() {
+  size_t index = length_;
+  if (!add(variant_t::null()))
+      return false;
+  sink_set_callback_t on_set = tclib::new_callback(
+      &pton_arena_array_t::set_from_sink, this, index);
+  return origin_->alloc_sink(on_set);
+}
+
 variant_t pton_arena_array_t::get(uint32_t index) {
   return (index < length_) ? elms_[index] : variant_t::null();
 }
@@ -465,6 +523,24 @@ pton_variant_t pton_map_get(pton_variant_t variant, pton_variant_t key) {
   return pton_is_map(variant)
       ? variant.payload_.as_arena_map_->get(key).to_c()
       : pton_null();
+}
+
+bool pton_map_set_sinks(pton_variant_t map, pton_sink_t **key_out,
+    pton_sink_t **value_out) {
+  pton_check_binary_version(map);
+  return pton_is_map(map) && map.payload_.as_arena_map_->set(key_out, value_out);
+}
+
+bool variant_t::map_set(sink_t *key_out, sink_t *value_out) {
+  pton_sink_t *key_ptr_out = NULL;
+  pton_sink_t *value_ptr_out = NULL;
+  if (pton_map_set_sinks(value_, &key_ptr_out, &value_ptr_out)) {
+    *key_out = sink_t(key_ptr_out);
+    *value_out = sink_t(value_ptr_out);
+    return true;
+  } else {
+    return false;
+  }
 }
 
 variant_t variant_t::map_get(variant_t key) const {
@@ -535,6 +611,34 @@ bool pton_arena_map_t::set(variant_t key, variant_t value) {
   entry_t *entry = &elms_[size_++];
   entry->key = key;
   entry->value = value;
+  return true;
+}
+
+bool pton_arena_map_t::set_key_from_sink(size_t index, variant_t value) {
+  if (is_frozen())
+    return false;
+  elms_[index].key = value;
+  return true;
+}
+
+bool pton_arena_map_t::set_value_from_sink(size_t index, variant_t value) {
+  if (is_frozen())
+    return false;
+  elms_[index].value = value;
+  return true;
+}
+
+bool pton_arena_map_t::set(pton_sink_t **key_out, pton_sink_t **value_out) {
+  size_t index = size_;
+  if (!(set(variant_t::null(), variant_t::null())))
+    return false;
+
+  pton_sink_t *key = origin_->alloc_sink(
+      tclib::new_callback(&pton_arena_map_t::set_key_from_sink, this, index));
+  *key_out = key;
+  pton_sink_t *value = origin_->alloc_sink(
+      tclib::new_callback(&pton_arena_map_t::set_value_from_sink, this, index));
+  *value_out = value;
   return true;
 }
 
@@ -697,9 +801,46 @@ bool sink_t::set(variant_t value) {
   return pton_sink_set(data_, value.value_);
 }
 
-pton_sink_t::pton_sink_t(pton_arena_t *origin)
+pton_variant_t pton_sink_as_array(pton_sink_t *sink) {
+  return sink->as_array().to_c();
+}
+
+array_t sink_t::as_array() {
+  return array_t(pton_sink_as_array(data_));
+}
+
+pton_variant_t pton_sink_as_map(pton_sink_t *sink) {
+  return sink->as_map().to_c();
+}
+
+map_t sink_t::as_map() {
+  return map_t(pton_sink_as_map(data_));
+}
+
+pton_sink_t *pton_sink_new_sink(pton_sink_t *sink, pton_variant_t *out) {
+  return sink_t(sink).new_sink(reinterpret_cast<variant_t*>(out)).to_c();
+}
+
+sink_t sink_t::new_sink(variant_t *out) {
+  return to_c()->new_sink(out);
+}
+
+sink_t pton_sink_t::new_sink(variant_t *out) {
+  return origin_->new_sink(out);
+}
+
+bool pton_sink_set_string(pton_sink_t *sink, const char *chars, uint32_t length) {
+  return sink->set_string(chars, length);
+}
+
+bool sink_t::set_string(const char *chars, uint32_t length) {
+  return pton_sink_set_string(data_, chars, length);
+}
+
+pton_sink_t::pton_sink_t(pton_arena_t *origin, sink_set_callback_t on_set)
   : is_empty_(true)
-  , origin_(origin) { }
+  , origin_(origin)
+  , on_set_(on_set) { }
 
 variant_t pton_sink_t::operator*() {
   return value_;
@@ -707,12 +848,35 @@ variant_t pton_sink_t::operator*() {
 
 bool pton_sink_t::set(variant_t value) {
   if (is_empty_) {
+    if (!on_set_.is_empty() && !on_set_(value))
+      return false;
     is_empty_ = false;
     value_ = value;
     return true;
   } else {
     return false;
   }
+}
+
+bool pton_sink_t::set_string(const char *chars, uint32_t length) {
+  if (!is_empty_)
+    return false;
+  variant_t value = origin_->new_string(chars, length);
+  return set(value);
+}
+
+variant_t pton_sink_t::as_array() {
+  if (!is_empty_)
+    return variant_t::null();
+  variant_t value = origin_->new_array();
+  return set(value) ? value : variant_t::null();
+}
+
+variant_t pton_sink_t::as_map() {
+  if (!is_empty_)
+    return variant_t::null();
+  variant_t value = origin_->new_map();
+  return set(value) ? value : variant_t::null();
 }
 
 bool pton_is_integer(pton_variant_t variant) {

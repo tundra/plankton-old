@@ -105,3 +105,29 @@ TEST(variant_cpp, id64) {
   ASSERT_EQ(64, var.id_size());
   ASSERT_EQ(0xFABACAEA, var.id64_value());
 }
+
+TEST(variant_cpp, array_sink) {
+  arena_t arena;
+  array_t array = arena.new_array();
+  sink_t e0 = array.add();
+  sink_t e1 = array.add();
+  sink_t e2 = array.add();
+  ASSERT_EQ(3, array.length());
+  ASSERT_EQ(PTON_NULL, array[0].type());
+  ASSERT_EQ(PTON_NULL, array[1].type());
+  ASSERT_EQ(PTON_NULL, array[2].type());
+  ASSERT_TRUE(e0.set(18));
+  ASSERT_FALSE(e0.set(19));
+  ASSERT_EQ(PTON_INTEGER, array[0].type());
+  ASSERT_EQ(PTON_NULL, array[1].type());
+  ASSERT_EQ(PTON_NULL, array[2].type());
+  ASSERT_TRUE(e2.set("foo"));
+  ASSERT_FALSE(e2.set("bar"));
+  ASSERT_EQ(PTON_INTEGER, array[0].type());
+  ASSERT_EQ(PTON_NULL, array[1].type());
+  ASSERT_EQ(PTON_STRING, array[2].type());
+  ASSERT_TRUE(e1.set(variant_t::yes()));
+  ASSERT_EQ(PTON_INTEGER, array[0].type());
+  ASSERT_EQ(PTON_BOOL, array[1].type());
+  ASSERT_EQ(PTON_STRING, array[2].type());
+}

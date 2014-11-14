@@ -1,11 +1,13 @@
+# This test is for checking that the yaml reader works as expected and is able
+# to read in the basic data types.
 - test_case:
   - test_type: datatypes
   - value: 0
     type: "int"
   - value: ""
-    type: "string"
+    type: "str"
   - value: foo
-    type: "string"
+    type: "str"
   - value: ~
     type: "null"
   - value: Yes

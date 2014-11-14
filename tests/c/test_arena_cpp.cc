@@ -91,11 +91,12 @@ TEST(arena_cpp, mutstring) {
 
 TEST(arena_cpp, sink) {
   arena_t arena;
-  sink_t s0 = arena.new_sink();
-  ASSERT_FALSE(bool(*s0));
+  variant_t out;
+  sink_t s0 = arena.new_sink(&out);
+  ASSERT_FALSE(bool(out));
   ASSERT_TRUE(s0.set(10));
-  ASSERT_TRUE(bool(*s0));
-  ASSERT_TRUE(*s0 == variant_t::integer(10));
+  ASSERT_TRUE(bool(out));
+  ASSERT_TRUE(out == variant_t::integer(10));
   ASSERT_FALSE(s0.set(12));
-  ASSERT_TRUE(*s0 == variant_t::integer(10));
+  ASSERT_TRUE(out == variant_t::integer(10));
 }

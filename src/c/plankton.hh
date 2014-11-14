@@ -13,11 +13,14 @@ BEGIN_C_INCLUDES
 #include "utils/alloc.h"
 END_C_INCLUDES
 
+#include "callback.hh"
+
 namespace plankton {
 
 typedef ::pton_arena_t arena_t;
 
 class variant_t;
+class sink_t;
 
 // An iterator that allows you to scan through all the mappings in a map.
 class map_iterator_t {
@@ -172,6 +175,10 @@ public:
   // true if adding succeeded.
   bool array_add(variant_t value);
 
+  // Adds an initially null value to this array, access to which is returned
+  // as a sink so setting the sink will cause the array value to be set.
+  sink_t array_add_sink();
+
   // Returns the number of mappings in this map, if this is a map, otherwise
   // 0.
   uint32_t map_size() const;
@@ -179,6 +186,8 @@ public:
   // Adds a mapping from the given key to the given value if this map is
   // mutable. Returns true if setting succeeded.
   bool map_set(variant_t key, variant_t value);
+
+  bool map_set(sink_t *key_out, sink_t *value_out);
 
   // Returns the mapping for the given key in this map if this contains the
   // key, otherwise null.
@@ -271,6 +280,9 @@ private:
 // really dealing with an array do an if-check.
 class array_t : public variant_t {
 public:
+  // Creates a new empty array.
+  array_t() : variant_t() { }
+
   // Conversion to an array of some value. If the value is indeed an array the
   // result is a proper array, if it is something else the result is null.
   explicit array_t(variant_t variant);
@@ -278,6 +290,10 @@ public:
   // Adds the given value at the end of this array if it is mutable. Returns
   // true if adding succeeded.
   bool add(variant_t value) { return array_add(value); }
+
+  // Adds an initially null value to this array, access to which is returned
+  // as a sink so setting the sink will cause the array value to be set.
+  sink_t add();
 
   // Returns the length of this array.
   uint32_t length() const { return array_length(); }
@@ -299,6 +315,10 @@ public:
   // Adds a mapping from the given key to the given value if this map is
   // mutable. Returns true if setting succeeded.
   bool set(variant_t key, variant_t value) { return map_set(key, value); }
+
+  // Adds an open mapping from keys and values to be set later through the
+  // sinks returned through the two out parameters.
+  bool set(sink_t *key_out, sink_t *value_out) { return map_set(key_out, value_out); }
 
   // Returns the mapping for the given key.
   variant_t operator[](variant_t key) { return map_get(key); }
@@ -356,14 +376,21 @@ public:
 // in the sink you would ask the sink to create the value itself.
 class sink_t {
 public:
+  sink_t() : data_(NULL) { }
+
   // Returns the value stored in this sink.
   variant_t operator*() const;
 
-  // If this sink has not already been asigned, creates an array, stores it as
+  // If this sink has not already been assigned, creates an array, stores it as
   // the value of this sink, and returns it.
   array_t as_array();
 
-  // If this sink has not already been asigned, creates a map, stores it as
+  // Creates and returns a new sink that is independent from this one but whose
+  // eventual value can be used to set this one. This can be useful in cases
+  // where you need a utility sink for some sub-computation.
+  sink_t new_sink(variant_t *out);
+
+  // If this sink has not already been assigned, creates a map, stores it as
   // the value of this sink, and returns it.
   map_t as_map();
 
@@ -371,10 +398,17 @@ public:
   // is a no-op. Returns whether the value was set.
   bool set(variant_t value);
 
-private:
-  friend struct ::pton_arena_t;
+  // If this sink has not already been assigned, creates a new string with the
+  // given contents and stores it as the value.
+  bool set_string(const char *chars, uint32_t length);
+
+  // Returns the C view of this sink.
+  pton_sink_t *to_c() { return data_; }
+
+  // Wraps a sink_t struct around a C sink.
   explicit sink_t(pton_sink_t *data);
 
+private:
   pton_sink_t *data_;
 };
 
@@ -510,6 +544,8 @@ private:
   char offender_;
 };
 
+typedef tclib::callback_t<bool(variant_t)> sink_set_callback_t;
+
 } // namespace plankton
 
 // An arena within which plankton values can be allocated. Once the values are
@@ -578,17 +614,20 @@ public:
   // initialized to all zeros.
   plankton::blob_t new_blob(uint32_t size);
 
-  // Creates and returns a new sink value.
-  plankton::sink_t new_sink();
+  // Creates and returns a new sink value that will store the value set into the
+  // given output parameter..
+  plankton::sink_t new_sink(plankton::variant_t *out);
 
 private:
   friend pton_sink_t *pton_new_sink(pton_arena_t *arena);
+  friend class pton_arena_array_t;
+  friend class pton_arena_map_t;
 
   // Allocates a raw block of memory.
   void *alloc_raw(uint32_t size);
 
   // Allocates the backing storage for a sink value.
-  pton_sink_t *alloc_sink();
+  pton_sink_t *alloc_sink(plankton::sink_set_callback_t on_set);
 
   size_t capacity_;
   size_t used_;
