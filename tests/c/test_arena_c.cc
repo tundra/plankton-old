@@ -57,11 +57,12 @@ TEST(arena_c, mutstring) {
 
 TEST(arena_c, sink) {
   pton_arena_t *carena = pton_new_arena();
-  pton_sink_t *cs0 = pton_new_sink(carena);
-  ASSERT_TRUE(pton_variants_equal(pton_sink_get(cs0), pton_null()));
+  pton_variant_t out = pton_null();
+  pton_sink_t *cs0 = pton_new_sink(carena, &out);
+  ASSERT_TRUE(pton_variants_equal(out, pton_null()));
   ASSERT_TRUE(pton_sink_set(cs0, pton_integer(10)));
-  ASSERT_TRUE(pton_variants_equal(pton_sink_get(cs0), pton_integer(10)));
+  ASSERT_TRUE(pton_variants_equal(out, pton_integer(10)));
   ASSERT_FALSE(pton_sink_set(cs0, pton_integer(12)));
-  ASSERT_TRUE(pton_variants_equal(pton_sink_get(cs0), pton_integer(10)));
+  ASSERT_TRUE(pton_variants_equal(out, pton_integer(10)));
   pton_dispose_arena(carena);
 }

@@ -262,7 +262,7 @@ pton_variant_t pton_new_array_with_capacity(pton_arena_t *arena, uint32_t init_c
 pton_variant_t pton_new_map(pton_arena_t *arena);
 
 // Creates and returns a new sink value.
-pton_sink_t *pton_new_sink(pton_arena_t *arena);
+pton_sink_t *pton_new_sink(pton_arena_t *arena, pton_variant_t *out);
 
 // Sets the value of this sink, if it hasn't already been set. Otherwise this
 // is a no-op. Returns whether the value was set.

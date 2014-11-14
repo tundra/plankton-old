@@ -284,8 +284,8 @@ pton_sink_t *pton_arena_t::alloc_sink(plankton::sink_set_callback_t on_set) {
 }
 
 // Creates and returns a new sink value.
-pton_sink_t *pton_new_sink(pton_arena_t *arena) {
-  return arena->alloc_sink(tclib::empty_callback());
+pton_sink_t *pton_new_sink(pton_arena_t *arena, pton_variant_t *out) {
+  return arena->new_sink(reinterpret_cast<variant_t*>(out)).to_c();
 }
 
 static void pton_check_binary_version(pton_variant_t variant) {
