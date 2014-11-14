@@ -137,11 +137,8 @@ public:
 
   sink_t new_sink(variant_t *out);
 
-  variant_t operator*();
-
 private:
   bool is_empty_;
-  variant_t value_;
   pton_arena_t *origin_;
   sink_set_callback_t on_set_;
 };
@@ -161,12 +158,12 @@ void *pton_arena_t::alloc_raw(uint32_t bytes) {
 }
 
 void pton_arena_t::add_disposable(plankton::disposable_t *ptr) {
-  garbage_.push_back(ptr);
+  disposables_.push_back(ptr);
 }
 
 pton_arena_t::~pton_arena_t() {
-  for (size_t i = 0; i < garbage_.size(); i++) {
-    disposable_t *ptr = garbage_[i];
+  for (size_t i = 0; i < disposables_.size(); i++) {
+    disposable_t *ptr = disposables_[i];
     ptr->~disposable_t();
   }
   for (size_t i = 0; i < blocks_.size(); i++)
@@ -793,14 +790,6 @@ blob_t::blob_t(variant_t variant) {
 sink_t::sink_t(pton_sink_t *data)
   : data_(data) { }
 
-pton_variant_t pton_sink_get(pton_sink_t *sink) {
-  return sink->operator*().to_c();
-}
-
-variant_t sink_t::operator*() const {
-  return pton_sink_get(data_);
-}
-
 bool pton_sink_set(pton_sink_t *sink, pton_variant_t value) {
   pton_check_binary_version(value);
   return sink->set(value);
@@ -851,16 +840,11 @@ pton_sink_t::pton_sink_t(pton_arena_t *origin, sink_set_callback_t on_set)
   , origin_(origin)
   , on_set_(on_set) { }
 
-variant_t pton_sink_t::operator*() {
-  return value_;
-}
-
 bool pton_sink_t::set(variant_t value) {
   if (is_empty_) {
     if (!on_set_.is_empty() && !on_set_(value))
       return false;
     is_empty_ = false;
-    value_ = value;
     return true;
   } else {
     return false;

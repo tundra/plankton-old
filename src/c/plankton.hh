@@ -380,9 +380,6 @@ class sink_t {
 public:
   sink_t() : data_(NULL) { }
 
-  // Returns the value stored in this sink.
-  variant_t operator*() const;
-
   // If this sink has not already been assigned, creates an array, stores it as
   // the value of this sink, and returns it.
   array_t as_array();
@@ -635,7 +632,7 @@ private:
   pton_sink_t *alloc_sink(plankton::sink_set_callback_t on_set);
 
   // Values that must be explicitly disposed when tearing down this arena.
-  std::vector<plankton::disposable_t*> garbage_;
+  std::vector<plankton::disposable_t*> disposables_;
 
   // The raw pages of memory allocated for this arena.
   std::vector<uint8_t*> blocks_;

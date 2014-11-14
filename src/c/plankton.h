@@ -281,10 +281,6 @@ pton_variant_t pton_sink_as_map(pton_sink_t *sink);
 // where you need a utility sink for some sub-computation.
 pton_sink_t *pton_sink_new_sink(pton_sink_t *sink, pton_variant_t *out);
 
-// Returns the value stored in this sink. If the sink is empty the result is
-// null.
-pton_variant_t pton_sink_get(pton_sink_t *sink);
-
 // Create a new plankton assembler.
 pton_assembler_t *pton_new_assembler();
 
