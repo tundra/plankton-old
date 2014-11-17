@@ -148,10 +148,17 @@ bool YamlParser::read(sink_t sink) {
           goto done;
         }
         char *endp = NULL;
-        int as_int = strtol(value, &endp, 10);
+        int64_t as_int = strtol(value, &endp, 10);
         if (endp == (value + length)) {
           sink.set(variant_t::integer(as_int));
           goto done;
+        }
+        if (length >= 2 && value[0] == '0' && value[1] == 'x') {
+          int64_t as_hex = strtol(value + 2, &endp, 16);
+          if (endp == (value + length)) {
+            sink.set(variant_t::integer(as_hex));
+            goto done;
+          }
         }
       }
       // This is where we fall through to if none of the special scalar types
@@ -224,6 +231,8 @@ static variant_t get_variant_type_name(variant_t value) {
       return "null";
     case PTON_BOOL:
       return "bool";
+    case PTON_ARRAY:
+      return "array";
     default:
       return "wut?";
   }
@@ -238,5 +247,21 @@ TEST(generic, datatypes) {
     variant_t value = entry.map_get("value");
     variant_t type_name = entry.map_get("type");
     ASSERT_TRUE(type_name == get_variant_type_name(value));
+  }
+}
+
+TEST(generic, transcoding) {
+  arena_t arena;
+  TestCase test_case;
+  ASSERT_TRUE(YamlParser::get_test_case("transcoding", &arena, &test_case));
+  for (size_t i = 0; i < test_case.size(); i++) {
+    variant_t entry = test_case[i];
+    variant_t value = entry.map_get("value");
+    variant_t binary_expected = entry.map_get("binary");
+    BinaryWriter writer;
+    writer.write(value);
+    ASSERT_EQ(binary_expected.array_length(), writer.size());
+    for (size_t i = 0; i < writer.size(); i++)
+      ASSERT_EQ(binary_expected.array_get(i).integer_value(), (*writer)[i]);
   }
 }

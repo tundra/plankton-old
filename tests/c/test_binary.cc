@@ -26,16 +26,6 @@ using namespace plankton;
   ASSERT_EQ(0, strcmp(*input_writer, *decoded_writer));                        \
 } while (false)
 
-TEST(binary, simple) {
-  CHECK_BINARY(variant_t::null());
-  CHECK_BINARY(variant_t::yes());
-  CHECK_BINARY(variant_t::no());
-  CHECK_BINARY(variant_t::integer(0));
-  CHECK_BINARY(-1);
-  CHECK_BINARY(3);
-  CHECK_BINARY(0xFFFFFFFFULL);
-}
-
 #define CHECK_ENCODED(EXP, N, ...) do {                                        \
   arena_t arena;                                                               \
   BinaryReader reader(&arena);                                                 \
@@ -43,21 +33,6 @@ TEST(binary, simple) {
   variant_t found = reader.parse(data, (N));                                   \
   ASSERT_TRUE(variant_t(EXP) == found);                                        \
 } while (false)
-
-TEST(binary, zigzag) {
-  CHECK_ENCODED(variant_t::integer(0), 2, BinaryImplUtils::boInteger, 0x00);
-  CHECK_ENCODED(-1, 2, BinaryImplUtils::boInteger, 0x01);
-  CHECK_ENCODED(1, 2, BinaryImplUtils::boInteger, 0x02);
-  CHECK_ENCODED(63, 2, BinaryImplUtils::boInteger, 0x7E);
-  CHECK_ENCODED(-64, 2, BinaryImplUtils::boInteger, 0x7F);
-  CHECK_ENCODED(64, 3, BinaryImplUtils::boInteger, 0x80, 0x00);
-  CHECK_ENCODED(-65, 3, BinaryImplUtils::boInteger, 0x81, 0x00);
-  CHECK_ENCODED(65, 3, BinaryImplUtils::boInteger, 0x82, 0x00);
-  CHECK_ENCODED(-8256, 3, BinaryImplUtils::boInteger, 0xFF, 0x7F);
-  CHECK_ENCODED(8256, 4, BinaryImplUtils::boInteger, 0x80, 0x80, 0x00);
-  CHECK_ENCODED(1056832, 5, BinaryImplUtils::boInteger, 0x80, 0x80, 0x80, 0x00);
-  CHECK_ENCODED(65536, 4, BinaryImplUtils::boInteger, 0x80, 0xff, 0x06);
-}
 
 TEST(binary, integers) {
   for (int i = -655; i < 655; i += 1)
@@ -68,20 +43,6 @@ TEST(binary, integers) {
     CHECK_BINARY(variant_t::integer(i));
   for (int i = -6553600; i < 6553600; i += 11112)
     CHECK_BINARY(variant_t::integer(i));
-  CHECK_BINARY(variant_t::integer(0xFFFFFFFFULL));
-}
-
-TEST(binary, array) {
-  arena_t arena;
-  array_t array = arena.new_array(0);
-  CHECK_BINARY(array);
-  ASSERT_TRUE(array.add(4));
-  CHECK_BINARY(array);
-  ASSERT_TRUE(array.add(variant_t::yes()));
-  CHECK_BINARY(array);
-  array_t inner = arena.new_array(0);
-  ASSERT_TRUE(array.add(inner));
-  CHECK_BINARY(array);
 }
 
 TEST(binary, map) {
@@ -95,12 +56,6 @@ TEST(binary, map) {
   map_t inner = arena.new_map();
   ASSERT_TRUE(map.set(8, inner));
   CHECK_BINARY(map);
-}
-
-TEST(binary, strings) {
-  CHECK_BINARY("");
-  CHECK_BINARY(variant_t::string("foo", 2));
-  CHECK_BINARY(variant_t::string("\0\0\0", 3));
 }
 
 TEST(binary, ids) {
