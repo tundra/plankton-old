@@ -103,6 +103,10 @@ int YamlParser::handle_framework_read(void *yaml_file_ptr, unsigned char *buffer
   return true;
 }
 
+static bool adapt_object(array_t fields, sink_t sink) {
+  return true;
+}
+
 bool YamlParser::read(sink_t sink) {
   switch (current_.type) {
     case YAML_SEQUENCE_START_EVENT: {
@@ -117,7 +121,8 @@ bool YamlParser::read(sink_t sink) {
     }
     case YAML_MAPPING_START_EVENT: {
       expect(YAML_MAPPING_START_EVENT);
-      map_t map = sink.as_map();
+      variant_t raw_map;
+      map_t map = sink.new_sink(&raw_map).as_map();
       while (!at(YAML_MAPPING_END_EVENT)) {
         sink_t key;
         sink_t value;
@@ -126,7 +131,13 @@ bool YamlParser::read(sink_t sink) {
           return false;
       }
       expect(YAML_MAPPING_END_EVENT);
-      return true;
+      variant_t as_object = map[variant_t::string("object")];
+      if (map.size() == 1 && as_object.is_array()) {
+        return adapt_object(array_t(as_object), sink);
+      } else {
+        sink.set(raw_map);
+        return true;
+      }
     }
     case YAML_SCALAR_EVENT: {
       // The framework isn't very helpful in this case so we have to do the
@@ -233,10 +244,29 @@ static variant_t get_variant_type_name(variant_t value) {
       return "bool";
     case PTON_ARRAY:
       return "array";
+    case PTON_MAP:
+      return "map";
     default:
       return "wut?";
   }
 }
+
+void fail_assert_samevar(const char *file, int line, variant_t a, variant_t b,
+    const char *a_src, const char *b_src) {
+  TextWriter a_writer;
+  a_writer.write(a);
+  TextWriter b_writer;
+  b_writer.write(b);
+  fail(file, line, "Assertion failed: %s == %s.\n  Expected: %s\n  Found: %s",
+      a_src, b_src, *a_writer, *b_writer);
+}
+
+#define ASSERT_SAMEVAR(A, B) do {                                              \
+  variant_t __a__ = (A);                                                       \
+  variant_t __b__ = (B);                                                       \
+  if (!(__a__ == __b__))                                                       \
+    fail_assert_samevar(__FILE__, __LINE__, __a__, __b__, #A, #B);             \
+} while (false)
 
 TEST(generic, datatypes) {
   arena_t arena;
@@ -246,7 +276,12 @@ TEST(generic, datatypes) {
     variant_t entry = test_case[i];
     variant_t value = entry.map_get("value");
     variant_t type_name = entry.map_get("type");
-    ASSERT_TRUE(type_name == get_variant_type_name(value));
+    if (!(type_name == get_variant_type_name(value))) {
+      TextWriter writer;
+      writer.write(value);
+      HEST("Error: %s", *writer);
+    }
+    ASSERT_SAMEVAR(type_name, get_variant_type_name(value));
   }
 }
 

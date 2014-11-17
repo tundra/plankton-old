@@ -305,6 +305,15 @@ public:
   variant_t operator[](uint32_t index) const { return array_get(index); }
 };
 
+class object_t : public variant_t {
+public:
+  object_t() : variant_t() { }
+
+  explicit object_t(variant_t variant);
+
+  variant_t header();
+};
+
 // A variant that represents a map. A map can be either an actual map or null,
 // to make conversion more convenient. If you want to be sure you're really
 // dealing with a map do an if-check.
