@@ -15,7 +15,12 @@ END_C_INCLUDES
 
 #include <vector>
 
-struct pton_arena_t { };
+// This is really just an opaque name for c api arenas but it does need a tiny
+// bit of functionality just to be on the safe side wrt. destruction.
+class pton_arena_t {
+public:
+  virtual ~pton_arena_t() { }
+};
 
 namespace plankton {
 

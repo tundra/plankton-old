@@ -104,9 +104,10 @@ private:
   uint32_t size_;
 };
 
-struct pton_sink_t {
+class pton_sink_t {
 public:
   explicit pton_sink_t(Factory *origin);
+  ~pton_sink_t() { }
 
   // Sets this sink's value but only if the on_set callback returns true and
   // the value hasn't already been set.
