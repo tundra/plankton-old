@@ -107,7 +107,7 @@ private:
 class pton_sink_t {
 public:
   explicit pton_sink_t(Factory *origin);
-  ~pton_sink_t() { }
+  virtual ~pton_sink_t() { }
 
   // Sets this sink's value but only if the on_set callback returns true and
   // the value hasn't already been set.
@@ -385,13 +385,6 @@ Variant Variant::default_string_encoding() {
   return Variant("utf-8");
 }
 
-Array::Array(Variant variant) : Variant() {
-  // Initialize this to the null value and then, if the given variant is an
-  // array, override with the variant's state.
-  if (variant.is_array())
-    *static_cast<Variant*>(this) = variant;
-}
-
 bool pton_array_add(pton_variant_t array, pton_variant_t value) {
   return Variant(array).array_add(Variant(value));
 }
@@ -496,13 +489,6 @@ pton_sink_t *pton_arena_array_t::add_sink() {
   ArraySink *result = origin_->alloc_sink<ArraySink>();
   result->init(this, index);
   return result;
-}
-
-Map::Map(Variant variant) : Variant() {
-  // Initialize this to the null value and then, if the given variant is a map,
-  // override with the variant's state.
-  if (variant.type() == PTON_MAP)
-    *static_cast<Variant*>(this) = variant;
 }
 
 uint32_t pton_map_size(pton_variant_t variant) {
@@ -745,11 +731,6 @@ char *Variant::string_mutable_chars() const {
   return pton_string_mutable_chars(value_);
 }
 
-String::String(Variant variant) {
-  if (variant.is_string())
-    *static_cast<Variant*>(this) = variant;
-}
-
 pton_arena_string_t::pton_arena_string_t(char *chars, uint32_t length,
     Variant encoding, bool is_frozen)
   : chars_(chars)
@@ -798,11 +779,6 @@ const void *Variant::blob_data() const {
 
 void *Variant::blob_mutable_data() {
   return is_frozen() ? NULL : const_cast<void*>(blob_data());
-}
-
-Blob::Blob(Variant variant) {
-  if (variant.is_blob())
-    *static_cast<Variant*>(this) = variant;
 }
 
 Sink::Sink(pton_sink_t *data)

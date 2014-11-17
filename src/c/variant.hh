@@ -271,9 +271,8 @@ public:
   // Creates a new empty array.
   Array() : Variant() { }
 
-  // Conversion to an array of some value. If the value is indeed an array the
-  // result is a proper array, if it is something else the result is null.
-  Array(Variant variant);
+  // Wrap some value as an array.
+  Array(Variant variant) : Variant(variant) { }
 
   // Adds the given value at the end of this array if it is mutable. Returns
   // true if adding succeeded.
@@ -322,9 +321,8 @@ public:
   // This is the name you'd typically use for an iterator.
   typedef Map_Iterator Iterator;
 
-  // Conversion to a map of some value. If the value is indeed a map the
-  // result is a proper map, if it is something else the result is null.
-  Map(Variant variant);
+  // Wrap some value as a map.
+  Map(Variant variant) : Variant(variant) { }
 
   // Adds a mapping from the given key to the given value if this map is
   // mutable. Returns true if setting succeeded.
@@ -350,7 +348,7 @@ public:
 // really dealing with a string do an if-check.
 class String : public Variant {
 public:
-  String(Variant variant);
+  String(Variant variant) : Variant(variant) { }
 
   // Returns the length of this string if it is a string, otherwise 0.
   uint32_t length() const { return string_length(); }
@@ -371,7 +369,9 @@ public:
 // really dealing with a blob do an if-check.
 class Blob : public Variant {
 public:
-  Blob(Variant variant);
+  Blob() : Variant() { }
+
+  Blob(Variant variant) : Variant(variant) { }
 
   // Returns the size of this blob if it is a blob, otherwise 0.
   uint32_t size() const { return blob_size(); }
