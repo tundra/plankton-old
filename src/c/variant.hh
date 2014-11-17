@@ -13,7 +13,6 @@ BEGIN_C_INCLUDES
 #include "utils/alloc.h"
 END_C_INCLUDES
 
-#include "callback.hh"
 #include <vector>
 
 struct pton_arena_t { };
@@ -384,7 +383,10 @@ public:
   virtual ~Factory() { }
 
   // Creates and returns a new map value.
-  virtual plankton::Map new_map() = 0;
+  virtual Map new_map() = 0;
+
+  // Creates and returns a new mutable array value.
+  virtual Array new_array() = 0;
 
   // Creates and returns a new sink value that will store the value set into the
   // given output parameter..
@@ -393,7 +395,7 @@ public:
   // Creates and returns a new variant string with the default encoding. The
   // string is fully owned by the arena so the character array can be disposed
   // after this call returns.
-  virtual plankton::String new_string(const char *str, uint32_t length) = 0;
+  virtual String new_string(const char *str, uint32_t length) = 0;
 };
 
 // A sink is like a pointer to a variant except that it also has access to an
@@ -436,8 +438,6 @@ private:
 
   pton_sink_t *data_;
 };
-
-typedef tclib::callback_t<bool(Variant)> sink_set_callback_t;
 
 // An arena within which plankton values can be allocated. Once the values are
 // no longer needed all can be disposed by disposing the arena.
@@ -521,14 +521,9 @@ private:
   // Allocates a raw block of memory.
   void *alloc_raw(uint32_t size);
 
-  // Adds a disposable value to the set of values to clean up on teardown.
-  void add_disposable(disposable_t *ptr);
-
   // Allocates the backing storage for a sink value.
-  pton_sink_t *alloc_sink(sink_set_callback_t on_set);
-
-  // Values that must be explicitly disposed when tearing down this arena.
-  std::vector<disposable_t*> disposables_;
+  template <typename S>
+  S *alloc_sink();
 
   // The raw pages of memory allocated for this arena.
   std::vector<uint8_t*> blocks_;

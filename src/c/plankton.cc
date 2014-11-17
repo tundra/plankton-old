@@ -3,7 +3,6 @@
 
 #include "plankton-inl.hh"
 #include "stdc.h"
-#include "callback.hh"
 #include <new>
 
 using namespace plankton;
@@ -40,11 +39,10 @@ public:
 
   pton_sink_t *add_sink();
 
-  bool set_from_sink(size_t index, Variant value);
-
 private:
   friend class plankton::Variant;
   friend class plankton::Arena;
+  friend class ArraySink;
   static const uint32_t kDefaultInitCapacity = 8;
   Arena *origin_;
   uint32_t length_;
@@ -69,12 +67,10 @@ public:
 
   uint32_t size() const { return size_; }
 
-  bool set_key_from_sink(size_t index, Variant value);
-
-  bool set_value_from_sink(size_t index, Variant value);
-
 private:
   friend class ::Map_Iterator;
+  friend class MapKeySink;
+  friend class MapValueSink;
 
   Arena *origin_;
   uint32_t size_;
@@ -108,26 +104,22 @@ private:
   uint32_t size_;
 };
 
-// Generic interface for arena-allocated values that have a virtual destructor
-// that must be called on cleanup.
-class plankton::disposable_t {
+struct pton_sink_t {
 public:
-  virtual ~disposable_t() { };
-};
-
-struct pton_sink_t : public disposable_t {
-public:
-  explicit pton_sink_t(Arena *origin, sink_set_callback_t on_set);
+  explicit pton_sink_t(Factory *origin);
 
   // Sets this sink's value but only if the on_set callback returns true and
   // the value hasn't already been set.
   bool set(Variant value);
 
+protected:
+  // Sets whatever destination this sink is backed by.
+  virtual bool set_destination(Variant value) = 0;
+
 private:
   friend class plankton::Sink;
   bool is_empty_;
-  Arena *origin_;
-  sink_set_callback_t on_set_;
+  Factory *origin_;
 };
 
 pton_arena_t *pton_new_arena() {
@@ -144,15 +136,7 @@ void *Arena::alloc_raw(uint32_t bytes) {
   return result;
 }
 
-void Arena::add_disposable(disposable_t *ptr) {
-  disposables_.push_back(ptr);
-}
-
 Arena::~Arena() {
-  for (size_t i = 0; i < disposables_.size(); i++) {
-    disposable_t *ptr = disposables_[i];
-    ptr->~disposable_t();
-  }
   for (size_t i = 0; i < blocks_.size(); i++)
     delete[] blocks_[i];
 }
@@ -251,23 +235,36 @@ Blob Arena::new_blob(uint32_t size) {
   return Blob(result);
 }
 
-static bool set_variant_ptr(Variant *out, Variant value) {
-  *out = value;
+class VariantPtrSink : public pton_sink_t {
+public:
+  explicit VariantPtrSink(Factory *origin)
+    : pton_sink_t(origin)
+    , out_(NULL) { }
+  void init(Variant *out);
+  virtual bool set_destination(Variant value);
+private:
+  Variant *out_;
+};
+
+void VariantPtrSink::init(Variant *out) {
+  out_ = out;
+}
+
+bool VariantPtrSink::set_destination(Variant value) {
+  *out_ = value;
   return true;
 }
 
 Sink Arena::new_sink(Variant *out) {
-  pton_sink_t *data = alloc_sink(tclib::new_callback(set_variant_ptr, out));
-  return Sink(data);
+  VariantPtrSink *sink = alloc_sink<VariantPtrSink>();
+  sink->init(out);
+  return Sink(sink);
 }
 
-pton_sink_t *Arena::alloc_sink(plankton::sink_set_callback_t on_set) {
-  pton_sink_t *result = alloc_value<pton_sink_t>();
-  if (!on_set.is_empty())
-    // If there is a nontrivial callback we need to be sure it gets disposed on
-    // arena teardown.
-    add_disposable(result);
-  return new (result) pton_sink_t(this, on_set);
+template <typename S>
+S *Arena::alloc_sink() {
+  S *result = alloc_value<S>();
+  return new (result) S(this);
 }
 
 // Creates and returns a new sink value.
@@ -466,10 +463,28 @@ bool pton_arena_array_t::add(Variant value) {
   return true;
 }
 
-bool pton_arena_array_t::set_from_sink(size_t index, Variant value) {
-  if (is_frozen())
+class ArraySink : public pton_sink_t {
+public:
+  explicit ArraySink(Factory *origin)
+    : pton_sink_t(origin)
+    , array_(NULL)
+    , index_(0) { }
+  void init(pton_arena_array_t *data, uint32_t index);
+  virtual bool set_destination(Variant value);
+private:
+  pton_arena_array_t *array_;
+  uint32_t index_;
+};
+
+void ArraySink::init(pton_arena_array_t *array, uint32_t index) {
+  array_ = array;
+  index_ = index;
+}
+
+bool ArraySink::set_destination(Variant value) {
+  if (array_->is_frozen())
     return false;
-  elms_[index] = value;
+  array_->elms_[index_] = value;
   return true;
 }
 
@@ -477,9 +492,9 @@ pton_sink_t *pton_arena_array_t::add_sink() {
   size_t index = length_;
   if (!add(Variant::null()))
       return false;
-  sink_set_callback_t on_set = tclib::new_callback(
-      &pton_arena_array_t::set_from_sink, this, index);
-  return origin_->alloc_sink(on_set);
+  ArraySink *result = origin_->alloc_sink<ArraySink>();
+  result->init(this, index);
+  return result;
 }
 
 Map::Map(Variant variant) : Variant() {
@@ -606,17 +621,46 @@ bool pton_arena_map_t::set(Variant key, Variant value) {
   return true;
 }
 
-bool pton_arena_map_t::set_key_from_sink(size_t index, Variant value) {
-  if (is_frozen())
+class MapSink : public pton_sink_t {
+public:
+  explicit MapSink(Factory *origin)
+    : pton_sink_t(origin)
+    , map_(NULL)
+    , index_(0) { }
+  void init(pton_arena_map_t *map, size_t index);
+protected:
+  pton_arena_map_t *map_;
+  size_t index_;
+};
+
+void MapSink::init(pton_arena_map_t *map, size_t index) {
+  map_ = map;
+  index_ = index;
+}
+
+class MapKeySink : public MapSink {
+public:
+  explicit MapKeySink(Factory *origin) : MapSink(origin) { }
+  virtual bool set_destination(Variant value);
+};
+
+bool MapKeySink::set_destination(Variant value) {
+  if (map_->is_frozen())
     return false;
-  elms_[index].key = value;
+  map_->elms_[index_].key = value;
   return true;
 }
 
-bool pton_arena_map_t::set_value_from_sink(size_t index, Variant value) {
-  if (is_frozen())
+class MapValueSink : public MapSink {
+public:
+  explicit MapValueSink(Factory *origin) : MapSink(origin) { }
+  virtual bool set_destination(Variant value);
+};
+
+bool MapValueSink::set_destination(Variant value) {
+  if (map_->is_frozen())
     return false;
-  elms_[index].value = value;
+  map_->elms_[index_].value = value;
   return true;
 }
 
@@ -624,13 +668,12 @@ bool pton_arena_map_t::set(pton_sink_t **key_out, pton_sink_t **value_out) {
   size_t index = size_;
   if (!(set(Variant::null(), Variant::null())))
     return false;
-
-  pton_sink_t *key = origin_->alloc_sink(
-      tclib::new_callback(&pton_arena_map_t::set_key_from_sink, this, index));
-  *key_out = key;
-  pton_sink_t *value = origin_->alloc_sink(
-      tclib::new_callback(&pton_arena_map_t::set_value_from_sink, this, index));
-  *value_out = value;
+  MapKeySink *key_sink = origin_->alloc_sink<MapKeySink>();
+  key_sink->init(this, index);
+  *key_out = key_sink;
+  MapValueSink *value_sink = origin_->alloc_sink<MapValueSink>();
+  value_sink->init(this, index);
+  *value_out = value_sink;
   return true;
 }
 
@@ -818,14 +861,13 @@ bool Sink::set_string(const char *chars, uint32_t length) {
   return data_->set(value);
 }
 
-pton_sink_t::pton_sink_t(Arena *origin, sink_set_callback_t on_set)
+pton_sink_t::pton_sink_t(Factory *origin)
   : is_empty_(true)
-  , origin_(origin)
-  , on_set_(on_set) { }
+  , origin_(origin) { }
 
 bool pton_sink_t::set(Variant value) {
   if (is_empty_) {
-    if (!on_set_.is_empty() && !on_set_(value))
+    if (!set_destination(value))
       return false;
     is_empty_ = false;
     return true;
