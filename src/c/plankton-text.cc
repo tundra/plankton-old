@@ -23,7 +23,7 @@ public:
   TextWriterImpl();
 
   // Writes the given value on the stream at the current indentation level.
-  void write(variant_t value);
+  void write(Variant value);
 
   // Null-terminates and stores the result in the destination.
   void flush(TextWriter *writer);
@@ -78,10 +78,10 @@ private:
   void write_blob(const void *data, size_t size);
 
   // Writes an array value.
-  void write_array(array_t array);
+  void write_array(Array array);
 
   // Writes a map value.
-  void write_map(map_t map);
+  void write_map(Map map);
 
   // Writes the given identity token.
   void write_id(uint32_t size, uint64_t value);
@@ -106,7 +106,7 @@ private:
   // greater we bail out immediately. This is to keep the calculation constant
   // and avoid the potential complexity blowup if we compute the full size
   // of subtrees for every variant.
-  static size_t get_short_length(variant_t variant, size_t offset);
+  static size_t get_short_length(Variant variant, size_t offset);
 
   Buffer<char> chars_;
   size_t indent_;
@@ -117,7 +117,7 @@ TextWriterImpl::TextWriterImpl()
   : indent_(0)
   , has_pending_newline_(false) { }
 
-void TextWriterImpl::write(variant_t value) {
+void TextWriterImpl::write(Variant value) {
   switch (value.type()) {
     case PTON_BOOL:
       write_raw_string(value.bool_value() ? "%t" : "%f");
@@ -138,10 +138,10 @@ void TextWriterImpl::write(variant_t value) {
       write_blob(value.blob_data(), value.blob_size());
       break;
     case PTON_ARRAY:
-      write_array(array_t(value));
+      write_array(Array(value));
       break;
     case PTON_MAP:
-      write_map(map_t(value));
+      write_map(Map(value));
       break;
     default:
       write_raw_string("?");
@@ -149,7 +149,7 @@ void TextWriterImpl::write(variant_t value) {
   }
 }
 
-size_t TextWriterImpl::get_short_length(variant_t value, size_t offset) {
+size_t TextWriterImpl::get_short_length(Variant value, size_t offset) {
   switch (value.type()) {
     case PTON_INTEGER:
       return offset + 5;
@@ -159,17 +159,17 @@ size_t TextWriterImpl::get_short_length(variant_t value, size_t offset) {
     case PTON_STRING:
       return offset + value.string_length();
     case PTON_ARRAY: {
-      array_t array = array_t(value);
+      Array array = Array(value);
       size_t current = offset + 2;
       for (size_t i = 0; i < array.length() && current < kShortLengthLimit; i++)
         current = get_short_length(array[i], current) + 2;
       return current;
     }
     case PTON_MAP: {
-      map_t map = map_t(value);
+      Map map = Map(value);
       size_t current = offset + 2;
-      variant_t key, value;
-      for (map_iterator_t iter = map.iter();
+      Variant key, value;
+      for (Map::Iterator iter = map.iter();
            iter.advance(&key, &value) && current < kShortLengthLimit;) {
         current = get_short_length(key, current) + 2;
         current = get_short_length(value, current);
@@ -334,7 +334,7 @@ void TextWriterImpl::write_blob(const void *data, size_t size) {
   write_raw_char(']');
 }
 
-void TextWriterImpl::write_array(array_t array) {
+void TextWriterImpl::write_array(Array array) {
   bool is_long = get_short_length(array, indent_) >= kShortLengthLimit;
   write_raw_char('[');
   if (is_long) {
@@ -342,7 +342,7 @@ void TextWriterImpl::write_array(array_t array) {
     schedule_newline();
   }
   for (size_t i = 0; i < array.length(); i++) {
-    variant_t value = array[i];
+    Variant value = array[i];
     write(value);
     if (i + 1 < array.length()) {
       write_raw_char(',');
@@ -357,16 +357,16 @@ void TextWriterImpl::write_array(array_t array) {
   write_raw_char(']');
 }
 
-void TextWriterImpl::write_map(map_t map) {
+void TextWriterImpl::write_map(Map map) {
   bool is_long = get_short_length(map, indent_) >= kShortLengthLimit;
   write_raw_char('{');
   if (is_long) {
     indent();
     schedule_newline();
   }
-  variant_t key;
-  variant_t value;
-  for (map_iterator_t iter = map.iter(); iter.advance(&key, &value);) {
+  Variant key;
+  Variant value;
+  for (Map::Iterator iter = map.iter(); iter.advance(&key, &value);) {
     write(key);
     write_raw_char(':');
     write_raw_char(' ');
@@ -413,7 +413,7 @@ void TextWriterImpl::flush(TextWriter *writer) {
   writer->chars_ = chars_.release();
 }
 
-void TextWriter::write(variant_t value) {
+void TextWriter::write(Variant value) {
   TextWriterImpl impl;
   impl.write(value);
   impl.flush(this);
@@ -426,7 +426,7 @@ public:
 
   // Decode a toplevel variant expression. A toplevel expression is different
   // from others because it must fill the whole string.
-  bool decode_toplevel(variant_t *out);
+  bool decode_toplevel(Variant *out);
 
 private:
   // Mapping from ascii characters to the base-64 sextets they represent.
@@ -466,34 +466,34 @@ private:
   static bool is_digit(char c);
 
   // Fails parsing, returning false.
-  bool fail(variant_t *out);
+  bool fail(Variant *out);
 
   // Succeeds parsing of some expression, returning true.
-  bool succeed(variant_t value, variant_t *out);
+  bool succeed(Variant value, Variant *out);
 
   // Decodes a non-toplevel expression.
-  bool decode(variant_t *out);
+  bool decode(Variant *out);
 
   // Parses the next integer.
-  bool decode_integer(variant_t *out);
+  bool decode_integer(Variant *out);
 
   // Parses the next unquoted string.
-  bool decode_unquoted_string(variant_t *out);
+  bool decode_unquoted_string(Variant *out);
 
   // Parses the next quoted string.
-  bool decode_quoted_string(variant_t *out);
+  bool decode_quoted_string(Variant *out);
 
   // Parses the next binary blob.
-  bool decode_blob(variant_t *out);
+  bool decode_blob(Variant *out);
 
   // Parses the next array.
-  bool decode_array(variant_t *out);
+  bool decode_array(Variant *out);
 
   // Parses the next map.
-  bool decode_map(variant_t *out);
+  bool decode_map(Variant *out);
 
   // Returns the arena to use for allocation.
-  pton_arena_t *arena() { return parser_->arena_; }
+  Arena *arena() { return parser_->arena_; }
 
   // Given a character, returns the special character it encodes (for instance
   // a newline for 'n'), or a null character if this one doesn't represent a
@@ -551,24 +551,24 @@ bool TextReaderImpl::is_digit(char c) {
   return '0' <= c && c <= '9';
 }
 
-bool TextReaderImpl::decode_toplevel(variant_t *out) {
+bool TextReaderImpl::decode_toplevel(Variant *out) {
   return decode(out) && (!has_more() || fail(out));
 }
 
-bool TextReaderImpl::decode(variant_t *out) {
+bool TextReaderImpl::decode(Variant *out) {
   switch (current()) {
     case '%':
       advance();
       switch (current()) {
         case 'f':
           advance_and_skip();
-          return succeed(variant_t::no(), out);
+          return succeed(Variant::no(), out);
         case 't':
           advance_and_skip();
-          return succeed(variant_t::yes(), out);
+          return succeed(Variant::yes(), out);
         case 'n':
           advance_and_skip();
-          return succeed(variant_t::null(), out);
+          return succeed(Variant::null(), out);
         case '[':
           return decode_blob(out);
         default:
@@ -593,7 +593,7 @@ bool TextReaderImpl::decode(variant_t *out) {
   }
 }
 
-bool TextReaderImpl::decode_integer(variant_t *out) {
+bool TextReaderImpl::decode_integer(Variant *out) {
   bool is_negative = false;
   if (current() == '-') {
     is_negative = true;
@@ -607,10 +607,10 @@ bool TextReaderImpl::decode_integer(variant_t *out) {
   skip_whitespace();
   if (is_negative)
     result = -result;
-  return succeed(variant_t::integer(result), out);
+  return succeed(Variant::integer(result), out);
 }
 
-bool TextReaderImpl::decode_unquoted_string(variant_t *out) {
+bool TextReaderImpl::decode_unquoted_string(Variant *out) {
   const char *start = chars_ + cursor_;
   while (TextWriterImpl::is_unquoted_string_part(current()))
     advance();
@@ -672,7 +672,7 @@ static bool parse_hex_digit(char c, uint8_t *out) {
   return true;
 }
 
-bool TextReaderImpl::decode_quoted_string(variant_t *out) {
+bool TextReaderImpl::decode_quoted_string(Variant *out) {
   advance();
   Buffer<char> buf;
   while (has_more() && current() != '"') {
@@ -709,11 +709,11 @@ bool TextReaderImpl::decode_quoted_string(variant_t *out) {
   return succeed(arena()->new_string(*buf, buf.length()), out);
 }
 
-bool TextReaderImpl::decode_array(variant_t *out) {
+bool TextReaderImpl::decode_array(Variant *out) {
   advance_and_skip();
-  array_t result = arena()->new_array();
+  Array result = arena()->new_array();
   while (has_more() && current() != ']') {
-    variant_t next;
+    Variant next;
     if (!decode(&next))
       return fail(out);
     result.add(next);
@@ -730,17 +730,17 @@ bool TextReaderImpl::decode_array(variant_t *out) {
   return succeed(result, out);
 }
 
-bool TextReaderImpl::decode_map(variant_t *out) {
+bool TextReaderImpl::decode_map(Variant *out) {
   advance_and_skip();
-  map_t result = arena()->new_map();
+  Map result = arena()->new_map();
   while (has_more() && current() != '}') {
-    variant_t key;
+    Variant key;
     if (!decode(&key))
       return fail(out);
     if (current() != ':')
       return fail(out);
     advance_and_skip();
-    variant_t value;
+    Variant value;
     if (!decode(&value))
       return fail(out);
     result.set(key, value);
@@ -782,7 +782,7 @@ const uint8_t TextReaderImpl::kBase64CharToSextet[256] = {
   INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV, INV
 };
 
-bool TextReaderImpl::decode_blob(variant_t *out) {
+bool TextReaderImpl::decode_blob(Variant *out) {
   Buffer<uint8_t> data;
   if (current() == '[') {
     advance_and_skip();
@@ -818,35 +818,35 @@ bool TextReaderImpl::decode_blob(variant_t *out) {
   }
   if (current() == ']') {
     advance_and_skip();
-    variant_t result = arena()->new_blob(*data, data.length());
+    Variant result = arena()->new_blob(*data, data.length());
     return succeed(result, out);
   } else {
     return fail(out);
   }
 }
 
-bool TextReaderImpl::fail(variant_t *out) {
+bool TextReaderImpl::fail(Variant *out) {
   parser_->has_failed_ = true;
   parser_->offender_ = current();
-  *out = variant_t::null();
+  *out = Variant::null();
   return false;
 }
 
-bool TextReaderImpl::succeed(variant_t value, variant_t *out) {
+bool TextReaderImpl::succeed(Variant value, Variant *out) {
   *out = value;
   return true;
 }
 
-TextReader::TextReader(pton_arena_t *arena)
+TextReader::TextReader(Arena *arena)
   : arena_(arena)
   , has_failed_(false)
   , offender_('\0') { }
 
-variant_t TextReader::parse(const char *chars, size_t length) {
+Variant TextReader::parse(const char *chars, size_t length) {
   has_failed_ = false;
   offender_ = '\0';
   TextReaderImpl decoder(chars, length, this);
-  variant_t result;
+  Variant result;
   decoder.decode_toplevel(&result);
   return result;
 }

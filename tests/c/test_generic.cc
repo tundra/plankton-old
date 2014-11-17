@@ -18,28 +18,28 @@ using namespace plankton;
 class TestCase {
 public:
   TestCase() { }
-  TestCase(variant_t entries);
+  TestCase(Variant entries);
 
   // Returns the number of entries in this test case, discounting the clauses
   // that contained metadata like the test_type.
   size_t size() { return cases_.size(); }
 
   // Returns the i'th entry, skipping metadata clauses.
-  variant_t operator[](size_t i) { return entries_[cases_[i]]; }
+  Variant operator[](size_t i) { return entries_[cases_[i]]; }
 
   // Returns the test type field, null if there were none.
-  variant_t test_type() { return test_type_; }
+  Variant test_type() { return test_type_; }
 
 private:
-  array_t entries_;
-  variant_t test_type_;
+  Array entries_;
+  Variant test_type_;
   std::vector<size_t> cases_;
 };
 
-TestCase::TestCase(variant_t entries) : entries_(entries) {
+TestCase::TestCase(Variant entries) : entries_(entries) {
   for (size_t i = 0; i < entries_.length(); i++) {
-    variant_t entry = entries_[i];
-    variant_t test_type = entry.map_get("test_type");
+    Variant entry = entries_[i];
+    Variant test_type = entry.map_get("test_type");
     if (test_type.is_string()) {
       test_type_ = test_type;
     } else {
@@ -57,13 +57,13 @@ public:
 
   // Parses the contents of the given file as yaml, building the result using
   // the given sink.
-  bool parse(open_file_t *in, sink_t sink);
+  bool parse(open_file_t *in, Sink sink);
 
-  static bool get_test_case(variant_t name, arena_t *arena, TestCase *test_case);
+  static bool get_test_case(Variant name, Arena *arena, TestCase *test_case);
 
 private:
   // Reads the next expression.
-  bool read(sink_t sink);
+  bool read(Sink sink);
 
   // Advances the parser to the next event.
   void advance();
@@ -103,11 +103,11 @@ int YamlParser::handle_framework_read(void *yaml_file_ptr, unsigned char *buffer
   return true;
 }
 
-bool YamlParser::read(sink_t sink) {
+bool YamlParser::read(Sink sink) {
   switch (current_.type) {
     case YAML_SEQUENCE_START_EVENT: {
       expect(YAML_SEQUENCE_START_EVENT);
-      array_t array = sink.as_array();
+      Array array = sink.as_array();
       while (!at(YAML_SEQUENCE_END_EVENT)) {
         if (!read(array.add()))
           return false;
@@ -117,10 +117,10 @@ bool YamlParser::read(sink_t sink) {
     }
     case YAML_MAPPING_START_EVENT: {
       expect(YAML_MAPPING_START_EVENT);
-      map_t map = sink.as_map();
+      Map map = sink.as_map();
       while (!at(YAML_MAPPING_END_EVENT)) {
-        sink_t key;
-        sink_t value;
+        Sink key;
+        Sink value;
         ASSERT_TRUE(map.set(&key, &value));
         if (!read(key) || !read(value))
           return false;
@@ -136,27 +136,27 @@ bool YamlParser::read(sink_t sink) {
       if (!current_.data.scalar.quoted_implicit) {
         // This is the case where the scalar is unquoted.
         if (strcmp("Yes", value) == 0) {
-          sink.set(variant_t::yes());
+          sink.set(Variant::yes());
           goto done;
         }
         if (strcmp("No", value) == 0) {
-          sink.set(variant_t::no());
+          sink.set(Variant::no());
           goto done;
         }
         if (strcmp("~", value) == 0) {
-          sink.set(variant_t::null());
+          sink.set(Variant::null());
           goto done;
         }
         char *endp = NULL;
         int64_t as_int = strtol(value, &endp, 10);
         if (endp == (value + length)) {
-          sink.set(variant_t::integer(as_int));
+          sink.set(Variant::integer(as_int));
           goto done;
         }
         if (length >= 2 && value[0] == '0' && value[1] == 'x') {
           int64_t as_hex = strtol(value + 2, &endp, 16);
           if (endp == (value + length)) {
-            sink.set(variant_t::integer(as_hex));
+            sink.set(Variant::integer(as_hex));
             goto done;
           }
         }
@@ -188,7 +188,7 @@ bool YamlParser::at(yaml_event_type_t type) {
   return current_.type == type;
 }
 
-bool YamlParser::parse(open_file_t *in, sink_t sink) {
+bool YamlParser::parse(open_file_t *in, Sink sink) {
   yaml_parser_set_input(&parser_, handle_framework_read, in);
   yaml_parser_parse(&parser_, &current_);
   expect(YAML_STREAM_START_EVENT);
@@ -200,18 +200,18 @@ bool YamlParser::parse(open_file_t *in, sink_t sink) {
   return true;
 }
 
-bool YamlParser::get_test_case(variant_t test_type, arena_t *arena, TestCase *test_case_out) {
+bool YamlParser::get_test_case(Variant test_type, Arena *arena, TestCase *test_case_out) {
   // Read the test case file into a variant.
   const char *yaml_path = getenv("YAML_PATH");
   open_file_t *yaml_file = file_system_open(file_system_native(), yaml_path,
       OPEN_FILE_MODE_READ);
   YamlParser parser;
-  variant_t everything;
+  Variant everything;
   ASSERT_TRUE(parser.parse(yaml_file, arena->new_sink(&everything)));
   open_file_close(yaml_file);
   // Scan through the test case to find the one we're looking for.
   for (size_t i = 0; i < everything.array_length(); i++) {
-    variant_t test_case = everything.array_get(i).map_get("test_case");
+    Variant test_case = everything.array_get(i).map_get("test_case");
     TestCase candidate(test_case);
     if (candidate.test_type() == test_type) {
       *test_case_out = candidate;
@@ -221,7 +221,7 @@ bool YamlParser::get_test_case(variant_t test_type, arena_t *arena, TestCase *te
   return false;
 }
 
-static variant_t get_variant_type_name(variant_t value) {
+static Variant get_variant_type_name(Variant value) {
   switch (value.type()) {
     case PTON_INTEGER:
       return "int";
@@ -239,25 +239,25 @@ static variant_t get_variant_type_name(variant_t value) {
 }
 
 TEST(generic, datatypes) {
-  arena_t arena;
+  Arena arena;
   TestCase test_case;
   ASSERT_TRUE(YamlParser::get_test_case("datatypes", &arena, &test_case));
   for (size_t i = 0; i < test_case.size(); i++) {
-    variant_t entry = test_case[i];
-    variant_t value = entry.map_get("value");
-    variant_t type_name = entry.map_get("type");
+    Variant entry = test_case[i];
+    Variant value = entry.map_get("value");
+    Variant type_name = entry.map_get("type");
     ASSERT_TRUE(type_name == get_variant_type_name(value));
   }
 }
 
 TEST(generic, transcoding) {
-  arena_t arena;
+  Arena arena;
   TestCase test_case;
   ASSERT_TRUE(YamlParser::get_test_case("transcoding", &arena, &test_case));
   for (size_t i = 0; i < test_case.size(); i++) {
-    variant_t entry = test_case[i];
-    variant_t value = entry.map_get("value");
-    variant_t binary_expected = entry.map_get("binary");
+    Variant entry = test_case[i];
+    Variant value = entry.map_get("value");
+    Variant binary_expected = entry.map_get("binary");
     BinaryWriter writer;
     writer.write(value);
     ASSERT_EQ(binary_expected.array_length(), writer.size());

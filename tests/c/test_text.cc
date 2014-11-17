@@ -11,9 +11,9 @@ using namespace plankton;
   TextWriter writer;                                                           \
   writer.write(VAR);                                                           \
   ASSERT_EQ(0, strcmp(EXP, *writer));                                          \
-  arena_t decoder;                                                             \
+  Arena decoder;                                                               \
   TextReader parser(&decoder);                                                 \
-  variant_t decoded = parser.parse(*writer, writer.length());                  \
+  Variant decoded = parser.parse(*writer, writer.length());                    \
   ASSERT_TRUE(decoded.is_frozen());                                            \
   TextWriter rewriter;                                                         \
   rewriter.write(decoded);                                                     \
@@ -21,25 +21,25 @@ using namespace plankton;
 } while (false)
 
 TEST(text, primitive) {
-  CHECK_ASCII("%f", variant_t::no());
-  CHECK_ASCII("%t", variant_t::yes());
-  CHECK_ASCII("%n", variant_t::null());
-  CHECK_ASCII("0", variant_t::integer(0));
-  CHECK_ASCII("10", variant_t::integer(10));
-  CHECK_ASCII("-10", variant_t::integer(-10));
-  CHECK_ASCII("fooBAR123", variant_t::string("fooBAR123"));
-  CHECK_ASCII("\"\"", variant_t::string(""));
-  CHECK_ASCII("\"123\"", variant_t::string("123"));
-  CHECK_ASCII("\"a b c\"", variant_t::string("a b c"));
-  CHECK_ASCII("\"a\\nb\"", variant_t::string("a\nb"));
-  CHECK_ASCII("\"a\\\"b\\\"c\"", variant_t::string("a\"b\"c"));
-  CHECK_ASCII("\"a\\x01b\\xa2c\"", variant_t::string("a\x1" "b" "\xa2" "c"));
-  CHECK_ASCII("%[TWFu]", variant_t::blob("Man", 3));
-  CHECK_ASCII("%[cGxlYXN1cmUu]", variant_t::blob("pleasure.", 9));
-  CHECK_ASCII("%[bGVhc3VyZS4=]", variant_t::blob("leasure.", 8));
-  CHECK_ASCII("%[ZWFzdXJlLg==]", variant_t::blob("easure.", 7));
-  CHECK_ASCII("%[YXN1cmUu]", variant_t::blob("asure.", 6));
-  CHECK_ASCII("%[c3VyZS4=]", variant_t::blob("sure.", 5));
+  CHECK_ASCII("%f", Variant::no());
+  CHECK_ASCII("%t", Variant::yes());
+  CHECK_ASCII("%n", Variant::null());
+  CHECK_ASCII("0", Variant::integer(0));
+  CHECK_ASCII("10", Variant::integer(10));
+  CHECK_ASCII("-10", Variant::integer(-10));
+  CHECK_ASCII("fooBAR123", Variant::string("fooBAR123"));
+  CHECK_ASCII("\"\"", Variant::string(""));
+  CHECK_ASCII("\"123\"", Variant::string("123"));
+  CHECK_ASCII("\"a b c\"", Variant::string("a b c"));
+  CHECK_ASCII("\"a\\nb\"", Variant::string("a\nb"));
+  CHECK_ASCII("\"a\\\"b\\\"c\"", Variant::string("a\"b\"c"));
+  CHECK_ASCII("\"a\\x01b\\xa2c\"", Variant::string("a\x1" "b" "\xa2" "c"));
+  CHECK_ASCII("%[TWFu]", Variant::blob("Man", 3));
+  CHECK_ASCII("%[cGxlYXN1cmUu]", Variant::blob("pleasure.", 9));
+  CHECK_ASCII("%[bGVhc3VyZS4=]", Variant::blob("leasure.", 8));
+  CHECK_ASCII("%[ZWFzdXJlLg==]", Variant::blob("easure.", 7));
+  CHECK_ASCII("%[YXN1cmUu]", Variant::blob("asure.", 6));
+  CHECK_ASCII("%[c3VyZS4=]", Variant::blob("sure.", 5));
   const char *long_blob =
       "Man is distinguished, not only by his reason, but by this singular passion from "
       "other animals, which is a lust of the mind, that by a perseverance of delight "
@@ -51,13 +51,13 @@ TEST(text, primitive) {
       "dGhlIG1pbmQsIHRoYXQgYnkgYSBwZXJzZXZlcmFuY2Ugb2YgZGVsaWdodCBpbiB0aGUgY29udGlu"
       "dWVkIGFuZCBpbmRlZmF0aWdhYmxlIGdlbmVyYXRpb24gb2Yga25vd2xlZGdlLCBleGNlZWRzIHRo"
       "ZSBzaG9ydCB2ZWhlbWVuY2Ugb2YgYW55IGNhcm5hbCBwbGVhc3VyZS4=]";
-  CHECK_ASCII(long_encoded, variant_t::blob(long_blob, strlen(long_blob)));
-  CHECK_ASCII("%[]", variant_t::blob(NULL, 0));
+  CHECK_ASCII(long_encoded, Variant::blob(long_blob, strlen(long_blob)));
+  CHECK_ASCII("%[]", Variant::blob(NULL, 0));
 }
 
 TEST(text, arrays) {
-  arena_t arena;
-  array_t a0 = arena.new_array();
+  Arena arena;
+  Array a0 = arena.new_array();
   a0.add(8);
   a0.add("foo");
   CHECK_ASCII("[8, foo]", a0);
@@ -79,21 +79,21 @@ TEST(text, arrays) {
       "  blahblahblah,\n"
       "  blahblahblah\n"
       "]", a0);
-  array_t a1 = arena.new_array();
+  Array a1 = arena.new_array();
   CHECK_ASCII("[]", a1);
-  array_t a2 = arena.new_array();
+  Array a2 = arena.new_array();
   a2.add(a1);
   a2.add(a1);
   CHECK_ASCII("[[], []]", a2);
-  array_t a3 = arena.new_array();
+  Array a3 = arena.new_array();
   a3.add(a2);
   a3.add(a2);
   CHECK_ASCII("[[[], []], [[], []]]", a3);
-  array_t a4 = arena.new_array();
+  Array a4 = arena.new_array();
   a4.add(a3);
   a4.add(a3);
   CHECK_ASCII("[[[[], []], [[], []]], [[[], []], [[], []]]]", a4);
-  array_t a5 = arena.new_array();
+  Array a5 = arena.new_array();
   a5.add(a4);
   a5.add(a4);
   CHECK_ASCII("[\n"
@@ -103,8 +103,8 @@ TEST(text, arrays) {
 }
 
 TEST(text, maps) {
-  arena_t arena;
-  map_t m0 = arena.new_map();
+  Arena arena;
+  Map m0 = arena.new_map();
   m0.set("foo", "bar");
   CHECK_ASCII("{foo: bar}", m0);
   m0.set(8, 16);
@@ -114,18 +114,18 @@ TEST(text, maps) {
 }
 
 #define CHECK_REWRITE(IN, OUT) do {                                            \
-  arena_t decoder;                                                             \
+  Arena decoder;                                                               \
   TextReader parser(&decoder);                                                 \
-  variant_t decoded = parser.parse(IN, strlen(IN));                            \
+  Variant decoded = parser.parse(IN, strlen(IN));                              \
   TextWriter writer;                                                           \
   writer.write(decoded);                                                       \
   ASSERT_EQ(0, strcmp(OUT, *writer));                                          \
 } while (false)
 
 #define CHECK_FAILS(CHR, IN) do {                                              \
-  arena_t arena;                                                               \
+  Arena arena;                                                                 \
   TextReader parser(&arena);                                                   \
-  variant_t decoded = parser.parse(IN, strlen(IN));                            \
+  Variant decoded = parser.parse(IN, strlen(IN));                              \
   ASSERT_TRUE(parser.has_failed());                                            \
   ASSERT_FALSE(bool(decoded));                                                 \
   ASSERT_EQ(CHR, parser.offender());                                           \

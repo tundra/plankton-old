@@ -8,7 +8,7 @@
 using namespace plankton;
 
 TEST(arena_cpp, alloc_values) {
-  arena_t arena;
+  Arena arena;
   int32_t *blocks[100];
   for (size_t i = 1; i < 100; i++) {
     int32_t *memory = arena.alloc_values<int32_t>(i);
@@ -24,8 +24,8 @@ TEST(arena_cpp, alloc_values) {
 }
 
 TEST(arena_cpp, array) {
-  arena_t arena;
-  array_t array = arena.new_array();
+  Arena arena;
+  Array array = arena.new_array();
   ASSERT_FALSE(array.is_frozen());
   for (size_t i = 0; i < 100; i++) {
     ASSERT_EQ(i, array.length());
@@ -37,23 +37,23 @@ TEST(arena_cpp, array) {
   ASSERT_FALSE(array.add(100));
   ASSERT_EQ(100, array.length());
   for (size_t i = 0; i < 100; i++) {
-    variant_t elm = array[i];
+    Variant elm = array[i];
     ASSERT_EQ(i, elm.integer_value());
   }
-  variant_t var = array;
+  Variant var = array;
   ASSERT_TRUE(array == var);
-  array_t array_again = array_t(var);
+  Array array_again = Array(var);
   ASSERT_TRUE(bool(array_again));
   ASSERT_EQ(100, array_again.length());
-  array_t null_array = array_t(variant_t::null());
+  Array null_array = Array(Variant::null());
   ASSERT_FALSE(bool(null_array));
-  ASSERT_TRUE(null_array[0] == variant_t::null());
+  ASSERT_TRUE(null_array[0] == Variant::null());
   ASSERT_EQ(0, null_array.length());
 }
 
 TEST(arena_cpp, map) {
-  arena_t arena;
-  map_t map = arena.new_map();
+  Arena arena;
+  Map map = arena.new_map();
   ASSERT_FALSE(map.is_frozen());
   for (size_t i = 0; i < 100; i++) {
     ASSERT_EQ(i, map.size());
@@ -65,38 +65,38 @@ TEST(arena_cpp, map) {
   ASSERT_FALSE(map.set(1000, 1001));
   ASSERT_EQ(100, map.size());
   for (size_t i = 0; i < 100; i++) {
-    variant_t elm = map[i];
+    Variant elm = map[i];
     ASSERT_EQ(i + 3, elm.integer_value());
   }
-  variant_t var = map;
+  Variant var = map;
   ASSERT_TRUE(map == var);
-  map_t map_again = map_t(var);
+  Map map_again = Map(var);
   ASSERT_TRUE(bool(map_again));
   ASSERT_EQ(100, map_again.size());
-  map_t null_map = map_t(variant_t::null());
+  Map null_map = Map(Variant::null());
   ASSERT_FALSE(bool(null_map));
-  ASSERT_TRUE(null_map[10] == variant_t::null());
+  ASSERT_TRUE(null_map[10] == Variant::null());
   ASSERT_EQ(0, null_map.size());
 }
 
 TEST(arena_cpp, mutstring) {
-  arena_t arena;
-  plankton::string_t varu8 = arena.new_string(3);
+  Arena arena;
+  plankton::String varu8 = arena.new_string(3);
   ASSERT_FALSE(varu8.is_frozen());
-  ASSERT_TRUE(varu8.encoding() == variant_t::default_string_encoding());
-  plankton::string_t varai = arena.new_string(3, "ascii");
+  ASSERT_TRUE(varu8.encoding() == Variant::default_string_encoding());
+  plankton::String varai = arena.new_string(3, "ascii");
   ASSERT_FALSE(varai.is_frozen());
-  ASSERT_TRUE(varai.encoding() == variant_t("ascii"));
+  ASSERT_TRUE(varai.encoding() == Variant("ascii"));
 }
 
 TEST(arena_cpp, sink) {
-  arena_t arena;
-  variant_t out;
-  sink_t s0 = arena.new_sink(&out);
+  Arena arena;
+  Variant out;
+  Sink s0 = arena.new_sink(&out);
   ASSERT_FALSE(bool(out));
   ASSERT_TRUE(s0.set(10));
   ASSERT_TRUE(bool(out));
-  ASSERT_TRUE(out == variant_t::integer(10));
+  ASSERT_TRUE(out == Variant::integer(10));
   ASSERT_FALSE(s0.set(12));
-  ASSERT_TRUE(out == variant_t::integer(10));
+  ASSERT_TRUE(out == Variant::integer(10));
 }

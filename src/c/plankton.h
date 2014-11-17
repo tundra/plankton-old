@@ -61,7 +61,8 @@ typedef struct {
     // data viewed as variants.
     uint8_t binary_version_ IF_MSVC(, : 8);
     // A length or size field. Only used by some variants but it wastes space
-    // on 64 bits to put it in the payload.
+    // on 64 bits to put it in the payload. Note that this field can not be
+    // used the length of a value whose length can change (arrays for instance).
     uint32_t length_ IF_MSVC(, : 32);
   } header_;
 
