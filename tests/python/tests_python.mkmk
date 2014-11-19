@@ -1,0 +1,19 @@
+# Copyright 2014 the Neutrino authors (see AUTHORS).
+# Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+file_names = [
+  "test_generic.py",
+]
+
+all = get_group("run-tests")
+path = get_root().get_child("src", "python")
+tests_yaml = get_external("tests", "generic", "tests.yaml")
+
+for file_name in file_names:
+  source_file = py.get_source_file(file_name)
+  source_file.add_pythonpath(path)
+  test_case = test.get_exec_test_case(file_name)
+  test_case.set_runner(source_file)
+  if file_name == "test_generic.py":
+    test_case.add_dependency(tests_yaml)
+  all.add_member(test_case)

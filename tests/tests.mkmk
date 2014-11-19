@@ -3,6 +3,8 @@
 
 include("generic", "tests_generic.mkmk")
 include("c", "tests_c.mkmk")
+include("python", "tests_python.mkmk")
 
 run_tests = get_group("run-tests")
 run_tests.add_dependency(get_external("tests", "c", "run-tests"))
+run_tests.add_dependency(get_external("tests", "python", "run-tests"))

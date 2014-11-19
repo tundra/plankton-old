@@ -411,9 +411,9 @@ def always_throw(key):
 
 class DefaultObject(object):
 
-  def __init__(self, header=None):
+  def __init__(self, header=None, payload=None):
     self.header = header
-    self.payload = None
+    self.payload = payload
 
   def set_header(self, value):
     self.header = value
