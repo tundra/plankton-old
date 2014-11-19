@@ -80,6 +80,12 @@ class GenericTest(unittest.TestCase):
       expected_type = GenericTest._PLANKTON_TO_PYTHON_TYPES.get(plankton_type, plankton_type)
       self.assertEquals(expected_type, found_type)
 
+  def test_transcoding(self):
+    for test_case in self.get_test("transcoding"):
+      value = test_case["value"]
+      binary = test_case["binary"]
+      self.assertEquals(binary, list(plankton.Encoder().encode(value)))
+
 
 if __name__ == '__main__':
   runner = unittest.TextTestRunner(verbosity=0)

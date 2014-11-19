@@ -409,109 +409,6 @@ def always_throw(key):
   raise Exception(key)
 
 
-class DefaultObject(object):
-
-  def __init__(self, header=None, payload=None):
-    self.header = header
-    self.payload = payload
-
-  def set_header(self, value):
-    self.header = value
-    return self
-
-  def get_header(self):
-    return self.header
-
-  def set_payload(self, value):
-    self.payload = value
-    return self
-
-  def set_contents(self, value):
-    return self.set_payload(value)
-
-  def get_payload(self):
-    return self.payload
-
-  def __str__(self):
-    return "#<? %s %s>" % (self.header, self.payload)
-
-
-
-class Decoder(object):
-
-  def __init__(self, access=str, default_object=DefaultObject):
-    self.access = access
-    self.default_object = default_object
-
-  # Decodes a byte array into a plankton object.
-  def decode(self, data):
-    stream = DataInputStream(data, self.access, self.default_object)
-    return stream.read_object()
-
-  def disassemble(self, data):
-    stream = DataInputStream(data, self.access, None)
-    return stream.disassemble_object("")
-
-  # Decodes a base64 encoded string into a plankton object.
-  def base64decode(self, data):
-    return self.decode(bytearray(base64.b64decode(data)))
-
-  def base64disassemble(self, data):
-    return self.disassemble(bytearray(base64.b64decode(data)))
-
-  # Sets the function to use to access environment values by key.
-  def set_access(self, value):
-    if not value is None:
-      self.access = value
-    return self
-
-
-# Holds state used when stringifying a value.
-class Stringifier(object):
-
-  def __init__(self):
-    pass
-
-  def s(self, value):
-    return visit_data(value, self)
-
-  def visit_object(self, value):
-    return '#<%s: %s>' % (self.s(value.header), self.s(value.payload))
-
-  def visit_array(self, value):
-    return "[%s]" % ", ".join([self.s(e) for e in value ])
-
-
-  def visit_map(self, value):
-    return "{%s}" % ", ".join([
-      "%s: %s" % (self.s(k), self.s(v))
-        for (k, v)
-        in value.items()
-    ])
-
-  def visit_string(self, value):
-    return '"%s"' % value
-
-  def visit_int(self, value):
-    return str(value)
-
-  def visit_null(self, value):
-    return "null"
-
-
-# Returns a human-readable string representation of the given data. The result
-# is _not_ intended to be read back in so if you're ever tempted to write a
-# parser, don't.
-def stringify(data):
-  return visit_data(data, Stringifier())
-
-
-# An empty object type used to create new class instances without calling init.
-# Hacky, granted.
-class Empty(object):
-  pass
-
-
 # A collection of information about how to serialize a python object.
 class ClassMetaInfo(object):
 
@@ -648,25 +545,8 @@ class ClassRegistry(object):
     return self.nearest_cache[klass]
 
 
-# An object that will always be resolved as an environment reference.
-class EnvironmentReference(object):
-
-  def __init__(self, key):
-    self.key = key
-
-  def __hash__(self):
-    return ~hash(self.key)
-
-  def __eq__(self, that):
-    if not isinstance(that, EnvironmentReference):
-      return False
-    else:
-      return self.key == that.key
-
-  # Create an environment reference whose key is the array of the given values.
-  @staticmethod
-  def path(*key):
-    return EnvironmentReference(key)
+# The singleton class registry that holds all the meta info used by plankton.
+_CLASS_REGISTRY = ClassRegistry()
 
 
 # Peel off any method wrappers (i.e. staticmethod) and return the naked
@@ -775,5 +655,128 @@ def field(name):
   return add_fields
 
 
-# The singleton class registry that holds all the meta info used by plankton.
-_CLASS_REGISTRY = ClassRegistry()
+@serializable
+class DefaultObject(object):
+
+  def __init__(self, header=None, payload=None):
+    self.header = header
+    self.payload = payload
+
+  def set_header(self, value):
+    self.header = value
+    return self
+
+  @header
+  def get_header(self):
+    return self.header
+
+  def set_payload(self, value):
+    self.payload = value
+    return self
+
+  def set_contents(self, value):
+    return self.set_payload(value)
+
+  @payload
+  def get_payload(self):
+    return self.payload
+
+  def __str__(self):
+    return "#<? %s %s>" % (self.header, self.payload)
+
+
+
+class Decoder(object):
+
+  def __init__(self, access=str, default_object=DefaultObject):
+    self.access = access
+    self.default_object = default_object
+
+  # Decodes a byte array into a plankton object.
+  def decode(self, data):
+    stream = DataInputStream(data, self.access, self.default_object)
+    return stream.read_object()
+
+  def disassemble(self, data):
+    stream = DataInputStream(data, self.access, None)
+    return stream.disassemble_object("")
+
+  # Decodes a base64 encoded string into a plankton object.
+  def base64decode(self, data):
+    return self.decode(bytearray(base64.b64decode(data)))
+
+  def base64disassemble(self, data):
+    return self.disassemble(bytearray(base64.b64decode(data)))
+
+  # Sets the function to use to access environment values by key.
+  def set_access(self, value):
+    if not value is None:
+      self.access = value
+    return self
+
+
+# Holds state used when stringifying a value.
+class Stringifier(object):
+
+  def __init__(self):
+    pass
+
+  def s(self, value):
+    return visit_data(value, self)
+
+  def visit_object(self, value):
+    return '#<%s: %s>' % (self.s(value.header), self.s(value.payload))
+
+  def visit_array(self, value):
+    return "[%s]" % ", ".join([self.s(e) for e in value ])
+
+
+  def visit_map(self, value):
+    return "{%s}" % ", ".join([
+      "%s: %s" % (self.s(k), self.s(v))
+        for (k, v)
+        in value.items()
+    ])
+
+  def visit_string(self, value):
+    return '"%s"' % value
+
+  def visit_int(self, value):
+    return str(value)
+
+  def visit_null(self, value):
+    return "null"
+
+
+# Returns a human-readable string representation of the given data. The result
+# is _not_ intended to be read back in so if you're ever tempted to write a
+# parser, don't.
+def stringify(data):
+  return visit_data(data, Stringifier())
+
+
+# An empty object type used to create new class instances without calling init.
+# Hacky, granted.
+class Empty(object):
+  pass
+
+
+# An object that will always be resolved as an environment reference.
+class EnvironmentReference(object):
+
+  def __init__(self, key):
+    self.key = key
+
+  def __hash__(self):
+    return ~hash(self.key)
+
+  def __eq__(self, that):
+    if not isinstance(that, EnvironmentReference):
+      return False
+    else:
+      return self.key == that.key
+
+  # Create an environment reference whose key is the array of the given values.
+  @staticmethod
+  def path(*key):
+    return EnvironmentReference(key)
