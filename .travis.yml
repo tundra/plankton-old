@@ -1,7 +1,7 @@
 language: c
 compiler: gcc
 script: mkmk init --config plankton.mkmk --debug --noisy && ./build.sh all run-tests
-install: source ./tools/enter-devenv.sh
+install: source ./tools/enter-devenv.sh && sudo apt-get update && sudo apt-get install python-yaml
 
 matrix:
   include:
