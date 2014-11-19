@@ -621,6 +621,27 @@ Variant Variant::object_get_field(Variant key) {
       : null();
 }
 
+uint32_t Variant::object_field_count() {
+  pton_check_binary_version(value_);
+  return is_object()
+      ? value_.payload_.as_arena_object_->fields_.size()
+      : 0;
+}
+
+Map_Iterator Variant::object_fields_begin() {
+  pton_check_binary_version(value_);
+  return is_object()
+      ? value_.payload_.as_arena_object_->fields_.begin()
+      : Map_Iterator();
+}
+
+Map_Iterator Variant::object_fields_end() {
+  pton_check_binary_version(value_);
+  return is_object()
+      ? value_.payload_.as_arena_object_->fields_.end()
+      : Map_Iterator();
+}
+
 uint32_t Variant::id_size() const {
   return pton_id_size(value_);
 }

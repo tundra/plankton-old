@@ -197,6 +197,17 @@ public:
   // that field. Otherwise returns the null value.
   Variant object_get_field(Variant key);
 
+  // If this is an object, returns the number of fields it contains. If not
+  // returns 0.
+  uint32_t object_field_count();
+
+  // Returns an iterator for traversing the fields of this object.
+  Map_Iterator object_fields_begin();
+
+  // Returns an iterator that indicates the limit when traversing the fields
+  // of this object.
+  Map_Iterator object_fields_end();
+
   // Returns the size in bits of this id value or 0 if this is not an id.
   uint32_t id_size() const;
 
@@ -310,31 +321,6 @@ public:
   Variant operator[](uint32_t index) const { return array_get(index); }
 };
 
-// A variant that represents a user-defined object type.
-class Object : public Variant {
-public:
-  // Creates a new empty object.
-  Object() : Variant() { }
-
-  // Wrap some value as an object.
-  Object(Variant variant) : Variant(variant) { }
-
-  // Returns this object's header.
-  Variant header() { return object_header(); }
-
-  // Sets this object's header. Returns true iff setting succeeded.
-  bool set_header(Variant value) { return object_set_header(value); }
-
-  // Sets the value of the given field to the given value. Returns true iff
-  // setting succeeded.
-  bool set_field(Variant key, Variant value) { return object_set_field(key, value); }
-
-  // Sets the value of the given field to the given value. Returns true iff
-  // setting succeeded.
-  Variant get_field(Variant key) { return object_get_field(key); }
-
-};
-
 // An iterator that allows you to scan through all the mappings in a map.
 class Map_Iterator {
 public:
@@ -377,6 +363,40 @@ private:
   Entry entry_;
 };
 
+// A variant that represents a user-defined object type.
+class Object : public Variant {
+public:
+  // This is the name you'd typically use for an iterator.
+  typedef Map_Iterator Iterator;
+
+  // Creates a new empty object.
+  Object() : Variant() { }
+
+  // Wrap some value as an object.
+  Object(Variant variant) : Variant(variant) { }
+
+  // Returns this object's header.
+  Variant header() { return object_header(); }
+
+  // Sets this object's header. Returns true iff setting succeeded.
+  bool set_header(Variant value) { return object_set_header(value); }
+
+  // Sets the value of the given field to the given value. Returns true iff
+  // setting succeeded.
+  bool set_field(Variant key, Variant value) { return object_set_field(key, value); }
+
+  // Sets the value of the given field to the given value. Returns true iff
+  // setting succeeded.
+  Variant get_field(Variant key) { return object_get_field(key); }
+
+  // Returns the number of fields this object contains.
+  size_t field_count() { return object_field_count(); }
+
+  Iterator fields_begin() { return object_fields_begin(); }
+
+  Iterator fields_end() { return object_fields_end(); }
+
+};
 
 // A variant that represents a map. A map can be either an actual map or null,
 // to make conversion more convenient. If you want to be sure you're really

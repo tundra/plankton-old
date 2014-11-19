@@ -315,7 +315,17 @@ void VariantWriter::encode_array(Array value) {
 void VariantWriter::encode_map(Map value) {
   size_t size = value.size();
   assm()->begin_map(size);
-  for (Map::Iterator i = value.map_begin(); i != value.map_end(); i++) {
+  for (Map::Iterator i = value.begin(); i != value.end(); i++) {
+    encode(i->key());
+    encode(i->value());
+  }
+}
+
+void VariantWriter::encode_object(Object value) {
+  assm()->begin_object();
+  encode(value.header());
+  assm()->begin_map(value.field_count());
+  for (Object::Iterator i = value.fields_begin(); i != value.fields_end(); i++) {
     encode(i->key());
     encode(i->value());
   }
