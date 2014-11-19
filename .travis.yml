@@ -9,19 +9,19 @@ matrix:
     - language: c
       compiler: clang
       script: mkmk init --config plankton.mkmk --debug --valgrind --noisy && ./build.sh all run-tests
-      install: source ./tools/enter-devenv.sh && sudo apt-get update && sudo apt-get install valgrind
+      install: source ./tools/enter-devenv.sh  && pip install PyYAML && sudo apt-get update && sudo apt-get install valgrind
     # Test everything using an optimized clang build.
     - language: c
       compiler: clang
       script: mkmk init --config plankton.mkmk --noisy && ./build.sh all run-tests
-      install: source ./tools/enter-devenv.sh
+      install: source ./tools/enter-devenv.sh && pip install PyYAML
     # Test with checks disabled.
     - languate: c
       compiler: clang
       script: mkmk init --config plankton.mkmk --nochecks --noisy && ./build.sh all run-tests
-      install: source ./tools/enter-devenv.sh
+      install: source ./tools/enter-devenv.sh && pip install PyYAML
     # Check that the C code compiles using gcc.
     - language: c
       compiler: gcc
       script: mkmk init --config plankton.mkmk --debug --noisy && ./build.sh all run-tests
-      install: source ./tools/enter-devenv.sh
+      install: source ./tools/enter-devenv.sh && pip install PyYAML
