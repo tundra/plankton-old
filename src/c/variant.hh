@@ -178,7 +178,24 @@ public:
   // Returns an iterator for iterating this map, if this is a map, otherwise an
   // empty iterator. The first call to advance will yield the first mapping, if
   // there is one.
-  Map_Iterator map_iter() const;
+  Map_Iterator map_begin() const;
+
+  Map_Iterator map_end() const;
+
+  // Returns the header of this object, if this is an object, otherwise null.
+  Variant object_header() const;
+
+  // Sets the header of this object if this is a mutable object. Returns true if
+  // setting succeeded, otherwise false.
+  bool object_set_header(Variant value);
+
+  // Sets the value of a field if this is a mutable object. Returns true if
+  // setting succeeded, otherwise false.
+  bool object_set_field(Variant key, Variant value);
+
+  // If this is an object with a field with the given key, returns the value of
+  // that field. Otherwise returns the null value.
+  Variant object_get_field(Variant key);
 
   // Returns the size in bits of this id value or 0 if this is not an id.
   uint32_t id_size() const;
@@ -229,6 +246,9 @@ public:
 
   // Is this value an array?
   inline bool is_array() const;
+
+  // Is this value an object?
+  inline bool is_object() const;
 
   // Is this value a string?
   inline bool is_string() const;
@@ -290,24 +310,71 @@ public:
   Variant operator[](uint32_t index) const { return array_get(index); }
 };
 
+// A variant that represents a user-defined object type.
+class Object : public Variant {
+public:
+  // Creates a new empty object.
+  Object() : Variant() { }
+
+  // Wrap some value as an object.
+  Object(Variant variant) : Variant(variant) { }
+
+  // Returns this object's header.
+  Variant header() { return object_header(); }
+
+  // Sets this object's header. Returns true iff setting succeeded.
+  bool set_header(Variant value) { return object_set_header(value); }
+
+  // Sets the value of the given field to the given value. Returns true iff
+  // setting succeeded.
+  bool set_field(Variant key, Variant value) { return object_set_field(key, value); }
+
+  // Sets the value of the given field to the given value. Returns true iff
+  // setting succeeded.
+  Variant get_field(Variant key) { return object_get_field(key); }
+
+};
+
 // An iterator that allows you to scan through all the mappings in a map.
 class Map_Iterator {
 public:
-  // If there are more mappings in this map sets the key and value in the
-  // given out parameters and returns true. Otherwise returns false.
-  bool advance(Variant *key, Variant *value);
+  class Entry {
+  public:
+    Entry(pton_arena_map_t *data, uint32_t cursor)
+      : data_(data)
+      , cursor_(cursor) { }
+    Variant key() const;
+    Variant value() const;
+  private:
+    friend class Map_Iterator;
+    pton_arena_map_t *data_;
+    uint32_t cursor_;
+  };
+
+  // Advances this iterator to the next entry in this map.
+  Map_Iterator &operator++();
+
+  // I don't know what's going on with this. What's the int parameter for?
+  Map_Iterator &operator++(int);
+
+  // Returns true iff this and the given iterator point to the same entry.
+  bool operator==(const Map_Iterator &that) { return entry_.cursor_ == that.entry_.cursor_; }
+
+  // Returns true iff this and the given iterator point to different entries.
+  bool operator!=(const Map_Iterator &that) { return entry_.cursor_ != that.entry_.cursor_; }
 
   // Returns true iff the next call to advance will return true.
   bool has_next();
 
+  // Returns the current entry.
+  const Entry *operator->() { return &entry_; }
+
 private:
   friend class Variant;
-  Map_Iterator(pton_arena_map_t *data);
-  Map_Iterator() : data_(NULL), cursor_(0), limit_(0) { }
+  Map_Iterator(pton_arena_map_t *data, uint32_t cursor);
+  Map_Iterator() : entry_(NULL, 0) { }
 
-  pton_arena_map_t *data_;
-  uint32_t cursor_;
-  uint32_t limit_;
+  Entry entry_;
 };
 
 
@@ -335,12 +402,18 @@ public:
   // Returns the mapping for the given key.
   Variant operator[](Variant key) { return map_get(key); }
 
+  // Because of the way string indexing works the normal [] operator can give
+  // overloading ambiguities when passed strings. This method disambiguates.
+  Variant operator[](const char *str_key) { return map_get(Variant::string(str_key)); }
+
   // Returns the number of mappings in this map.
   uint32_t size() const { return map_size(); }
 
-  // Returns an iterator for iterating this map. The first call to advance will
-  // yield the first mapping, if there is one.
-  Iterator iter() const { return map_iter(); }
+  // Returns an iterator at the beginning of this map.
+  Iterator begin() const { return map_begin(); }
+
+  // Returns an iterator just past the end of this map.
+  Iterator end() const { return map_end(); }
 };
 
 // A variant that represents a string. A string can be either an actual string
@@ -393,6 +466,9 @@ public:
   // Creates and returns a new mutable array value.
   virtual Array new_array() = 0;
 
+  // Creates and returns a new mutable object value.
+  virtual Object new_object() = 0;
+
   // Creates and returns a new sink value that will store the value set into the
   // given output parameter..
   virtual Sink new_sink(Variant *out) = 0;
@@ -417,6 +493,10 @@ public:
   // If this sink has not already been assigned, creates a map, stores it as
   // the value of this sink, and returns it.
   Map as_map();
+
+  // If this sink has not already been assigned, creates an object, stores it as
+  // the value of this sink, and returns it.
+  Object as_object();
 
   // Returns a factory that can be used to create values that can be stored in
   // this sink. This can be useful in cases where you need a utility value for
@@ -469,8 +549,11 @@ public:
   // Creates and returns a new mutable array value.
   Array new_array(uint32_t init_capacity);
 
-  // Creates and returns a new map value.
+  // Creates and returns a new mutable map value.
   Map new_map();
+
+  // Creates and returns a new mutable object value.
+  Object new_object();
 
   // Creates and returns a new variant string. The string is fully owned by
   // the arena so the character array can be disposed after this call returns.

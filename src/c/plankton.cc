@@ -22,9 +22,13 @@ struct pton_arena_value_t {
 public:
   pton_arena_value_t() : is_frozen_(false) { }
 
+  // This virtual constructor is to make the compiler happy -- all these values
+  // get arena deallocated so the constructor will never be called.
+  virtual ~pton_arena_value_t() { }
+
   bool is_frozen() { return is_frozen_; }
 
-  void ensure_frozen() { is_frozen_ = true; }
+  virtual void ensure_frozen() { is_frozen_ = true; }
 
 protected:
   bool is_frozen_;
@@ -77,6 +81,24 @@ private:
   uint32_t capacity_;
   entry_t *elms_;
 };
+
+struct pton_arena_object_t : public pton_arena_value_t {
+public:
+  explicit pton_arena_object_t(Arena *origin);
+
+  virtual void ensure_frozen();
+
+private:
+  friend class plankton::Variant;
+  Arena *origin_;
+  Variant header_;
+  Map fields_;
+};
+
+void pton_arena_object_t::ensure_frozen() {
+  fields_.ensure_frozen();
+  pton_arena_value_t::ensure_frozen();
+}
 
 struct pton_arena_string_t : public pton_arena_value_t {
 public:
@@ -174,6 +196,11 @@ Map Arena::new_map() {
 
 pton_variant_t pton_new_map(pton_arena_t *arena) {
   return Arena::from_c(arena)->new_map().to_c();
+}
+
+Object Arena::new_object() {
+  pton_arena_object_t *data = alloc_value<pton_arena_object_t>();
+  return Variant(header_t::PTON_REPR_ARNA_OBJECT, new (data) pton_arena_object_t(this));
 }
 
 pton_variant_t pton_new_c_str(pton_arena_t *arena, const char *str) {
@@ -349,6 +376,7 @@ bool pton_is_frozen(pton_variant_t variant) {
     case header_t::PTON_REPR_ARNA_MAP:
     case header_t::PTON_REPR_ARNA_STRING:
     case header_t::PTON_REPR_ARNA_BLOB:
+    case header_t::PTON_REPR_ARNA_OBJECT:
       return variant.payload_.as_arena_value_->is_frozen();
     default:
       return false;
@@ -366,6 +394,7 @@ void pton_ensure_frozen(pton_variant_t variant) {
     case header_t::PTON_REPR_ARNA_MAP:
     case header_t::PTON_REPR_ARNA_STRING:
     case header_t::PTON_REPR_ARNA_BLOB:
+    case header_t::PTON_REPR_ARNA_OBJECT:
       variant.payload_.as_arena_value_->ensure_frozen();
       break;
     default:
@@ -559,32 +588,76 @@ uint32_t pton_id_size(pton_variant_t variant) {
       : 0;
 }
 
+Variant Variant::object_header() const {
+  pton_check_binary_version(value_);
+  return is_object() ? value_.payload_.as_arena_object_->header_ : null();
+}
+
+bool Variant::object_set_header(Variant value) {
+  pton_check_binary_version(value_);
+  pton_check_binary_version(value.value_);
+  if (is_object() && !is_frozen()) {
+    value_.payload_.as_arena_object_->header_ = value;
+    return true;
+  } else {
+    return false;
+  }
+}
+
+bool Variant::object_set_field(Variant key, Variant value) {
+  pton_check_binary_version(value_);
+  pton_check_binary_version(key.value_);
+  pton_check_binary_version(value.value_);
+  return is_object()
+      ? value_.payload_.as_arena_object_->fields_.set(key, value)
+      : false;
+}
+
+Variant Variant::object_get_field(Variant key) {
+  pton_check_binary_version(value_);
+  pton_check_binary_version(key.value_);
+  return is_object()
+      ? value_.payload_.as_arena_object_->fields_[key]
+      : null();
+}
+
 uint32_t Variant::id_size() const {
   return pton_id_size(value_);
 }
 
-Map_Iterator Variant::map_iter() const {
-  return is_map() ? Map_Iterator(payload()->as_arena_map_) : Map_Iterator();
+Map_Iterator Variant::map_begin() const {
+  return is_map() ? Map_Iterator(payload()->as_arena_map_, 0) : Map_Iterator(NULL, 0);
 }
 
-Map_Iterator::Map_Iterator(pton_arena_map_t *data)
-  : data_(data)
-  , cursor_(0)
-  , limit_(data->size_) { }
+Map_Iterator Variant::map_end() const {
+  return is_map()
+      ? Map_Iterator(payload()->as_arena_map_, payload()->as_arena_map_->size())
+      : Map_Iterator(NULL, 0);
+}
 
-bool Map_Iterator::advance(Variant *key, Variant *value) {
-  if (cursor_ == limit_) {
-    return false;
-  } else {
-    *key = data_->elms_[cursor_].key;
-    *value = data_->elms_[cursor_].value;
-    cursor_++;
-    return true;
-  }
+Map_Iterator::Map_Iterator(pton_arena_map_t *data, uint32_t cursor)
+  : entry_(data, cursor) { }
+
+Variant Map_Iterator::Entry::key() const {
+  return data_->elms_[cursor_].key;
+}
+
+Variant Map_Iterator::Entry::value() const {
+  return data_->elms_[cursor_].value;
+}
+
+Map_Iterator &Map_Iterator::operator++() {
+  entry_.cursor_++;
+  return *this;
+}
+
+Map_Iterator &Map_Iterator::operator++(int) {
+  entry_.cursor_++;
+  return *this;
 }
 
 bool Map_Iterator::has_next() {
-  return cursor_ < data_->size();
+  return (entry_.cursor_ + 1) < entry_.data_->size_;
 }
 
 pton_arena_map_t::pton_arena_map_t(Arena *origin)
@@ -671,6 +744,11 @@ Variant pton_arena_map_t::get(Variant key) const {
       return entry->value;
   }
   return Variant::null();
+}
+
+pton_arena_object_t::pton_arena_object_t(Arena *origin)
+  : origin_(origin) {
+  fields_ = origin->new_map();
 }
 
 uint32_t pton_string_length(pton_variant_t variant) {
@@ -816,6 +894,13 @@ Map Sink::as_map() {
   if (!can_be_set())
     return Variant::null();
   Variant value = factory()->new_map();
+  return set(value) ? value : Variant::null();
+}
+
+Object Sink::as_object() {
+  if (!can_be_set())
+    return Variant::null();
+  Variant value = factory()->new_object();
   return set(value) ? value : Variant::null();
 }
 

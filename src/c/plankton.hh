@@ -27,6 +27,10 @@ public:
   // followed immediately by the mappings, keys and values alternating.
   bool begin_map(uint32_t size) { return pton_assembler_begin_map(assm_, size); }
 
+  // Writes an object header. This must be followed immediately by the header
+  // and body of the object.
+  bool begin_object() { return pton_assembler_begin_object(assm_); }
+
   // Writes the given boolean value.
   bool emit_bool(bool value) { return pton_assembler_emit_bool(assm_, value); }
 

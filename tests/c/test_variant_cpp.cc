@@ -131,3 +131,18 @@ TEST(variant_cpp, array_sink) {
   ASSERT_EQ(PTON_BOOL, array[1].type());
   ASSERT_EQ(PTON_STRING, array[2].type());
 }
+
+TEST(variant_cpp, object) {
+  Arena arena;
+  Object obj = arena.new_object();
+  ASSERT_TRUE(obj.header().is_null());
+  ASSERT_TRUE(obj.set_header("foo"));
+  ASSERT_TRUE(Variant("foo") == obj.header());
+  ASSERT_TRUE(obj.get_field("blah").is_null());
+  ASSERT_TRUE(obj.set_field("blah", 43));
+  ASSERT_EQ(43, obj.get_field("blah").integer_value());
+  obj.ensure_frozen();
+  ASSERT_FALSE(obj.set_header("bar"));
+  ASSERT_FALSE(obj.set_field("blah", 44));
+  ASSERT_FALSE(obj.set_field("blub", 45));
+}

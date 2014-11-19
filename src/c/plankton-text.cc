@@ -168,11 +168,11 @@ size_t TextWriterImpl::get_short_length(Variant value, size_t offset) {
     case PTON_MAP: {
       Map map = Map(value);
       size_t current = offset + 2;
-      Variant key, value;
-      for (Map::Iterator iter = map.iter();
-           iter.advance(&key, &value) && current < kShortLengthLimit;) {
-        current = get_short_length(key, current) + 2;
-        current = get_short_length(value, current);
+      for (Map::Iterator i = map.begin();
+           i != map.end() && current < kShortLengthLimit;
+           i++) {
+        current = get_short_length(i->key(), current) + 2;
+        current = get_short_length(i->value(), current);
       }
       return current;
     }
@@ -364,14 +364,12 @@ void TextWriterImpl::write_map(Map map) {
     indent();
     schedule_newline();
   }
-  Variant key;
-  Variant value;
-  for (Map::Iterator iter = map.iter(); iter.advance(&key, &value);) {
-    write(key);
+  for (Map::Iterator i = map.begin(); i != map.end(); i++) {
+    write(i->key());
     write_raw_char(':');
     write_raw_char(' ');
-    write(value);
-    if (iter.has_next()) {
+    write(i->value());
+    if (i.has_next()) {
       write_raw_char(',');
       if (!is_long)
         write_raw_char(' ');

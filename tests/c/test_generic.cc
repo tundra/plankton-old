@@ -104,6 +104,19 @@ int YamlParser::handle_framework_read(void *yaml_file_ptr, unsigned char *buffer
 }
 
 static bool adapt_object(Array fields, Sink sink) {
+  Object result = sink.as_object();
+  for (size_t i = 0; i < fields.length(); i++) {
+    Map field = fields[i];
+    ASSERT_EQ(1, field.size());
+    Variant as_type = field["type"];
+    if (!as_type.is_null()) {
+      result.set_header(as_type);
+    } else {
+      Map::Iterator iter = field.begin();
+      ASSERT_TRUE(iter != field.end());
+      result.set_field(iter->key(), iter->value());
+    }
+  }
   return true;
 }
 
@@ -131,7 +144,7 @@ bool YamlParser::read(Sink sink) {
           return false;
       }
       expect(YAML_MAPPING_END_EVENT);
-      Variant as_object = map[Variant::string("object")];
+      Variant as_object = map["object"];
       if (map.size() == 1 && as_object.is_array()) {
         return adapt_object(as_object, sink);
       } else {
@@ -246,6 +259,8 @@ static Variant get_variant_type_name(Variant value) {
       return "array";
     case PTON_MAP:
       return "map";
+    case PTON_OBJECT:
+      return "obj";
     default:
       return "wut?";
   }

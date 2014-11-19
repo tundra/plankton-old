@@ -56,6 +56,10 @@ bool Variant::is_array() const {
   return pton_is_array(value_);
 }
 
+bool Variant::is_object() const {
+  return type() == PTON_OBJECT;
+}
+
 bool Variant::is_string() const {
   return type() == PTON_STRING;
 }

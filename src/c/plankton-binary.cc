@@ -250,6 +250,8 @@ public:
 
   void encode_map(Map value);
 
+  void encode_object(Object value);
+
 private:
   Assembler *assm_;
   Assembler *assm() { return assm_; }
@@ -265,13 +267,16 @@ void VariantWriter::flush(BinaryWriter *writer) {
 void VariantWriter::encode(Variant value) {
   switch (value.type()) {
     case PTON_ARRAY:
-      encode_array(Array(value));
+      encode_array(value);
       break;
     case PTON_STRING:
-      encode_string(String(value));
+      encode_string(value);
       break;
     case PTON_MAP:
-      encode_map(Map(value));
+      encode_map(value);
+      break;
+    case PTON_OBJECT:
+      encode_object(value);
       break;
     case PTON_BOOL:
       assm()->emit_bool(value.bool_value());
@@ -310,16 +315,11 @@ void VariantWriter::encode_array(Array value) {
 void VariantWriter::encode_map(Map value) {
   size_t size = value.size();
   assm()->begin_map(size);
-  Map::Iterator iter = value.map_iter();
-  while (iter.has_next()) {
-    Variant key;
-    Variant value;
-    iter.advance(&key, &value);
-    encode(key);
-    encode(value);
+  for (Map::Iterator i = value.map_begin(); i != value.map_end(); i++) {
+    encode(i->key());
+    encode(i->value());
   }
 }
-
 
 void BinaryWriter::write(Variant value) {
   Assembler assm;
