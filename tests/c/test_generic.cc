@@ -291,11 +291,6 @@ TEST(generic, datatypes) {
     Variant entry = test_case[i];
     Variant value = entry.map_get("value");
     Variant type_name = entry.map_get("type");
-    if (!(type_name == get_variant_type_name(value))) {
-      TextWriter writer;
-      writer.write(value);
-      HEST("Error: %s", *writer);
-    }
     ASSERT_SAMEVAR(type_name, get_variant_type_name(value));
   }
 }

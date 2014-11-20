@@ -163,11 +163,16 @@ class DataOutputStream(object):
             meta_info = None
             last_obj = replacement
         index = self.acquire_offset()
+        header = meta_info.get_header(obj)
+        fields = meta_info.get_payload(obj)
         self.assm.tag(_OBJECT_TAG)
+        self.assm.uint32(len(fields))
         self.object_index[obj] = -1
-        self.write_object(meta_info.get_header(obj))
+        self.write_object(header)
         self.object_index[obj] = index
-        self.write_object(meta_info.get_payload(obj))
+        for field in sorted(fields.keys()):
+          self.write_object(field)
+          self.write_object(fields[field])
       else:
         index = self.acquire_offset()
         self.assm.tag(_ENVIRONMENT_TAG)
@@ -279,15 +284,18 @@ class DataInputStream(object):
       children.append(self.disassemble_object(new_indent))
     return "%sarray %i\n%s" % (indent, length, "\n".join(children))
 
-  # Reads a naked map from the stream.
-  def _decode_map(self):
-    length = self._decode_uint32()
+  def _decode_map_contents(self, length):
     result = {}
     for i in xrange(0, length):
       k = self.read_object()
       v = self.read_object()
       result[k] = v
     return result
+
+  # Reads a naked map from the stream.
+  def _decode_map(self):
+    length = self._decode_uint32()
+    return self._decode_map_contents(length)
 
   def _disassemble_map(self, indent):
     length = self._decode_uint32()
@@ -300,6 +308,7 @@ class DataInputStream(object):
 
   # Reads a naked object from the stream.
   def _decode_object(self):
+    fieldc = self._decode_uint32()
     index = self.grab_index()
     self.object_index[index] = None
     header = self.read_object()
@@ -309,7 +318,7 @@ class DataInputStream(object):
     else:
       instance = (self.default_object)(header)
     self.object_index[index] = instance
-    payload = self.read_object()
+    payload = self._decode_map_contents(fieldc)
     if not meta_info is None:
       meta_info.set_instance_contents(instance, payload)
     else:

@@ -301,7 +301,7 @@ bool pton_assembler_begin_array(pton_assembler_t *assm, uint32_t length);
 bool pton_assembler_begin_map(pton_assembler_t *assm, uint32_t size);
 
 // Writes an object header.
-bool pton_assembler_begin_object(pton_assembler_t *assm);
+bool pton_assembler_begin_object(pton_assembler_t *assm, uint32_t fieldc);
 
 // Writes the header of an environment reference.
 bool pton_assembler_begin_environment_reference(pton_assembler_t *assm);
@@ -358,6 +358,7 @@ typedef struct {
     int64_t int64_value;
     uint64_t array_length;
     uint64_t map_size;
+    uint64_t object_fieldc;
     struct {
       uint64_t length;
       const uint8_t *contents;

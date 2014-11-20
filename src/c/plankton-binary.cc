@@ -23,7 +23,7 @@ public:
 
   bool begin_map(uint32_t length);
 
-  bool begin_object();
+  bool begin_object(uint32_t fieldc);
 
   bool begin_environment_reference();
 
@@ -80,12 +80,12 @@ bool pton_assembler_t::emit_bool(bool value) {
   return write_byte(value ? boTrue : boFalse);
 }
 
-bool pton_assembler_t::begin_object() {
-  return write_byte(boObject);
+bool pton_assembler_t::begin_object(uint32_t fieldc) {
+  return write_byte(boObject) && write_uint64(fieldc);
 }
 
-bool pton_assembler_begin_object(pton_assembler_t *assm) {
-  return assm->begin_object();
+bool pton_assembler_begin_object(pton_assembler_t *assm, uint32_t fieldc) {
+  return assm->begin_object(fieldc);
 }
 
 bool pton_assembler_t::begin_environment_reference() {
@@ -322,9 +322,8 @@ void VariantWriter::encode_map(Map value) {
 }
 
 void VariantWriter::encode_object(Object value) {
-  assm()->begin_object();
+  assm()->begin_object(value.field_count());
   encode(value.header());
-  assm()->begin_map(value.field_count());
   for (Object::Iterator i = value.fields_begin(); i != value.fields_end(); i++) {
     encode(i->key());
     encode(i->value());
@@ -467,6 +466,8 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
       instr_out->payload.bool_value = (opcode == BinaryImplUtils::boTrue);
       break;
     case BinaryImplUtils::boObject:
+      if (!decode_uint64(&instr_out->payload.object_fieldc))
+        return false;
       instr_out->opcode = PTON_OPCODE_BEGIN_OBJECT;
       break;
     case BinaryImplUtils::boReference:
