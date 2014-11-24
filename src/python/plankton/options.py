@@ -193,7 +193,7 @@ def value_to_string(value):
 
 
 # An individual option element representing an argument (as opposed to a flag).
-@codec.serializable(codec.EnvironmentReference.path('options', 'ArgumentElement'))
+@codec.serializable('options.ArgumentElement')
 class ArgumentElement(object):
 
   @codec.field('value')
@@ -215,7 +215,7 @@ class ArgumentElement(object):
     return '%s' % value_to_string(self.value)
 
 
-@codec.serializable(codec.EnvironmentReference.path('options', 'FlagElement'))
+@codec.serializable('options.FlagElement')
 class FlagElement(object):
 
   @codec.field('key')
@@ -245,7 +245,7 @@ class FlagElement(object):
 # A collection of command-line options. An options object provides access to
 # the arguments as a list, the flags by name, and a more naked view of the
 # options as a list of elements, each either an argument or a flag.
-@codec.serializable(codec.EnvironmentReference.path('options', 'Options'))
+@codec.serializable('options.Options')
 class Options(object):
 
   @codec.field('elements')
