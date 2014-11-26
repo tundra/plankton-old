@@ -14,5 +14,21 @@ for filename in filenames:
   object = source.get_object()
   library.add_member(object)
 
+pton_filenames = [
+  "pton.cc"
+]
+
+pton = c.get_executable("pton")
+pton.add_object(library)
+pton.add_object(get_dep_external('tclib', 'src', 'c', 'io', 'library'))
+pton.add_object(get_dep_external('tclib', 'src', 'c', 'utils', 'library'))
+
+for filename in pton_filenames:
+  source = c.get_source_file(filename)
+  source.add_include(get_dep("tclib").get_child("src", "c"))
+  object = source.get_object()
+  pton.add_object(object)
+
 all = get_group("all")
 all.add_member(library)
+all.add_member(pton)

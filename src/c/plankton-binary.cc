@@ -353,6 +353,9 @@ private:
   // Read a map's payload.
   bool decode_map(uint64_t size, Variant *result_out);
 
+  // Read an object's payload.
+  bool decode_object(uint64_t fieldc, Variant *result_out);
+
   // Convert default-encoding string data into a string variant.
   bool decode_default_string(pton_instr_t *instr, Variant *result_out);
 
@@ -599,6 +602,8 @@ bool BinaryReaderImpl::decode(Variant *result_out) {
       return decode_array(instr.payload.array_length, result_out);
     case PTON_OPCODE_BEGIN_MAP:
       return decode_map(instr.payload.map_size, result_out);
+    case PTON_OPCODE_BEGIN_OBJECT:
+      return decode_object(instr.payload.object_fieldc, result_out);
     case PTON_OPCODE_NULL:
       return succeed(Variant::null(), result_out);
     case PTON_OPCODE_BOOL:
@@ -606,6 +611,10 @@ bool BinaryReaderImpl::decode(Variant *result_out) {
     case PTON_OPCODE_ID64:
       return succeed(Variant::id(instr.payload.id64.size, instr.payload.id64.value),
           result_out);
+    case PTON_OPCODE_BEGIN_ENVIRONMENT_REFERENCE:
+      return decode(result_out);
+    case PTON_OPCODE_REFERENCE:
+      return succeed(Variant::integer(instr.payload.reference_offset), result_out);
     default:
       return false;
   }
@@ -654,6 +663,25 @@ bool BinaryReaderImpl::decode_map(uint64_t size, Variant *result_out) {
     if (!decode(&value))
       return false;
     result.set(key, value);
+  }
+  result.ensure_frozen();
+  return succeed(result, result_out);
+}
+
+bool BinaryReaderImpl::decode_object(uint64_t size, Variant *result_out) {
+  Object result = reader_->arena_->new_object();
+  Variant header;
+  if (!decode(&header))
+    return false;
+  result.set_header(header);
+  for (size_t i = 0; i < size; i++) {
+    Variant key;
+    if (!decode(&key))
+      return false;
+    Variant value;
+    if (!decode(&value))
+      return false;
+    result.set_field(key, value);
   }
   result.ensure_frozen();
   return succeed(result, result_out);

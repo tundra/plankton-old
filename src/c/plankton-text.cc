@@ -83,6 +83,9 @@ private:
   // Writes a map value.
   void write_map(Map map);
 
+  // Writes an object value.
+  void write_object(Object obj);
+
   // Writes the given identity token.
   void write_id(uint32_t size, uint64_t value);
 
@@ -138,10 +141,13 @@ void TextWriterImpl::write(Variant value) {
       write_blob(value.blob_data(), value.blob_size());
       break;
     case PTON_ARRAY:
-      write_array(Array(value));
+      write_array(value);
       break;
     case PTON_MAP:
-      write_map(Map(value));
+      write_map(value);
+      break;
+    case PTON_OBJECT:
+      write_object(value);
       break;
     default:
       write_raw_string("?");
@@ -365,6 +371,33 @@ void TextWriterImpl::write_map(Map map) {
     schedule_newline();
   }
   for (Map::Iterator i = map.begin(); i != map.end(); i++) {
+    write(i->key());
+    write_raw_char(':');
+    write_raw_char(' ');
+    write(i->value());
+    if (i.has_next()) {
+      write_raw_char(',');
+      if (!is_long)
+        write_raw_char(' ');
+    }
+    if (is_long)
+      schedule_newline();
+  }
+  if (is_long)
+    deindent();
+  write_raw_char('}');
+}
+
+void TextWriterImpl::write_object(Object obj) {
+  bool is_long = get_short_length(obj, indent_) >= kShortLengthLimit;
+  write(obj.header());
+  write_raw_char(' ');
+  write_raw_char('{');
+  if (is_long) {
+    indent();
+    schedule_newline();
+  }
+  for (Object::Iterator i = obj.fields_begin(); i != obj.fields_end(); i++) {
     write(i->key());
     write_raw_char(':');
     write_raw_char(' ');
