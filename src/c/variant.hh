@@ -13,11 +13,11 @@ BEGIN_C_INCLUDES
 #include "utils/alloc.h"
 END_C_INCLUDES
 
-#include <vector>
+#include "std/stdvector.hh"
 
 // This is really just an opaque name for c api arenas but it does need a tiny
 // bit of functionality just to be on the safe side wrt. destruction.
-class pton_arena_t {
+struct pton_arena_t {
 public:
   virtual ~pton_arena_t() { }
 };
@@ -630,8 +630,8 @@ public:
 
 private:
   friend pton_sink_t *pton_new_sink(pton_arena_t *arena);
-  friend class ::pton_arena_array_t;
-  friend class ::pton_arena_map_t;
+  friend struct ::pton_arena_array_t;
+  friend struct ::pton_arena_map_t;
 
   // Allocates a raw block of memory.
   void *alloc_raw(uint32_t size);

@@ -3,7 +3,7 @@
 
 #include "plankton-inl.hh"
 #include "stdc.h"
-#include <new>
+#include "std/stdnew.hh"
 
 using namespace plankton;
 
@@ -126,7 +126,7 @@ private:
   uint32_t size_;
 };
 
-class pton_sink_t {
+struct pton_sink_t {
 public:
   explicit pton_sink_t(Factory *origin);
   virtual ~pton_sink_t() { }
