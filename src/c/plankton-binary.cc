@@ -35,6 +35,8 @@ public:
 
   bool emit_default_string(const char *chars, uint32_t length);
 
+  bool emit_blob(const void *data, uint32_t size);
+
   bool begin_string_with_encoding(const void *chars, uint32_t length);
 
   bool emit_id64(uint32_t size, uint64_t value);
@@ -123,9 +125,20 @@ bool pton_assembler_t::emit_default_string(const char *chars, uint32_t length) {
   return true;
 }
 
+bool pton_assembler_t::emit_blob(const void *data, uint32_t size) {
+  write_byte(boBlob);
+  write_uint64(size);
+  bytes_.write(reinterpret_cast<const uint8_t*>(data), size);
+  return true;
+}
+
 bool pton_assembler_emit_default_string(pton_assembler_t *assm, const char *chars,
     uint32_t length) {
   return assm->emit_default_string(chars, length);
+}
+
+bool pton_assembler_emit_blob(pton_assembler_t *assm, const void *data, uint32_t size) {
+  return assm->emit_blob(data, size);
 }
 
 bool pton_assembler_t::begin_string_with_encoding(const void *chars, uint32_t length) {
@@ -248,6 +261,8 @@ public:
 
   void encode_string(String value);
 
+  void encode_blob(Blob value);
+
   void encode_map(Map value);
 
   void encode_object(Object value);
@@ -271,6 +286,9 @@ void VariantWriter::encode(Variant value) {
       break;
     case PTON_STRING:
       encode_string(value);
+      break;
+    case PTON_BLOB:
+      encode_blob(value);
       break;
     case PTON_MAP:
       encode_map(value);
@@ -303,6 +321,10 @@ void VariantWriter::encode_string(String value) {
     assm()->begin_string_with_encoding(value.chars(), length);
     encode(encoding);
   }
+}
+
+void VariantWriter::encode_blob(Blob value) {
+  assm()->emit_blob(value.data(), value.size());
 }
 
 void VariantWriter::encode_array(Array value) {

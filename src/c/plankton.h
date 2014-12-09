@@ -315,6 +315,9 @@ bool pton_assembler_emit_null(pton_assembler_t *assm);
 // Writes an int64 with the given value.
 bool pton_assembler_emit_int64(pton_assembler_t *assm, int64_t value);
 
+// Writes a blob with the given contents.
+bool pton_assembler_emit_blob(pton_assembler_t *assm, const void *data, uint32_t size);
+
 // Writes an utf8-encoded string.
 bool pton_assembler_emit_default_string(pton_assembler_t *assm, const char *chars,
     uint32_t length);

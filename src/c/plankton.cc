@@ -925,6 +925,13 @@ Object Sink::as_object() {
   return set(value) ? value : Variant::null();
 }
 
+Blob Sink::as_blob(uint32_t size) {
+  if (!can_be_set())
+    return Variant::null();
+  Variant value = factory()->new_blob(size);
+  return set(value) ? value : Variant::null();
+}
+
 pton_sink_t *pton_sink_new_sink(pton_sink_t *sink, pton_variant_t *out) {
   return Sink(sink).factory()->new_sink(reinterpret_cast<Variant*>(out)).to_c();
 }

@@ -120,6 +120,16 @@ static bool adapt_object(Array fields, Sink sink) {
   return true;
 }
 
+static bool adapt_blob(Array bytes, Sink sink) {
+  Blob result = sink.as_blob(bytes.length());
+  uint8_t *data = static_cast<uint8_t*>(result.mutable_data());
+  for (size_t i = 0; i < bytes.length(); i++) {
+    Variant byte = bytes[i];
+    data[i] = byte.integer_value();
+  }
+  return true;
+}
+
 bool YamlParser::read(Sink sink) {
   switch (current_.type) {
     case YAML_SEQUENCE_START_EVENT: {
@@ -144,13 +154,16 @@ bool YamlParser::read(Sink sink) {
           return false;
       }
       expect(YAML_MAPPING_END_EVENT);
-      Variant as_object = map["object"];
-      if (map.size() == 1 && as_object.is_array()) {
-        return adapt_object(as_object, sink);
-      } else {
-        sink.set(raw_map);
-        return true;
+      if (map.size() == 1) {
+        Variant as_object = map["object"];
+        if (as_object.is_array())
+          return adapt_object(as_object, sink);
+        Variant as_blob = map["blob"];
+        if (as_blob.is_array())
+          return adapt_blob(as_blob, sink);
       }
+      sink.set(raw_map);
+      return true;
     }
     case YAML_SCALAR_EVENT: {
       // The framework isn't very helpful in this case so we have to do the
@@ -261,6 +274,8 @@ static Variant get_variant_type_name(Variant value) {
       return "map";
     case PTON_OBJECT:
       return "obj";
+    case PTON_BLOB:
+      return "blob";
     default:
       return "wut?";
   }

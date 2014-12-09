@@ -27,7 +27,8 @@ public:
     boReference = 8,
     boBeginEnvironmentReference = 9,
     boBeginStringWithEncoding = 10,
-    boId = 11
+    boId = 11,
+    boBlob = 12
   };
 };
 

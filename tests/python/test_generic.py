@@ -8,6 +8,7 @@ import collections
 import os.path
 import unittest
 import yaml
+import StringIO
 
 
 class TestCase(object):
@@ -50,6 +51,8 @@ class GenericTest(unittest.TestCase):
       adapted = collections.OrderedDict(new_items)
       if len(adapted) == 1 and ("object" in adapted):
         return self.adapt_object(adapted["object"])
+      elif len(adapted) == 1 and ("blob" in adapted):
+        return self.adapt_blob(adapted["blob"])
       else:
         return adapted
     else:
@@ -66,11 +69,15 @@ class GenericTest(unittest.TestCase):
         fields[f] = v
     return plankton.DefaultObject(type, fields)
 
+  def adapt_blob(self, blob):
+    return bytearray(blob)
+
   _PLANKTON_TO_PYTHON_TYPES = {
     "null": "NoneType",
     "array": "list",
     "map": "OrderedDict",
-    "obj": "DefaultObject"
+    "obj": "DefaultObject",
+    "blob": "bytearray"
   }
 
   def test_datatypes(self):
@@ -85,6 +92,22 @@ class GenericTest(unittest.TestCase):
       value = test_case["value"]
       binary = test_case["binary"]
       self.assertEquals(binary, list(plankton.Encoder().encode(value)))
+
+  def test_stream(self):
+    header = []
+    for test_case in self.get_test("streaming"):
+      if "header" in test_case:
+        header = test_case["header"]
+        continue
+      strs = StringIO.StringIO()
+      out = plankton.OutputStream(strs)
+      for part in test_case["input"]:
+        encoding = part.get("set_default_string_encoding", None)
+        if not encoding is None:
+          out.set_default_string_encoding(encoding)
+      found = map(ord, list(strs.getvalue()))
+      expected = header + test_case["binary"]
+      self.assertEquals(expected, found)
 
 
 if __name__ == '__main__':

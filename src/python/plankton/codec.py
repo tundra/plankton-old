@@ -18,6 +18,7 @@ _FALSE_TAG = 6
 _OBJECT_TAG = 7
 _REFERENCE_TAG = 8
 _ENVIRONMENT_TAG = 9
+_BLOB_TAG = 12
 
 
 # Dispatches to the appropriate method on the given visitor depending on the
@@ -32,6 +33,8 @@ def visit_data(data, visitor):
     return visitor.visit_array(data)
   elif (t == dict) or (t == collections.OrderedDict):
     return visitor.visit_map(data)
+  elif (t == bytearray):
+    return visitor.visit_blob(data)
   elif data is None:
     return visitor.visit_null(data)
   elif (data is True) or (data is False):
@@ -101,6 +104,11 @@ class DataOutputStream(object):
     bytes = bytearray(value, "utf-8")
     self.assm.uint32(len(bytes))
     self.assm.blob(bytes)
+
+  def visit_blob(self, value):
+    self.assm.tag(_BLOB_TAG)
+    self.assm.uint32(len(value))
+    self.assm.blob(value)
 
   # Emit a tagged array.
   def visit_array(self, value):
@@ -789,3 +797,40 @@ class EnvironmentReference(object):
   @staticmethod
   def path(*key):
     return EnvironmentReference(key)
+
+
+_SET_DEFAULT_STRING_ENCODING = 1
+
+class OutputStream(object):
+
+  def __init__(self, file):
+    self.file = file
+    self.cursor = 0
+    self.write_header()
+
+  def write_header(self):
+    self.file.write("pt\xf6n\00\00\00\00")
+
+  def set_default_string_encoding(self, value):
+    self.write_byte(_SET_DEFAULT_STRING_ENCODING)
+    self.write_value(bytearray(value.encode("ascii")))
+    self.write_padding()
+
+  def write_byte(self, byte):
+    self.file.write(chr(byte))
+    self.cursor += 1
+
+  def write_blob(self, bytes):
+    self.file.write(bytes)
+    self.cursor += len(bytes)
+
+  def write_padding(self):
+    while (self.cursor % 8) != 0:
+      self.write_byte(0)
+
+  def write_value(self, value):
+    data = Encoder().encode(value)
+    assm = EncodingAssembler()
+    assm.int32(len(data))
+    self.write_blob(assm.bytes)
+    self.write_blob(data)

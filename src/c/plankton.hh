@@ -45,6 +45,9 @@ public:
     return pton_assembler_emit_default_string(assm_, chars, length);
   }
 
+  // Writes a blob with the given contents.
+  bool emit_blob(const void *data, uint32_t size) { return pton_assembler_emit_blob(assm_, data, size); }
+
   // Writes the header for a string with a custom encoding.
   bool begin_string_with_encoding(const void *chars, uint32_t length) {
     return pton_assembler_begin_string_with_encoding(assm_, chars, length);

@@ -489,6 +489,9 @@ public:
   // Creates and returns a new mutable object value.
   virtual Object new_object() = 0;
 
+  // Creates and returns a new mutable blob value of the given size.
+  virtual Blob new_blob(uint32_t size) = 0;
+
   // Creates and returns a new sink value that will store the value set into the
   // given output parameter..
   virtual Sink new_sink(Variant *out) = 0;
@@ -517,6 +520,10 @@ public:
   // If this sink has not already been assigned, creates an object, stores it as
   // the value of this sink, and returns it.
   Object as_object();
+
+  // If this sink has not already been assigned, creates a blob, stores it as
+  // the value of this sink, and returns it.
+  Blob as_blob(uint32_t size);
 
   // Returns a factory that can be used to create values that can be stored in
   // this sink. This can be useful in cases where you need a utility value for
