@@ -223,6 +223,8 @@ class DataInputStream(object):
       return self._decode_reference()
     elif tag == _ENVIRONMENT_TAG:
       return self._decode_environment()
+    elif tag == _BLOB_TAG:
+      return self._decode_blob()
     else:
       raise Exception(tag)
 
@@ -251,17 +253,21 @@ class DataInputStream(object):
     else:
       return str(tag)
 
-  # Reads a naked unsigned from the stream.
-  def _decode_uint32(self):
-    next = self._get_byte()
+  @staticmethod
+  def decode_uint32_from(input):
+    next = input._get_byte()
     result = (next & 0x7F)
     offset = 7
     while next >= 0x80:
-      next = self._get_byte()
+      next = input._get_byte()
       payload = (next & 0x7F) + 1
       result = result + (payload << offset)
       offset += 7
     return result
+
+  # Reads a naked unsigned from the stream.
+  def _decode_uint32(self):
+    return DataInputStream.decode_uint32_from(self)
 
   # Reads a naked integer from the stream.
   def _decode_int32(self):
@@ -275,6 +281,14 @@ class DataInputStream(object):
     for i in xrange(0, length):
       bytes.append(self._get_byte())
     return str(bytes)
+
+  # Reads a blob from the stream.
+  def _decode_blob(self):
+    length = self._decode_uint32()
+    bytes = bytearray()
+    for i in xrange(0, length):
+      bytes.append(self._get_byte())
+    return bytes
 
   # Reads a naked array from the stream.
   def _decode_array(self):
@@ -797,40 +811,3 @@ class EnvironmentReference(object):
   @staticmethod
   def path(*key):
     return EnvironmentReference(key)
-
-
-_SET_DEFAULT_STRING_ENCODING = 1
-
-class OutputStream(object):
-
-  def __init__(self, file):
-    self.file = file
-    self.cursor = 0
-    self.write_header()
-
-  def write_header(self):
-    self.file.write("pt\xf6n\00\00\00\00")
-
-  def set_default_string_encoding(self, value):
-    self.write_byte(_SET_DEFAULT_STRING_ENCODING)
-    self.write_value(bytearray(value.encode("ascii")))
-    self.write_padding()
-
-  def write_byte(self, byte):
-    self.file.write(chr(byte))
-    self.cursor += 1
-
-  def write_blob(self, bytes):
-    self.file.write(bytes)
-    self.cursor += len(bytes)
-
-  def write_padding(self):
-    while (self.cursor % 8) != 0:
-      self.write_byte(0)
-
-  def write_value(self, value):
-    data = Encoder().encode(value)
-    assm = EncodingAssembler()
-    assm.int32(len(data))
-    self.write_blob(assm.bytes)
-    self.write_blob(data)

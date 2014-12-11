@@ -2,4 +2,5 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 from .codec import *
+from .container import *
 from . import options

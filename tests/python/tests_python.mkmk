@@ -3,6 +3,7 @@
 
 file_names = [
   "test_generic.py",
+  "test_container.py",
 ]
 
 all = get_group("run-tests")
