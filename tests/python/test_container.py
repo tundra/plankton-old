@@ -19,7 +19,7 @@ class ContainerTest(unittest.TestCase):
   def test_socket(self):
     outstr = StringIO.StringIO()
     out = plankton.OutputSocket(outstr)
-    out.set_default_string_encoding("utf8")
+    out.set_default_string_encoding("UTF-8")
     out.send_value([1, 2, 3])
     out.send_value({"a": 3})
     instr = plankton.InputSocket(StringIO.StringIO(outstr.getvalue()))
