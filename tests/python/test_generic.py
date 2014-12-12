@@ -100,7 +100,7 @@ class GenericTest(unittest.TestCase):
         header = test_case["header"]
         continue
       strs = StringIO.StringIO()
-      out = plankton.OutputStream(strs)
+      out = plankton.OutputSocket(strs)
       for part in test_case["input"]:
         encoding = part.get("set_default_string_encoding", None)
         if not encoding is None:
