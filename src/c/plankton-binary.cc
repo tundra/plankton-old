@@ -25,8 +25,6 @@ public:
 
   bool begin_object(uint32_t fieldc);
 
-  bool begin_environment_reference();
-
   bool emit_bool(bool value);
 
   bool emit_null();
@@ -88,14 +86,6 @@ bool pton_assembler_t::begin_object(uint32_t fieldc) {
 
 bool pton_assembler_begin_object(pton_assembler_t *assm, uint32_t fieldc) {
   return assm->begin_object(fieldc);
-}
-
-bool pton_assembler_t::begin_environment_reference() {
-  return write_byte(boBeginEnvironmentReference);
-}
-
-bool pton_assembler_begin_environment_reference(pton_assembler_t *assm) {
-  return assm->begin_environment_reference();
 }
 
 bool pton_assembler_emit_bool(pton_assembler_t *assm, bool value) {
@@ -500,9 +490,6 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
         return false;
       instr_out->opcode = PTON_OPCODE_REFERENCE;
       break;
-    case BinaryImplUtils::boBeginEnvironmentReference:
-      instr_out->opcode = PTON_OPCODE_BEGIN_ENVIRONMENT_REFERENCE;
-      break;
     case BinaryImplUtils::boId: {
       if (!has_more())
         return false;
@@ -633,8 +620,6 @@ bool BinaryReaderImpl::decode(Variant *result_out) {
     case PTON_OPCODE_ID64:
       return succeed(Variant::id(instr.payload.id64.size, instr.payload.id64.value),
           result_out);
-    case PTON_OPCODE_BEGIN_ENVIRONMENT_REFERENCE:
-      return decode(result_out);
     case PTON_OPCODE_REFERENCE:
       return succeed(Variant::integer(instr.payload.reference_offset), result_out);
     default:

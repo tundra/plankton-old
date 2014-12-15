@@ -303,9 +303,6 @@ bool pton_assembler_begin_map(pton_assembler_t *assm, uint32_t size);
 // Writes an object header.
 bool pton_assembler_begin_object(pton_assembler_t *assm, uint32_t fieldc);
 
-// Writes the header of an environment reference.
-bool pton_assembler_begin_environment_reference(pton_assembler_t *assm);
-
 // Writes the given boolean value.
 bool pton_assembler_emit_bool(pton_assembler_t *assm, bool value);
 
@@ -348,8 +345,7 @@ typedef enum pton_instr_opcode_t {
   PTON_OPCODE_NULL,
   PTON_OPCODE_BOOL,
   PTON_OPCODE_BEGIN_OBJECT,
-  PTON_OPCODE_REFERENCE,
-  PTON_OPCODE_BEGIN_ENVIRONMENT_REFERENCE
+  PTON_OPCODE_REFERENCE
 } pton_instr_opcode_t;
 
 // Describes an individual binary plankton code instruction.

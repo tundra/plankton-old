@@ -19,7 +19,6 @@ _TRUE_TAG = 5
 _FALSE_TAG = 6
 _OBJECT_TAG = 7
 _REFERENCE_TAG = 8
-_ENVIRONMENT_TAG = 9
 _BLOB_TAG = 12
 _STRING_TAG = 13
 
@@ -90,11 +89,10 @@ class EncodingAssembler(object):
 # Encapsulates state relevant to writing plankton data.
 class DataOutputStream(object):
 
-  def __init__(self, assembler, resolver, string_codec):
+  def __init__(self, assembler, string_codec):
     self.assm = assembler
     self.object_index = {}
     self.object_offset = 0
-    self.resolver = resolver
     self.string_codec = string_codec
 
   # Writes a value to the stream.
@@ -153,12 +151,6 @@ class DataOutputStream(object):
     self.object_offset += 1
     return index
 
-  def resolve_object(self, obj):
-    if isinstance(obj, EnvironmentReference):
-      return obj.key
-    else:
-      return (self.resolver)(obj)
-
   # Emit a tagged object or reference.
   def visit_object(self, obj):
     if obj in self.object_index:
@@ -168,48 +160,38 @@ class DataOutputStream(object):
       offset = self.object_offset - self.object_index[obj] - 1
       self.assm.uint32(offset)
     else:
-      resolved = self.resolve_object(obj)
-      if resolved is None:
-        # Find the appropriate meta info and, if necessary, replacement
-        # object.
-        meta_info = None
-        last_obj = obj
-        while meta_info is None:
-          meta_info = _CLASS_REGISTRY.get_nearest_meta_info(last_obj.__class__)
-          if meta_info is None:
-            raise Exception(last_obj.__class__)
-          replacement = meta_info.get_replacement(last_obj)
-          if not replacement is last_obj:
-            meta_info = None
-            last_obj = replacement
-        index = self.acquire_offset()
-        header = meta_info.get_header(obj)
-        fields = meta_info.get_payload(obj)
-        self.assm.tag(_OBJECT_TAG)
-        self.assm.uint32(len(fields))
-        self.object_index[obj] = -1
-        self.write_object(header)
-        self.object_index[obj] = index
-        for field in sorted(fields.keys()):
-          self.write_object(field)
-          self.write_object(fields[field])
-      else:
-        index = self.acquire_offset()
-        self.assm.tag(_ENVIRONMENT_TAG)
-        self.object_index[obj] = -1
-        self.write_object(resolved)
-        self.object_index[obj] = index
-
+      # Find the appropriate meta info and, if necessary, replacement
+      # object.
+      meta_info = None
+      last_obj = obj
+      while meta_info is None:
+        meta_info = _CLASS_REGISTRY.get_nearest_meta_info(last_obj.__class__)
+        if meta_info is None:
+          raise Exception(last_obj.__class__)
+        replacement = meta_info.get_replacement(last_obj)
+        if not replacement is last_obj:
+          meta_info = None
+          last_obj = replacement
+      index = self.acquire_offset()
+      header = meta_info.get_header(obj)
+      fields = meta_info.get_payload(obj)
+      self.assm.tag(_OBJECT_TAG)
+      self.assm.uint32(len(fields))
+      self.object_index[obj] = -1
+      self.write_object(header)
+      self.object_index[obj] = index
+      for field in sorted(fields.keys()):
+        self.write_object(field)
+        self.write_object(fields[field])
 
 # Encapsulates state relevant to reading plankton data.
 class DataInputStream(object):
 
-  def __init__(self, bytes, access, default_object, string_codec):
+  def __init__(self, bytes, default_object, string_codec):
     self.bytes = bytes
     self.cursor = 0
     self.object_index = {}
     self.object_offset = 0
-    self.access = access
     self.default_object = default_object
     self.string_codec = string_codec
 
@@ -236,8 +218,6 @@ class DataInputStream(object):
       return self._decode_object()
     elif tag == _REFERENCE_TAG:
       return self._decode_reference()
-    elif tag == _ENVIRONMENT_TAG:
-      return self._decode_environment()
     elif tag == _BLOB_TAG:
       return self._decode_blob()
     else:
@@ -263,8 +243,6 @@ class DataInputStream(object):
       return self._disassemble_object(indent)
     elif tag == _REFERENCE_TAG:
       return self._disassemble_reference(indent)
-    elif tag == _ENVIRONMENT_TAG:
-      return self._disassemble_environment(indent)
     else:
       return str(tag)
 
@@ -376,30 +354,11 @@ class DataInputStream(object):
     payload = self.disassemble_object(indent + "  ")
     return "%sobject (@%i)\n%s\n%s" % (indent, index, header, payload)
 
-  def access_environment(self, key):
-    if type(key) is list:
-      return EnvironmentReference(tuple(key))
-    else:
-      return (self.access)(key)
-
-  def _decode_environment(self):
-    index = self.grab_index()
-    self.object_index[index] = None
-    key = self.read_object()
-    value = self.access_environment(key)
-    self.object_index[index] = value
-    return value
-
   # Acquires the next object index.
   def grab_index(self):
     result = self.object_offset
     self.object_offset += 1
     return result
-
-  def _disassemble_environment(self, indent):
-    index = self.grab_index()
-    key = self.disassemble_object(indent + "  ")
-    return "%senvironment (@%i)\n%s" % (indent, index, key)
 
   # Reads a raw object reference from the stream.
   def _decode_reference(self):
@@ -509,7 +468,6 @@ class StringCodec(object):
 class Encoder(object):
 
   def __init__(self):
-    self.resolver = always_none
     self.string_codec = StringCodec.default()
 
   # Encodes the given object into a byte array.
@@ -522,19 +480,12 @@ class Encoder(object):
     self.string_codec = StringCodec(encoding)
 
   def write(self, obj, assembler):
-    stream = DataOutputStream(assembler, self.resolver, self.string_codec)
+    stream = DataOutputStream(assembler, self.string_codec)
     stream.write_object(obj)
 
   # Encodes the given object into a base64 string.
   def base64encode(self, obj):
     return base64.b64encode(self.encode(obj))
-
-  # Sets the environment resolver to use when encoding. If the given value is
-  # None the resolver is left unchanged.
-  def set_resolver(self, value):
-    if not value is None:
-      self.resolver = value
-    return self
 
 
 # Function that always throws its argument.
@@ -820,8 +771,7 @@ class DefaultObject(object):
 
 class Decoder(object):
 
-  def __init__(self, access=str, default_object=DefaultObject, string_codec=None):
-    self.access = access
+  def __init__(self, default_object=DefaultObject, string_codec=None):
     self.default_object = default_object
     if string_codec is None:
       string_codec = StringCodec.default()
@@ -829,11 +779,11 @@ class Decoder(object):
 
   # Decodes a byte array into a plankton object.
   def decode(self, data):
-    stream = DataInputStream(data, self.access, self.default_object, self.string_codec)
+    stream = DataInputStream(data, self.default_object, self.string_codec)
     return stream.read_object()
 
   def disassemble(self, data):
-    stream = DataInputStream(data, self.access, None, self.string_codec)
+    stream = DataInputStream(data, None, self.string_codec)
     return stream.disassemble_object("")
 
   # Decodes a base64 encoded string into a plankton object.
@@ -842,12 +792,6 @@ class Decoder(object):
 
   def base64disassemble(self, data):
     return self.disassemble(bytearray(base64.b64decode(data)))
-
-  # Sets the function to use to access environment values by key.
-  def set_access(self, value):
-    if not value is None:
-      self.access = value
-    return self
 
 
 # Holds state used when stringifying a value.
@@ -894,24 +838,3 @@ def stringify(data):
 # Hacky, granted.
 class Empty(object):
   pass
-
-
-# An object that will always be resolved as an environment reference.
-class EnvironmentReference(object):
-
-  def __init__(self, key):
-    self.key = key
-
-  def __hash__(self):
-    return ~hash(self.key)
-
-  def __eq__(self, that):
-    if not isinstance(that, EnvironmentReference):
-      return False
-    else:
-      return self.key == that.key
-
-  # Create an environment reference whose key is the array of the given values.
-  @staticmethod
-  def path(*key):
-    return EnvironmentReference(key)

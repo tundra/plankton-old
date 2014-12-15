@@ -25,7 +25,7 @@ class AbstractStream(object):
   # by this stream. The default implementation parses the data and passes the
   # result to receive_value.
   def receive_block(self, block):
-    value = codec.DataInputStream(block, None, None, self.socket.string_codec).read_object()
+    value = codec.DataInputStream(block, None, self.socket.string_codec).read_object()
     self.receive_value(value)
 
   # Custom handling of a new value being passed to this stream.
@@ -186,4 +186,4 @@ class InputSocket(object):
 
   def _read_value(self):
     block = self._read_block()
-    return codec.DataInputStream(block, None, None, self.string_codec).read_object()
+    return codec.DataInputStream(block, None, self.string_codec).read_object()
