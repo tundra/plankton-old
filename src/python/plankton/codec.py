@@ -20,6 +20,11 @@ _OBJECT_TAG = 7
 _REFERENCE_TAG = 8
 _ENVIRONMENT_TAG = 9
 _BLOB_TAG = 12
+_STRING_TAG = 13
+
+
+def is_string(data):
+  return isinstance(data, basestring)
 
 
 # Dispatches to the appropriate method on the given visitor depending on the
@@ -28,7 +33,7 @@ def visit_data(data, visitor):
   t = type(data)
   if t == int:
     return visitor.visit_int(data)
-  elif t == str:
+  elif is_string(data):
     return visitor.visit_string(data)
   elif (t == list) or (t == tuple):
     return visitor.visit_array(data)
@@ -103,9 +108,14 @@ class DataOutputStream(object):
   # Emit a tagged string.
   def visit_string(self, value):
     (bytes, encoding) = self.string_codec.encode(value)
-    self.assm.tag(_DEFAULT_STRING_TAG)
+    if encoding is None:
+      self.assm.tag(_DEFAULT_STRING_TAG)
+    else:
+      self.assm.tag(_STRING_TAG)
     self.assm.uint32(len(bytes))
     self.assm.blob(bytes)
+    if not (encoding is None):
+      self.write_object(encoding)
 
   def visit_blob(self, value):
     self.assm.tag(_BLOB_TAG)
@@ -194,13 +204,14 @@ class DataOutputStream(object):
 # Encapsulates state relevant to reading plankton data.
 class DataInputStream(object):
 
-  def __init__(self, bytes, access, default_object):
+  def __init__(self, bytes, access, default_object, string_codec):
     self.bytes = bytes
     self.cursor = 0
     self.object_index = {}
     self.object_offset = 0
     self.access = access
     self.default_object = default_object
+    self.string_codec = string_codec
 
   # Reads the next value from the stream.
   def read_object(self):
@@ -208,6 +219,8 @@ class DataInputStream(object):
     if tag == _INT32_TAG:
       return self._decode_int32()
     elif tag == _DEFAULT_STRING_TAG:
+      return self._decode_default_string()
+    elif tag == _STRING_TAG:
       return self._decode_string()
     elif tag == _ARRAY_TAG:
       return self._decode_array()
@@ -235,7 +248,7 @@ class DataInputStream(object):
     if tag == _INT32_TAG:
       return "%sint32 %i" % (indent, self._decode_int32())
     elif tag == _DEFAULT_STRING_TAG:
-      return "%sstring '%s'" % (indent, self._decode_string())
+      return "%sstring '%s'" % (indent, self._decode_default_string())
     elif tag == _ARRAY_TAG:
       return self._disassemble_array(indent)
     elif tag == _MAP_TAG:
@@ -277,12 +290,20 @@ class DataInputStream(object):
     return (value >> 1) ^ ((-(value & 1)))
 
   # Reads a naked string from the stream.
-  def _decode_string(self):
+  def _decode_default_string(self):
     length = self._decode_uint32()
     bytes = bytearray()
     for i in xrange(0, length):
       bytes.append(self._get_byte())
     return str(bytes)
+
+  def _decode_string(self):
+    length = self._decode_uint32()
+    bytes = bytearray()
+    for i in xrange(0, length):
+      bytes.append(self._get_byte())
+    encoding = self.read_object()
+    return self.string_codec.decode(bytes, encoding)
 
   # Reads a blob from the stream.
   def _decode_blob(self):
@@ -439,13 +460,17 @@ class StringCodec(object):
     else:
       return codecs.decode(bytes, encoding)
 
+  @staticmethod
+  def default():
+    return StringCodec(StringCodec.FALLBACK_ENCODING)
+
 
 # Configuration object that sets up how to perform plankton encoding.
 class Encoder(object):
 
   def __init__(self):
     self.resolver = always_none
-    self.string_codec = StringCodec("UTF-8")
+    self.string_codec = StringCodec.default()
 
   # Encodes the given object into a byte array.
   def encode(self, obj):
@@ -753,20 +778,22 @@ class DefaultObject(object):
     return "#<? %s %s>" % (self.header, self.payload)
 
 
-
 class Decoder(object):
 
-  def __init__(self, access=str, default_object=DefaultObject):
+  def __init__(self, access=str, default_object=DefaultObject, string_codec=None):
     self.access = access
     self.default_object = default_object
+    if string_codec is None:
+      string_codec = StringCodec.default()
+    self.string_codec = string_codec
 
   # Decodes a byte array into a plankton object.
   def decode(self, data):
-    stream = DataInputStream(data, self.access, self.default_object)
+    stream = DataInputStream(data, self.access, self.default_object, self.string_codec)
     return stream.read_object()
 
   def disassemble(self, data):
-    stream = DataInputStream(data, self.access, None)
+    stream = DataInputStream(data, self.access, None, self.string_codec)
     return stream.disassemble_object("")
 
   # Decodes a base64 encoded string into a plankton object.

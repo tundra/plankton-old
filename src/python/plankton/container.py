@@ -18,11 +18,14 @@ _SEND_VALUE = 2
 class AbstractStream(object):
   __metaclass__ = ABCMeta
 
+  def __init__(self, socket):
+    self.socket = socket
+
   # Called by the socket when a new block of data is available to be processed
   # by this stream. The default implementation parses the data and passes the
   # result to receive_value.
   def receive_block(self, block):
-    value = codec.DataInputStream(block, None, None).read_object()
+    value = codec.DataInputStream(block, None, None, self.socket.string_codec).read_object()
     self.receive_value(value)
 
   # Custom handling of a new value being passed to this stream.
@@ -33,7 +36,8 @@ class AbstractStream(object):
 
 class DefaultStream(AbstractStream):
 
-  def __init__(self):
+  def __init__(self, socket):
+    super(DefaultStream, self).__init__(socket)
     self.values = Queue.Queue()
 
   def receive_value(self, value):
@@ -100,7 +104,7 @@ class InputSocket(object):
 
   def __init__(self, file):
     self.file = file
-    self.default_encoding = None
+    self.string_codec = None
     self.cursor = 0
     self.streams = {}
     self.stream_factory = DefaultStream
@@ -117,7 +121,7 @@ class InputSocket(object):
   def init(self):
     header = self._read_blob(8)
     if header == "pt\xf6n\00\00\00\00":
-      root_stream = (self.stream_factory)()
+      root_stream = (self.stream_factory)(self)
       self._register_stream(None, root_stream)
       return True
     else:
@@ -132,7 +136,7 @@ class InputSocket(object):
     opcode = self._get_byte()
     if opcode == _SET_DEFAULT_STRING_ENCODING:
       value = self._read_value()
-      self.default_encoding = str(value)
+      self.string_codec = codec.StringCodec(str(value))
       self._read_padding()
       return True
     elif opcode == _SEND_VALUE:
@@ -175,4 +179,4 @@ class InputSocket(object):
 
   def _read_value(self):
     block = self._read_block()
-    return codec.DataInputStream(block, None, None).read_object()
+    return codec.DataInputStream(block, None, None, self.string_codec).read_object()

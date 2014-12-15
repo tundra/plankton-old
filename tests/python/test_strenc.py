@@ -34,6 +34,17 @@ class StringEncodingTest(unittest.TestCase):
     self.assertEquals((sjis_bytes, None), sjis_codec.encode(utf8))
     self.assertEquals(utf8, sjis_codec.decode(sjis_bytes))
 
+  def test_serializing(self):
+    ascii = "foo bar"
+    utf8 = u"foo \uff83 bar"
+    value = [ascii, utf8]
+    enc = plankton.Encoder()
+    enc.set_default_string_encoding("US-ASCII")
+    encoded = enc.encode(value)
+    dec = plankton.Decoder()
+    decoded = dec.decode(encoded)
+    self.assertEquals(value, decoded)
+
 
 if __name__ == '__main__':
   runner = unittest.TextTestRunner(verbosity=0)
