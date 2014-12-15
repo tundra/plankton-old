@@ -6,10 +6,11 @@
 
 import base64
 import collections
+import codecs
 
 
 _INT32_TAG = 0
-_STRING_TAG = 1
+_DEFAULT_STRING_TAG = 1
 _ARRAY_TAG = 2
 _MAP_TAG = 3
 _NULL_TAG = 4
@@ -83,11 +84,12 @@ class EncodingAssembler(object):
 # Encapsulates state relevant to writing plankton data.
 class DataOutputStream(object):
 
-  def __init__(self, assembler, resolver):
+  def __init__(self, assembler, resolver, string_codec):
     self.assm = assembler
     self.object_index = {}
     self.object_offset = 0
     self.resolver = resolver
+    self.string_codec = string_codec
 
   # Writes a value to the stream.
   def write_object(self, obj):
@@ -100,8 +102,8 @@ class DataOutputStream(object):
 
   # Emit a tagged string.
   def visit_string(self, value):
-    self.assm.tag(_STRING_TAG)
-    bytes = bytearray(value, "utf-8")
+    (bytes, encoding) = self.string_codec.encode(value)
+    self.assm.tag(_DEFAULT_STRING_TAG)
     self.assm.uint32(len(bytes))
     self.assm.blob(bytes)
 
@@ -205,7 +207,7 @@ class DataInputStream(object):
     tag = self._get_byte()
     if tag == _INT32_TAG:
       return self._decode_int32()
-    elif tag == _STRING_TAG:
+    elif tag == _DEFAULT_STRING_TAG:
       return self._decode_string()
     elif tag == _ARRAY_TAG:
       return self._decode_array()
@@ -232,7 +234,7 @@ class DataInputStream(object):
     tag = self._get_byte()
     if tag == _INT32_TAG:
       return "%sint32 %i" % (indent, self._decode_int32())
-    elif tag == _STRING_TAG:
+    elif tag == _DEFAULT_STRING_TAG:
       return "%sstring '%s'" % (indent, self._decode_string())
     elif tag == _ARRAY_TAG:
       return self._disassemble_array(indent)
@@ -407,11 +409,43 @@ def always_none(value):
   return None
 
 
+# An object responsible for converting strings to and from a suggested encoding
+# as necessary.
+class StringCodec(object):
+
+  FALLBACK_ENCODING = "UTF-8"
+
+  def __init__(self, encoding):
+    self.encoding = encoding
+
+  # Given a string and the suggested encoding, returns a pair of (bytes,
+  # encoding). The bytes value is a bytearray of the character data, the
+  # encoding is either None if we could use the suggested encoding, the ascii
+  # name of an encoding if the string needs a custom encoding.
+  def encode(self, string):
+    try:
+      encoding = None
+      bytes = bytearray(codecs.encode(string, self.encoding))
+    except UnicodeEncodeError:
+      encoding = StringCodec.FALLBACK_ENCODING
+      bytes = bytearray(codecs.encode(string, encoding))
+    return (bytes, encoding)
+
+  # Convert a block of bytes to a string, assuming they represent a string
+  # encoded using the given encoding.
+  def decode(self, bytes, encoding=None):
+    if encoding is None:
+      return codecs.decode(bytes, self.encoding)
+    else:
+      return codecs.decode(bytes, encoding)
+
+
 # Configuration object that sets up how to perform plankton encoding.
 class Encoder(object):
 
   def __init__(self):
     self.resolver = always_none
+    self.string_codec = StringCodec("UTF-8")
 
   # Encodes the given object into a byte array.
   def encode(self, obj):
@@ -419,8 +453,11 @@ class Encoder(object):
     self.write(obj, assembler)
     return assembler.bytes
 
+  def set_default_string_encoding(self, encoding):
+    self.string_codec = StringCodec(encoding)
+
   def write(self, obj, assembler):
-    stream = DataOutputStream(assembler, self.resolver)
+    stream = DataOutputStream(assembler, self.resolver, self.string_codec)
     stream.write_object(obj)
 
   # Encodes the given object into a base64 string.

@@ -2,8 +2,9 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 file_names = [
-  "test_generic.py",
   "test_container.py",
+  "test_generic.py",
+  "test_strenc.py",
 ]
 
 all = get_group("run-tests")
