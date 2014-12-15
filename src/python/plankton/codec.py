@@ -7,6 +7,7 @@
 import base64
 import collections
 import codecs
+import operator
 
 
 _INT32_TAG = 0
@@ -112,10 +113,9 @@ class DataOutputStream(object):
       self.assm.tag(_DEFAULT_STRING_TAG)
     else:
       self.assm.tag(_STRING_TAG)
+      self.assm.uint32(encoding)
     self.assm.uint32(len(bytes))
     self.assm.blob(bytes)
-    if not (encoding is None):
-      self.write_object(encoding)
 
   def visit_blob(self, value):
     self.assm.tag(_BLOB_TAG)
@@ -298,11 +298,11 @@ class DataInputStream(object):
     return str(bytes)
 
   def _decode_string(self):
+    encoding = self._decode_uint32()
     length = self._decode_uint32()
     bytes = bytearray()
     for i in xrange(0, length):
       bytes.append(self._get_byte())
-    encoding = self.read_object()
     return self.string_codec.decode(bytes, encoding)
 
   # Reads a blob from the stream.
@@ -434,35 +434,75 @@ def always_none(value):
 # as necessary.
 class StringCodec(object):
 
-  FALLBACK_ENCODING = "UTF-8"
+  # Symbolic names for the IANA character set enums. See
+  # https://www.iana.org/assignments/character-sets/character-sets.xhtml.
+  US_ASCII = 3
+  SHIFT_JIS = 17
+  UTF_8 = 106
+
+  # Maps enums to names. Each enum can have multiple aliases and it appears
+  # traditional to accomodate this rather than standardize on one unique name.
+  # The first name should be the preferred MIME name.
+  ENUM_TO_NAME = {
+    US_ASCII: ["US-ASCII"],
+    SHIFT_JIS: ["Shift_JIS"],
+    UTF_8: ["UTF-8"],
+  }
+
+  # Inverse of ENUM_TO_NAME, giving the enum for a name.
+  NAME_TO_ENUM = dict(reduce(operator.add, [[(k, v) for k in ks] for (v, ks) in ENUM_TO_NAME.items()]))
+
+  FALLBACK_ENCODING_NAME = "UTF-8"
+  FALLBACK_ENCODING_ENUM = UTF_8
 
   def __init__(self, encoding):
-    self.encoding = encoding
+    self.encoding_name = StringCodec.get_encoding_name(encoding)
+
+  # Given either an enum or a string name, returns the normalized encoding name.
+  # This means mapping enums and aliases to the canonical preferred name for the
+  # given encoding.
+  @staticmethod
+  def get_encoding_name(encoding):
+    if isinstance(encoding, basestring):
+      encoding_enum = StringCodec.NAME_TO_ENUM[encoding]
+    else:
+      encoding_enum = encoding
+    return StringCodec.ENUM_TO_NAME[encoding_enum][0]
+
+  # Given either an enum or a string name, returns the enum for the given
+  # encoding. This is a no-op if the argument is already an enum.
+  @staticmethod
+  def get_encoding_enum(encoding):
+    if isinstance(encoding, basestring):
+      return StringCodec.NAME_TO_ENUM[encoding]
+    else:
+      return encoding
 
   # Given a string and the suggested encoding, returns a pair of (bytes,
   # encoding). The bytes value is a bytearray of the character data, the
-  # encoding is either None if we could use the suggested encoding, the ascii
-  # name of an encoding if the string needs a custom encoding.
+  # encoding is either None if we could use the suggested encoding, the enum
+  # value of an encoding if the string needs a custom encoding.
   def encode(self, string):
     try:
       encoding = None
-      bytes = bytearray(codecs.encode(string, self.encoding))
+      bytes = bytearray(codecs.encode(string, self.encoding_name))
     except UnicodeEncodeError:
-      encoding = StringCodec.FALLBACK_ENCODING
-      bytes = bytearray(codecs.encode(string, encoding))
+      encoding = StringCodec.FALLBACK_ENCODING_ENUM
+      bytes = bytearray(codecs.encode(string, StringCodec.FALLBACK_ENCODING_NAME))
     return (bytes, encoding)
 
   # Convert a block of bytes to a string, assuming they represent a string
   # encoded using the given encoding.
   def decode(self, bytes, encoding=None):
     if encoding is None:
-      return codecs.decode(bytes, self.encoding)
+      return codecs.decode(bytes, self.encoding_name)
     else:
-      return codecs.decode(bytes, encoding)
+      encoding_name = StringCodec.get_encoding_name(encoding)
+      return codecs.decode(bytes, encoding_name)
 
   @staticmethod
   def default():
-    return StringCodec(StringCodec.FALLBACK_ENCODING)
+    return StringCodec(StringCodec.FALLBACK_ENCODING_NAME)
 
 
 # Configuration object that sets up how to perform plankton encoding.

@@ -4,6 +4,7 @@
 
 
 import plankton
+from plankton import StringCodec
 import unittest
 import StringIO
 import codecs
@@ -12,16 +13,16 @@ import codecs
 class StringEncodingTest(unittest.TestCase):
 
   def test_codecs(self):
-    utf8_codec = plankton.StringCodec("UTF-8")
-    ascii_codec = plankton.StringCodec("US-ASCII")
-    sjis_codec = plankton.StringCodec("Shift_JIS")
+    utf8_codec = StringCodec(StringCodec.UTF_8)
+    ascii_codec = StringCodec(StringCodec.US_ASCII)
+    sjis_codec = StringCodec(StringCodec.SHIFT_JIS)
     # The character U+FF83 is a katakana te which has a one-byte encoding in
     # shift-jis but a multibyte one in utf8.
     utf8 = u"foo \uff83 bar"
     utf8_bytes = bytearray(utf8.encode("utf8"))
     self.assertEquals(11, len(utf8_bytes))
     self.assertEquals((utf8_bytes, None), utf8_codec.encode(utf8))
-    self.assertEquals((utf8_bytes, "UTF-8"), ascii_codec.encode(utf8))
+    self.assertEquals((utf8_bytes, StringCodec.UTF_8), ascii_codec.encode(utf8))
     self.assertEquals(utf8, utf8_codec.decode(utf8_bytes))
     ascii = u"foo bar"
     ascii_bytes = bytearray(ascii.encode("ascii"))
@@ -39,7 +40,7 @@ class StringEncodingTest(unittest.TestCase):
     utf8 = u"foo \uff83 bar"
     value = [ascii, utf8]
     enc = plankton.Encoder()
-    enc.set_default_string_encoding("US-ASCII")
+    enc.set_default_string_encoding(StringCodec.US_ASCII)
     encoded = enc.encode(value)
     dec = plankton.Decoder()
     decoded = dec.decode(encoded)

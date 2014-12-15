@@ -61,10 +61,11 @@ class OutputSocket(object):
     self._write_header()
 
   # Writes the given ascii string value as the default string encoding.
-  def set_default_string_encoding(self, value):
-    self.default_string_encoding = value
+  def set_default_string_encoding(self, encoding):
+    enum = codec.StringCodec.get_encoding_enum(encoding)
+    self.default_string_encoding = enum
     self._write_byte(_SET_DEFAULT_STRING_ENCODING)
-    self._write_value(bytearray(codecs.encode(value, "ascii")))
+    self._write_uint32(enum)
     self._write_padding()
 
   # Sends the given value to the stream with the given id. If no id is given
@@ -78,10 +79,13 @@ class OutputSocket(object):
   # Writes the given value to this stream.
   def _write_value(self, value):
     data = codec.Encoder().encode(value)
-    assm = codec.EncodingAssembler()
-    assm.uint32(len(data))
-    self._write_blob(assm.bytes)
+    self._write_uint32(len(data))
     self._write_blob(data)
+
+  def _write_uint32(self, value):
+    assm = codec.EncodingAssembler()
+    assm.uint32(value)
+    self._write_blob(assm.bytes)
 
   def _write_header(self):
     self.file.write("pt\xf6n\00\00\00\00")
@@ -135,8 +139,8 @@ class InputSocket(object):
   def process_next_instruction(self):
     opcode = self._get_byte()
     if opcode == _SET_DEFAULT_STRING_ENCODING:
-      value = self._read_value()
-      self.string_codec = codec.StringCodec(str(value))
+      value = self._read_uint32()
+      self.string_codec = codec.StringCodec(value)
       self._read_padding()
       return True
     elif opcode == _SEND_VALUE:
@@ -174,8 +178,11 @@ class InputSocket(object):
       self._get_byte()
 
   def _read_block(self):
-    size = codec.DataInputStream.decode_uint32_from(self)
+    size = self._read_uint32()
     return bytearray(self._read_blob(size))
+
+  def _read_uint32(self):
+    return codec.DataInputStream.decode_uint32_from(self)
 
   def _read_value(self):
     block = self._read_block()
