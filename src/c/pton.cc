@@ -48,9 +48,6 @@ void disass_instr(pton_instr_t *instr, string_buffer_t *buf) {
     case PTON_OPCODE_REFERENCE:
       string_buffer_printf(buf, "get_ref:%i", instr->payload.reference_offset);
       break;
-    case PTON_OPCODE_BEGIN_ENVIRONMENT_REFERENCE:
-      string_buffer_printf(buf, "begin_environment_reference");
-      break;
     default:
       string_buffer_printf(buf, "unknown (%i)", instr->opcode);
       break;
