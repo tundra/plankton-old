@@ -1085,6 +1085,8 @@ void OutputSocket::write_byte(byte_t value) {
 }
 
 void OutputSocket::write_uint64(uint64_t value) {
+  // This is redundant with pton_assembler_t::write_uint64 but trying to factor
+  // it out and share the code would probably be more trouble than it's worth.
   uint64_t current = value;
   while (current >= 0x80) {
     write_byte((current & 0x7F) | 0x80);

@@ -34,6 +34,10 @@ typedef enum pton_type_t {
 } pton_type_t;
 
 // The charsets supported by plankton.
+//
+// TODO: only utf-8 is actually supported in c and a decision needs to be made
+//   about what "support" means -- just keeping the raw bytes and carrying the
+//   encoding along with them, or performing an actual conversion.
 typedef enum pton_charset_t {
   PTON_CHARSET_US_ASCII = 3,
   PTON_CHARSET_SHIFT_JIS = 17,
