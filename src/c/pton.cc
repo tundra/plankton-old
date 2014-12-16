@@ -57,10 +57,10 @@ void disass_instr(pton_instr_t *instr, string_buffer_t *buf) {
 int main(int argc, char *argv[]) {
   install_crash_handler();
   FileSystem *fs = FileSystem::native();
-  OpenFile *out = fs->std_out();
+  IoStream *out = fs->std_out();
   for (int i = 1; i < argc; i++) {
     const char *name = argv[i];
-    OpenFile *in = NULL;
+    IoStream *in = NULL;
     if (strcmp("-", name) == 0)
       in = fs->std_in();
     else

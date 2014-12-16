@@ -6,7 +6,7 @@
 #ifndef _PLANKTON_HH
 #define _PLANKTON_HH
 
-#include "stdc.h"
+#include "io/file.hh"
 #include "variant.hh"
 
 namespace plankton {
@@ -148,6 +148,36 @@ private:
   Arena *arena_;
   bool has_failed_;
   char offender_;
+};
+
+class OutputSocket {
+public:
+  // Create a new output socket that writes to the given stream.
+  OutputSocket(tclib::IoStream *dest);
+
+  // Write the stream header.
+  void init();
+
+  // Sets the default encoding charset to use when encoding strings.
+  void set_default_string_encoding(pton_charset_t value);
+
+private:
+  // Writes the given raw data to the destination.
+  void write_blob(byte_t *data, size_t size);
+
+  // Writes a single byte to the destination.
+  void write_byte(byte_t value);
+
+  // Writes a varint encoded uint64 to the destination.
+  void write_uint64(uint64_t value);
+
+  // Writes 0s until the total number of bytes written is a multiple of 8.
+  void write_padding();
+
+  static const byte_t kSetDefaultStringEncoding = 1;
+
+  tclib::IoStream *dest_;
+  size_t cursor_;
 };
 
 } // namespace plankton

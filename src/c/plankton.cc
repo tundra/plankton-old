@@ -1059,3 +1059,41 @@ pton_variant_t pton_id(uint32_t size, uint64_t value) {
   result.payload_.as_inline_id_ = value;
   return result;
 }
+
+OutputSocket::OutputSocket(tclib::IoStream *dest)
+  : dest_(dest)
+  , cursor_(0) { }
+
+void OutputSocket::init() {
+  byte_t header[8] = {'p', 't', 0xF6, 'n', 0, 0, 0, 0};
+  write_blob(header, 8);
+}
+
+void OutputSocket::set_default_string_encoding(pton_charset_t value) {
+  write_byte(kSetDefaultStringEncoding);
+  write_uint64(value);
+  write_padding();
+}
+
+void OutputSocket::write_blob(byte_t *data, size_t size) {
+  cursor_ += size;
+  dest_->write_bytes(data, size);
+}
+
+void OutputSocket::write_byte(byte_t value) {
+  write_blob(&value, 1);
+}
+
+void OutputSocket::write_uint64(uint64_t value) {
+  uint64_t current = value;
+  while (current >= 0x80) {
+    write_byte((current & 0x7F) | 0x80);
+    current = (current >> 7) - 1;
+  }
+  write_byte(current);
+}
+
+void OutputSocket::write_padding() {
+  while ((cursor_ % 8) != 0)
+    write_byte(0);
+}

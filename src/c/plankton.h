@@ -33,6 +33,13 @@ typedef enum pton_type_t {
   PTON_OBJECT = 0x09
 } pton_type_t;
 
+// The charsets supported by plankton.
+typedef enum pton_charset_t {
+  PTON_CHARSET_US_ASCII = 3,
+  PTON_CHARSET_SHIFT_JIS = 17,
+  PTON_CHARSET_UTF_8 = 106
+} pton_charset_t;
+
 // A value that encodes a value and the value's type. It provides a uniform
 // interface that abstracts over all the different types that can be encoded
 // to and decoded from plankton.
