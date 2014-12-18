@@ -61,6 +61,8 @@ public:
     : data_(data)
     , size_(size) { }
 
+  ~MessageData() { delete[] data_; }
+
   // Returns the raw message data.
   byte_t *data() { return data_; }
 
