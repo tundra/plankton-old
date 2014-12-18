@@ -1207,14 +1207,16 @@ bool InputSocket::process_next_instruction() {
       return true;
     }
     case kSendValue: {
-      MessageData stream_id_data = read_value();
-      StreamId id(stream_id_data.data(), stream_id_data.size(), true);
-      MessageData *value_data = new MessageData(read_value());
+      size_t stream_id_size = 0;
+      byte_t *stream_id_data = read_value(&stream_id_size);
+      StreamId id(stream_id_data, stream_id_size, true);
+      size_t value_size = 0;
+      byte_t *value_data = read_value(&value_size);
       InputStream *dest = get_stream(id);
       if (dest == NULL) {
         delete value_data;
       } else {
-        dest->receive_block(value_data);
+        dest->receive_block(new MessageData(value_data, value_size));
       }
       id.dispose();
       return true;
@@ -1224,11 +1226,12 @@ bool InputSocket::process_next_instruction() {
   }
 }
 
-MessageData InputSocket::read_value() {
+byte_t *InputSocket::read_value(size_t *size_out) {
   uint64_t size = read_uint64();
   byte_t *data = new byte_t[size];
   read_blob(data, size);
-  return MessageData(data, size);
+  *size_out = size;
+  return data;
 }
 
 StreamId InputSocket::root_id() {

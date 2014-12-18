@@ -178,7 +178,7 @@ private:
   void read_padding();
 
   // Reads the next block of data.
-  MessageData read_value();
+  byte_t *read_value(size_t *size_out);
 
   // The default stream factory function.
   static InputStream *new_default_stream(StreamId id);
