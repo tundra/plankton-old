@@ -25,7 +25,7 @@ public:
     boFalse = 6,
     boObject = 7,
     boReference = 8,
-    boBeginStringWithEncoding = 10,
+    boStringWithEncoding = 10,
     boId = 11,
     boBlob = 12
   };

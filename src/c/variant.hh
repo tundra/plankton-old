@@ -134,7 +134,7 @@ public:
   char *string_mutable_chars() const;
 
   // Returns this string's encoding if this is a string, otherwise null.
-  Variant string_encoding() const;
+  pton_charset_t string_encoding() const;
 
   // If this variant is a blob, returns the number of bytes. If not, returns 0.
   uint32_t blob_size() const;
@@ -273,7 +273,7 @@ public:
   // Returns this value viewed as the C type for variants.
   inline pton_variant_t to_c() { return value_; }
 
-  static Variant default_string_encoding();
+  static pton_charset_t default_string_encoding();
 
 protected:
   friend class Sink;
@@ -447,7 +447,7 @@ public:
   uint32_t length() const { return string_length(); }
 
   // Returns this string's character encoding.
-  Variant encoding() const { return string_encoding(); }
+  pton_charset_t encoding() const { return string_encoding(); }
 
   // Returns this string's characters.
   const char *chars() const { return string_chars(); }
@@ -595,7 +595,7 @@ public:
   // Creates and returns a new variant string with the given encoding. The
   // string is fully owned by the arena so the character array can be disposed
   // after this call returns.
-  String new_string(const void *str, uint32_t length, Variant encoding);
+  String new_string(const void *str, uint32_t length, pton_charset_t encoding);
 
   // Creates and returns a new mutable variant string of the given length with
   // the default encoding, initialized to all '\0's. See the new_string method
@@ -609,7 +609,7 @@ public:
   // characters are null. The null terminator is implicitly allocated in
   // addition to the requested length, so you only need to worry about the
   // non-null characters.
-  String new_string(uint32_t length, plankton::Variant encoding);
+  String new_string(uint32_t length, pton_charset_t encoding);
 
   // Creates and returns a new variant blob. The contents it copied into this
   // arena so the data array can be disposed after this call returns.

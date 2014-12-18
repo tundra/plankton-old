@@ -84,9 +84,9 @@ TEST(arena_cpp, mutstring) {
   plankton::String varu8 = arena.new_string(3);
   ASSERT_FALSE(varu8.is_frozen());
   ASSERT_TRUE(varu8.encoding() == Variant::default_string_encoding());
-  plankton::String varai = arena.new_string(3, "ascii");
+  plankton::String varai = arena.new_string(3, PTON_CHARSET_US_ASCII);
   ASSERT_FALSE(varai.is_frozen());
-  ASSERT_TRUE(varai.encoding() == Variant("ascii"));
+  ASSERT_TRUE(varai.encoding() == PTON_CHARSET_US_ASCII);
 }
 
 TEST(arena_cpp, sink) {

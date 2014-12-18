@@ -39,6 +39,9 @@ typedef enum pton_type_t {
 //   about what "support" means -- just keeping the raw bytes and carrying the
 //   encoding along with them, or performing an actual conversion.
 typedef enum pton_charset_t {
+  // Indicates no valid charset. The value 0 is reserved in the enumeration so
+  // it should be safe to use here.
+  PTON_CHARSET_NONE = 0,
   PTON_CHARSET_US_ASCII = 3,
   PTON_CHARSET_SHIFT_JIS = 17,
   PTON_CHARSET_UTF_8 = 106
@@ -171,8 +174,9 @@ const char *pton_string_chars(pton_variant_t variant);
 // otherwise NULL.
 char *pton_string_mutable_chars(pton_variant_t variant);
 
-// Returns the encoding of the given string if it is a string, otherwise null.
-pton_variant_t pton_string_encoding(pton_variant_t variant);
+// Returns the encoding of the given string if it is a string, otherwise
+// PTON_CHARSET_NONE.
+pton_charset_t pton_string_encoding(pton_variant_t variant);
 
 // If this variant is a blob, returns the number of bytes. If not, returns 0.
 uint32_t pton_blob_size(pton_variant_t variant);
@@ -331,8 +335,8 @@ bool pton_assembler_emit_default_string(pton_assembler_t *assm, const char *char
     uint32_t length);
 
 // Writes the payload part of a string with an explicit encoding.
-bool pton_assembler_begin_string_with_encoding(pton_assembler_t *assm,
-    const void *chars, uint32_t length);
+bool pton_assembler_emit_string_with_encoding(pton_assembler_t *assm,
+    pton_charset_t encoding, const void *chars, uint32_t length);
 
 // Writes an (up to) 64-bit identity token.
 bool pton_assembler_emit_id64(pton_assembler_t *assm, uint32_t size,
@@ -350,7 +354,7 @@ typedef enum pton_instr_opcode_t {
   PTON_OPCODE_INT64,
   PTON_OPCODE_ID64,
   PTON_OPCODE_DEFAULT_STRING,
-  PTON_OPCODE_BEGIN_STRING_WITH_ENCODING,
+  PTON_OPCODE_STRING_WITH_ENCODING,
   PTON_OPCODE_BEGIN_ARRAY,
   PTON_OPCODE_BEGIN_MAP,
   PTON_OPCODE_NULL,
@@ -374,6 +378,7 @@ typedef struct {
       const uint8_t *contents;
     } default_string_data;
     struct {
+      pton_charset_t encoding;
       uint64_t length;
       const uint8_t *contents;
     } string_with_encoding_data;

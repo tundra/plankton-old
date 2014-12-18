@@ -1,9 +1,11 @@
 //- Copyright 2014 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#include "plankton-binary.hh"
 #include "plankton-inl.hh"
-#include "stdc.h"
+#include "socket.hh"
 #include "std/stdnew.hh"
+#include "stdc.h"
 
 using namespace plankton;
 
@@ -102,18 +104,18 @@ void pton_arena_object_t::ensure_frozen() {
 
 struct pton_arena_string_t : public pton_arena_value_t {
 public:
-  pton_arena_string_t(char *chars, uint32_t length, Variant encoding, bool is_frozen);
+  pton_arena_string_t(char *chars, uint32_t length, pton_charset_t encoding, bool is_frozen);
 
   uint32_t length() { return length_; }
 
   const char *chars() { return chars_; }
 
-  Variant encoding() { return encoding_; }
+  pton_charset_t encoding() { return encoding_; }
 
 private:
   char *chars_;
   uint32_t length_;
-  Variant encoding_;
+  pton_charset_t encoding_;
 };
 
 struct pton_arena_blob_t : public pton_arena_value_t {
@@ -216,7 +218,7 @@ String Arena::new_string(const char *str, uint32_t length) {
 }
 
 String Arena::new_string(const void *str, uint32_t length,
-    Variant encoding) {
+    pton_charset_t encoding) {
   pton_arena_string_t *data = alloc_value<pton_arena_string_t>();
   char *own_str = alloc_values<char>(length + 1);
   memcpy(own_str, str, length);
@@ -234,7 +236,7 @@ String Arena::new_string(uint32_t length) {
   return new_string(length, Variant::default_string_encoding());
 }
 
-String Arena::new_string(uint32_t length, Variant encoding) {
+String Arena::new_string(uint32_t length, pton_charset_t encoding) {
   pton_arena_string_t *data = alloc_value<pton_arena_string_t>();
   char *own_str = alloc_values<char>(length + 1);
   memset(own_str, '\0', length + 1);
@@ -410,8 +412,8 @@ Variant Variant::blob(const void *data, uint32_t size) {
   return Variant(pton_blob(data, size));
 }
 
-Variant Variant::default_string_encoding() {
-  return Variant("utf-8");
+pton_charset_t Variant::default_string_encoding() {
+  return PTON_CHARSET_UTF_8;
 }
 
 bool pton_array_add(pton_variant_t array, pton_variant_t value) {
@@ -806,19 +808,19 @@ char *pton_string_mutable_chars(pton_variant_t variant) {
       : const_cast<char*>(pton_string_chars(variant));
 }
 
-Variant Variant::string_encoding() const {
+pton_charset_t Variant::string_encoding() const {
   return pton_string_encoding(value_);
 }
 
-pton_variant_t pton_string_encoding(pton_variant_t variant) {
+pton_charset_t pton_string_encoding(pton_variant_t variant) {
   pton_check_binary_version(variant);
   switch (variant.header_.repr_tag_) {
     case header_t::PTON_REPR_EXTN_STRING:
-      return Variant::default_string_encoding().to_c();
+      return Variant::default_string_encoding();
     case header_t::PTON_REPR_ARNA_STRING:
-      return variant.payload_.as_arena_string_->encoding().to_c();
+      return variant.payload_.as_arena_string_->encoding();
     default:
-      return pton_null();
+      return PTON_CHARSET_NONE;
   }
 }
 
@@ -831,7 +833,7 @@ char *Variant::string_mutable_chars() const {
 }
 
 pton_arena_string_t::pton_arena_string_t(char *chars, uint32_t length,
-    Variant encoding, bool is_frozen)
+    pton_charset_t encoding, bool is_frozen)
   : chars_(chars)
   , length_(length)
   , encoding_(encoding) {
@@ -1064,9 +1066,11 @@ OutputSocket::OutputSocket(tclib::IoStream *dest)
   : dest_(dest)
   , cursor_(0) { }
 
+static const byte_t kHeader[8] = {'p', 't', 0xF6, 'n', 0, 0, 0, 0};
+
 void OutputSocket::init() {
-  byte_t header[8] = {'p', 't', 0xF6, 'n', 0, 0, 0, 0};
-  write_blob(header, 8);
+  // TODO: constify.
+  write_blob(const_cast<byte_t*>(kHeader), 8);
 }
 
 void OutputSocket::set_default_string_encoding(pton_charset_t value) {
@@ -1075,9 +1079,24 @@ void OutputSocket::set_default_string_encoding(pton_charset_t value) {
   write_padding();
 }
 
+void OutputSocket::send_value(Variant value, Variant stream_id) {
+  write_byte(kSendValue);
+  write_value(stream_id);
+  write_value(value);
+  write_padding();
+}
+
 void OutputSocket::write_blob(byte_t *data, size_t size) {
   cursor_ += size;
   dest_->write_bytes(data, size);
+}
+
+void OutputSocket::write_value(Variant value) {
+  BinaryWriter writer;
+  writer.write(value);
+  size_t size = writer.size();
+  write_uint64(size);
+  write_blob(*writer, size);
 }
 
 void OutputSocket::write_byte(byte_t value) {
@@ -1098,4 +1117,158 @@ void OutputSocket::write_uint64(uint64_t value) {
 void OutputSocket::write_padding() {
   while ((cursor_ % 8) != 0)
     write_byte(0);
+}
+
+StreamId::StreamId(byte_t *raw_key, size_t key_size, bool owns_key)
+  : raw_key_(raw_key)
+  , key_size_(key_size)
+  , hash_code_(0)
+  , owns_key_(owns_key) {
+  for (size_t i = 0; i < key_size_; i++)
+    hash_code_ = (hash_code_ << 3) ^ raw_key_[i] ^ (hash_code_ >> (WORD_SIZE - 3));
+}
+
+bool StreamId::operator ==(const StreamId &that) const {
+  if (key_size_ != that.key_size_)
+    return false;
+  for (size_t i = 0; i < key_size_; i++) {
+    if (raw_key_[i] != that.raw_key_[i])
+      return false;
+  }
+  return true;
+}
+
+void StreamId::dispose() {
+  if (owns_key_)
+    delete[] raw_key_;
+  raw_key_ = NULL;
+}
+
+InputSocket::InputSocket(tclib::IoStream *src)
+  : src_(src)
+  , cursor_(0) {
+  stream_factory_ = tclib::new_callback(new_default_stream);
+}
+
+InputSocket::~InputSocket() {
+  // Dispose all the data associated with the streams map.
+  for (StreamMap::iterator i = streams_.begin(); i != streams_.end(); ++i) {
+    StreamId id = i->first;
+    InputStream *stream = i->second;
+    id.dispose();
+    delete stream;
+  }
+  streams_.clear();
+}
+
+InputStream *InputSocket::new_default_stream(StreamId id) {
+  return new BufferInputStream(id);
+}
+
+BufferInputStream::BufferInputStream(StreamId id) : InputStream(id) { }
+
+void BufferInputStream::receive_block(MessageData *message) {
+  pending_messages_.push_back(message);
+}
+
+Variant BufferInputStream::pull_message(Arena *arena) {
+  if (pending_messages_.empty())
+    return Variant::null();
+  MessageData *message = pending_messages_.front();
+  pending_messages_.erase(pending_messages_.begin());
+  BinaryReader reader(arena);
+  Variant result = reader.parse(message->data(), message->size());
+  delete message;
+  return result;
+}
+
+// The raw underlying data of the root id.
+static const byte_t kRawRootId[1] = {BinaryImplUtils::boNull};
+
+bool InputSocket::init() {
+  byte_t header[8];
+  read_blob(header, 8);
+  for (size_t i = 0; i < 8; i++) {
+    if (header[i] != kHeader[i])
+      return false;
+  }
+  StreamId id = root_id();
+  InputStream *root_stream = stream_factory_(id);
+  streams_[id] = root_stream;
+  return true;
+}
+
+bool InputSocket::process_next_instruction() {
+  byte_t opcode = read_byte();
+  switch (opcode) {
+    case kSetDefaultStringEncoding: {
+      read_uint64();
+      read_padding();
+      return true;
+    }
+    case kSendValue: {
+      MessageData stream_id_data = read_value();
+      StreamId id(stream_id_data.data(), stream_id_data.size(), true);
+      MessageData *value_data = new MessageData(read_value());
+      InputStream *dest = get_stream(id);
+      if (dest == NULL) {
+        delete value_data;
+      } else {
+        dest->receive_block(value_data);
+      }
+      id.dispose();
+      return true;
+    }
+    default:
+      return false;
+  }
+}
+
+MessageData InputSocket::read_value() {
+  uint64_t size = read_uint64();
+  byte_t *data = new byte_t[size];
+  read_blob(data, size);
+  return MessageData(data, size);
+}
+
+StreamId InputSocket::root_id() {
+  return StreamId(const_cast<byte_t*>(kRawRootId), 1, false);
+}
+
+InputStream *InputSocket::root_stream() {
+  return get_stream(root_id());
+}
+
+InputStream *InputSocket::get_stream(StreamId id) {
+  StreamMap::iterator i = streams_.find(id);
+  return (i == streams_.end()) ? NULL : i->second;
+}
+
+void InputSocket::read_blob(byte_t *dest, size_t size) {
+  cursor_ += size;
+  src_->read_bytes(dest, size);
+}
+
+byte_t InputSocket::read_byte() {
+  byte_t value = 0;
+  read_blob(&value, 1);
+  return value;
+}
+
+uint64_t InputSocket::read_uint64() {
+  uint8_t next = read_byte();
+  uint64_t result = (next & 0x7F);
+  uint64_t offset = 7;
+  while (next >= 0x80) {
+    next = read_byte();
+    uint64_t payload = ((next & 0x7F) + 1);
+    result = result + (payload << offset);
+    offset += 7;
+  }
+  return result;
+}
+
+void InputSocket::read_padding() {
+  while ((cursor_ % 8) != 0)
+    read_byte();
 }

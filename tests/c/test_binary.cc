@@ -67,10 +67,10 @@ TEST(binary, ids) {
 
 TEST(binary, string_encodings) {
   Arena arena;
-  Variant str = arena.new_string("foo", 3, "test-encoding");
+  Variant str = arena.new_string("foo", 3, PTON_CHARSET_SHIFT_JIS);
   BinaryWriter writer;
   writer.write(str);
   BinaryReader reader(&arena);
   Variant decoded = reader.parse(*writer, writer.size());
-  ASSERT_TRUE(decoded.string_encoding() == Variant("test-encoding"));
+  ASSERT_EQ(PTON_CHARSET_SHIFT_JIS, decoded.string_encoding());
 }

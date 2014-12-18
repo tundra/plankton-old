@@ -73,6 +73,5 @@ TEST(variant_c, blob) {
 
 TEST(variant_c, string_encoding) {
   pton_variant_t variant = pton_c_str("foo");
-  pton_variant_t utf8 = pton_c_str("utf-8");
-  ASSERT_TRUE(pton_variants_equal(utf8, pton_string_encoding(variant)));
+  ASSERT_EQ(PTON_CHARSET_UTF_8, pton_string_encoding(variant));
 }
