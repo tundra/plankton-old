@@ -10,12 +10,7 @@
 #include "variant.hh"
 #include "plankton.hh"
 #include "callback.hh"
-
-// TODO: this needs to be changed to work with windows and probably across gcc
-//   versions too.
-#define _GLIBCXX_PERMIT_BACKWARD_HASH
-#include <hash_map>
-#define hash_map_alias __gnu_cxx::hash_map
+#include "std/stdhashmap.hh"
 
 namespace plankton {
 
@@ -86,6 +81,9 @@ public:
   // Returns true iff this and the given stream id wrap identical binary keys.
   bool operator==(const StreamId &that) const;
 
+  // Returns true iff the binary key is lexically less than the given one.
+  bool operator<(const StreamId &that) const;
+
   // Returns a hash of the underlying key.
   size_t hash_code() const { return hash_code_; }
 
@@ -93,6 +91,12 @@ public:
   class Hasher {
   public:
     size_t operator()(const StreamId &id) const { return id.hash_code(); }
+
+    // See http://msdn.microsoft.com/en-us/library/1s1byw77.aspx.
+    static const size_t bucket_size = 4;
+
+    // The MSVC hash map needs the keys to be ordered using this operator. Wut?
+    bool operator()(const StreamId &a, const StreamId &b) { return a < b; }
   };
 
   // Stream ids are passed around by value so they don't need a destructor.
@@ -192,7 +196,7 @@ private:
   // found.
   InputStream *get_stream(StreamId id);
 
-  typedef hash_map_alias<StreamId, InputStream*, StreamId::Hasher> StreamMap;
+  typedef platform_hash_map<StreamId, InputStream*, StreamId::Hasher> StreamMap;
 
   tclib::IoStream *src_;
   size_t cursor_;

@@ -1128,7 +1128,7 @@ StreamId::StreamId(byte_t *raw_key, size_t key_size, bool owns_key)
     hash_code_ = (hash_code_ << 3) ^ raw_key_[i] ^ (hash_code_ >> (WORD_SIZE - 3));
 }
 
-bool StreamId::operator ==(const StreamId &that) const {
+bool StreamId::operator==(const StreamId &that) const {
   if (key_size_ != that.key_size_)
     return false;
   for (size_t i = 0; i < key_size_; i++) {
@@ -1136,6 +1136,16 @@ bool StreamId::operator ==(const StreamId &that) const {
       return false;
   }
   return true;
+}
+
+bool StreamId::operator<(const StreamId &that) const {
+  if (key_size_ < that.key_size_)
+    return true;
+  for (size_t i = 0; i < key_size_; i++) {
+    if (raw_key_[i] < that.raw_key_[i])
+      return true;
+  }
+  return false;
 }
 
 void StreamId::dispose() {
