@@ -11,6 +11,8 @@
 #include "plankton.hh"
 #include "callback.hh"
 
+// TODO: this needs to be changed to work with windows and probably across gcc
+//   versions too.
 #define _GLIBCXX_PERMIT_BACKWARD_HASH
 #include <hash_map>
 #define hash_map_alias __gnu_cxx::hash_map

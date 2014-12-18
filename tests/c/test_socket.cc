@@ -35,6 +35,7 @@ TEST(socket, values) {
   while (insock.process_next_instruction())
     ;
   BufferInputStream *root_stream = static_cast<BufferInputStream*>(insock.root_stream());
+  ASSERT_FALSE(root_stream == NULL);
   Array ain = root_stream->pull_message(&arena);
   ASSERT_EQ(2, ain.length());
   ASSERT_TRUE(ain[0].is_null());
