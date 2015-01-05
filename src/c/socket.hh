@@ -25,11 +25,12 @@ public:
   // Write the stream header.
   void init();
 
-  // Sets the default encoding charset to use when encoding strings.
-  void set_default_string_encoding(pton_charset_t value);
+  // Sets the default encoding charset to use when encoding strings. This must
+  // be done before init is called. The default encoding is utf-8.
+  bool set_default_string_encoding(pton_charset_t value);
 
   // Sends the given value to the default stream.
-  void send_value(Variant value, Variant stream_id);
+  void send_value(Variant value, Variant stream_id = Variant::null());
 
 private:
   // Writes the given raw data to the destination.
@@ -49,6 +50,8 @@ private:
 
   tclib::IoStream *dest_;
   size_t cursor_;
+  pton_charset_t default_encoding_;
+  bool has_been_inited_;
 };
 
 // The raw binary data associated with a message sent on a stream.
@@ -147,10 +150,33 @@ private:
   std::vector<MessageData*> pending_messages_;
 };
 
+// An input stream that parses and handles messages immediately.
+class PushInputStream : public InputStream {
+public:
+  typedef tclib::callback_t<void(Variant)> MessageAction;
+
+  // Creates a new input stream that performs the given action on each message
+  // it receives. The variant value passed to the action is valid during the
+  // call only, the behavior of variants past the end of the call is undefined.
+  PushInputStream(StreamId id, MessageAction action);
+
+  virtual void receive_block(MessageData *message);
+
+private:
+  MessageAction action_;
+};
+
 class InputSocket {
 public:
+  typedef tclib::callback_t<InputStream*(StreamId)> InputStreamFactory;
+
   // Create a new input socket that fetches data from the given source.
   InputSocket(tclib::IoStream *src);
+
+  // Sets the factory used to create input streams. If you want to set the
+  // stream factory you have to do it before calling init(). Returns true if
+  // setting succeeded, false if not.
+  bool set_stream_factory(InputStreamFactory factory);
 
   // Free all the data associated with this socket, including all the streams.
   // Once this method is called it is no longer safe to use any of the streams
@@ -166,7 +192,8 @@ public:
   // if input was in valid or if there is no more input to fecth.
   bool process_next_instruction();
 
-  // Returns the root stream for this socket.
+  // Returns the root stream for this socket. This stream was produced by this
+  // socket's stream factory.
   InputStream *root_stream();
 
 private:
@@ -199,8 +226,9 @@ private:
   typedef platform_hash_map<StreamId, InputStream*, StreamId::Hasher> StreamMap;
 
   tclib::IoStream *src_;
+  bool has_been_inited_;
   size_t cursor_;
-  tclib::callback_t<InputStream*(StreamId)> stream_factory_;
+  InputStreamFactory stream_factory_;
   StreamMap streams_;
 };
 

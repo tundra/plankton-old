@@ -1064,19 +1064,25 @@ pton_variant_t pton_id(uint32_t size, uint64_t value) {
 
 OutputSocket::OutputSocket(tclib::IoStream *dest)
   : dest_(dest)
-  , cursor_(0) { }
+  , cursor_(0)
+  , default_encoding_(PTON_CHARSET_UTF_8)
+  , has_been_inited_(false) { }
 
 static const byte_t kHeader[8] = {'p', 't', 0xF6, 'n', 0, 0, 0, 0};
 
 void OutputSocket::init() {
-  // TODO: constify.
   write_blob(const_cast<byte_t*>(kHeader), 8);
+  write_byte(kSetDefaultStringEncoding);
+  write_uint64(default_encoding_);
+  write_padding();
+  has_been_inited_ = true;
 }
 
-void OutputSocket::set_default_string_encoding(pton_charset_t value) {
-  write_byte(kSetDefaultStringEncoding);
-  write_uint64(value);
-  write_padding();
+bool OutputSocket::set_default_string_encoding(pton_charset_t value) {
+  if (has_been_inited_)
+    return false;
+  default_encoding_ = value;
+  return true;
 }
 
 void OutputSocket::send_value(Variant value, Variant stream_id) {
@@ -1156,6 +1162,7 @@ void StreamId::dispose() {
 
 InputSocket::InputSocket(tclib::IoStream *src)
   : src_(src)
+  , has_been_inited_(false)
   , cursor_(0) {
   stream_factory_ = tclib::new_callback(new_default_stream);
 }
@@ -1169,6 +1176,13 @@ InputSocket::~InputSocket() {
     delete stream;
   }
   streams_.clear();
+}
+
+bool InputSocket::set_stream_factory(InputStreamFactory factory) {
+  if (has_been_inited_)
+    return false;
+  stream_factory_ = factory;
+  return true;
 }
 
 InputStream *InputSocket::new_default_stream(StreamId id) {
@@ -1192,6 +1206,17 @@ Variant BufferInputStream::pull_message(Arena *arena) {
   return result;
 }
 
+PushInputStream::PushInputStream(StreamId id, MessageAction action)
+  : InputStream(id)
+  , action_(action) { }
+
+void PushInputStream::receive_block(MessageData *message) {
+  Arena arena;
+  BinaryReader reader(&arena);
+  Variant value = reader.parse(message->data(), message->size());
+  action_(value);
+}
+
 // The raw underlying data of the root id.
 static const byte_t kRawRootId[1] = {BinaryImplUtils::boNull};
 
@@ -1205,6 +1230,7 @@ bool InputSocket::init() {
   StreamId id = root_id();
   InputStream *root_stream = stream_factory_(id);
   streams_[id] = root_stream;
+  has_been_inited_ = true;
   return true;
 }
 
@@ -1222,6 +1248,7 @@ bool InputSocket::process_next_instruction() {
       StreamId id(stream_id_data, stream_id_size, true);
       size_t value_size = 0;
       byte_t *value_data = read_value(&value_size);
+      read_padding();
       InputStream *dest = get_stream(id);
       if (dest == NULL) {
         delete value_data;
