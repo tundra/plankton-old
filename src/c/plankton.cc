@@ -1214,6 +1214,7 @@ void PushInputStream::receive_block(MessageData *message) {
   Arena arena;
   BinaryReader reader(&arena);
   Variant value = reader.parse(message->data(), message->size());
+  delete message;
   action_(value);
 }
 
