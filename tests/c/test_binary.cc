@@ -102,14 +102,14 @@ void Point::init(Object payload, Factory* factory) {
   y_ = payload.get_field("y").integer_value();
 }
 
-ObjectType<Point> Point::kType("Point",
+ObjectType<Point> Point::kType("binary.Point",
     tclib::new_callback(Point::new_instance),
     tclib::new_callback(&Point::init));
 
 TEST(binary, object_type) {
   Arena arena;
   Object obj = arena.new_object();
-  obj.set_header("Point");
+  obj.set_header("binary.Point");
   obj.set_field("x", 10);
   obj.set_field("y", 18);
   Native value = Point::type()->get_initial_instance(obj.header(), &arena);
@@ -118,4 +118,32 @@ TEST(binary, object_type) {
   ASSERT_TRUE(p != NULL);
   ASSERT_EQ(10, p->x());
   ASSERT_EQ(18, p->y());
+}
+
+TEST(binary, registry) {
+  TypeRegistry registry;
+  registry.register_type(Point::type());
+  ASSERT_TRUE(registry.resolve_type("binary.Point") == Point::type());
+  char other[13] = "binary.Point";
+  ASSERT_TRUE(registry.resolve_type(other) == Point::type());
+  ASSERT_TRUE(registry.resolve_type("blah") == NULL);
+}
+
+TEST(binary, auto_object) {
+  Arena arena;
+  Object obj = arena.new_object();
+  obj.set_header("binary.Point");
+  obj.set_field("x", 11);
+  obj.set_field("y", 12);
+  BinaryWriter out;
+  out.write(obj);
+  TypeRegistry registry;
+  registry.register_type(Point::type());
+  BinaryReader in(&arena);
+  in.set_type_registry(&registry);
+  Native value = in.parse(*out, out.size());
+  Point *pnt = value.as(Point::type());
+  ASSERT_FALSE(pnt == NULL);
+  ASSERT_EQ(11, pnt->x());
+  ASSERT_EQ(12, pnt->y());
 }

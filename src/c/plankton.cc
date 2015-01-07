@@ -1350,3 +1350,12 @@ void InputSocket::read_padding() {
   while ((cursor_ % 8) != 0)
     read_byte();
 }
+
+void TypeRegistry::register_type(AbstractObjectType *type) {
+  types_.set(type->header(), type);
+}
+
+AbstractObjectType *TypeRegistry::resolve_type(Variant header) {
+  AbstractObjectType **type = types_[header];
+  return (type == NULL) ? NULL : *type;
+}

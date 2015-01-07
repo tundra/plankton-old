@@ -110,6 +110,8 @@ private:
   size_t length_;
 };
 
+class AbstractTypeRegistry;
+
 // Utility for reading variant values from serialized data.
 class BinaryReader {
 public:
@@ -119,9 +121,13 @@ public:
   // Deserializes the given input and returns the result as a variant.
   Variant parse(const void *data, size_t size);
 
+  // Sets the type registry to use to resolve types during parsing.
+  void set_type_registry(AbstractTypeRegistry *value) { type_registry_ = value; }
+
 private:
   friend class BinaryReaderImpl;
   Arena *arena_;
+  AbstractTypeRegistry *type_registry_;
 };
 
 // Utility for converting a plankton variant to a 7-bit ascii string.

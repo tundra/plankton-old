@@ -681,11 +681,16 @@ bool BinaryReaderImpl::decode_map(uint64_t size, Variant *result_out) {
 }
 
 bool BinaryReaderImpl::decode_object(uint64_t size, Variant *result_out) {
-  Object result = reader_->arena_->new_object();
   Variant header;
   if (!decode(&header))
     return false;
-  result.set_header(header);
+  Object object = reader_->arena_->new_object();
+  object.set_header(header);
+  AbstractTypeRegistry *registry = reader_->type_registry_;
+  AbstractObjectType *type = registry == NULL ? NULL : registry->resolve_type(header);
+  Variant result = (type == NULL)
+    ? object
+    : type->get_initial_instance(header, reader_->arena_);
   for (size_t i = 0; i < size; i++) {
     Variant key;
     if (!decode(&key))
@@ -693,9 +698,11 @@ bool BinaryReaderImpl::decode_object(uint64_t size, Variant *result_out) {
     Variant value;
     if (!decode(&value))
       return false;
-    result.set_field(key, value);
+    object.set_field(key, value);
   }
-  result.ensure_frozen();
+  object.ensure_frozen();
+  if (type != NULL)
+    result = type->get_complete_instance(result, object, reader_->arena_);
   return succeed(result, result_out);
 }
 
@@ -705,7 +712,8 @@ bool BinaryReaderImpl::succeed(Variant value, Variant *out) {
 }
 
 BinaryReader::BinaryReader(Arena *arena)
-  : arena_(arena) { }
+  : arena_(arena)
+  , type_registry_(NULL) { }
 
 Variant BinaryReader::parse(const void *data, size_t size) {
   BinaryReaderImpl decoder(data, size, this);

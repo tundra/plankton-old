@@ -8,6 +8,10 @@
 #include "std/stdhashmap.hh"
 #include "std/stdvector.hh"
 
+// TODO: move this into tclib and add something similar for windows.
+#include <hash_fun.h>
+#define platform_hash __gnu_cxx::hash
+
 namespace plankton {
 
 template <typename T>
@@ -61,13 +65,19 @@ public:
   T *operator[](Variant key);
 
 private:
+  // Controls how strings are hashed in the string map.
+  struct StringHasher {
+  public:
+    size_t operator()(const String &key) const;
+  };
+
   // A non special case mapping.
   struct GenericMapping {
     Variant key;
     T value;
   };
 
-  typedef platform_hash_map<const char *, T> StringMap;
+  typedef platform_hash_map<String, T, StringHasher> StringMap;
   typedef std::vector<GenericMapping> GenericVector;
 
   // Looks up a binding in the generic mappings.
@@ -86,7 +96,7 @@ private:
 template <typename T>
 void VariantMap<T>::set(Variant key, const T &value) {
   if (key.is_string()) {
-    strings_[key.string_chars()] = value;
+    strings_[key] = value;
   } else {
     set_generic(key, value);
   }
@@ -106,7 +116,7 @@ void VariantMap<T>::set_generic(Variant key, const T &value) {
 template <typename T>
 T *VariantMap<T>::operator[](Variant key) {
   if (key.is_string()) {
-    typename StringMap::iterator i = strings_.find(key.string_chars());
+    typename StringMap::iterator i = strings_.find(key);
     return (i == strings_.end()) ? NULL : &i->second;
   } else {
     return get_generic(key);
@@ -122,6 +132,12 @@ T *VariantMap<T>::get_generic(Variant key) {
       return &i->value;
   }
   return NULL;
+}
+
+template <typename T>
+size_t VariantMap<T>::StringHasher::operator()(const String &key) const {
+  platform_hash<const char*> hasher;
+  return hasher(key.string_chars());
 }
 
 } // namespace plankton
