@@ -290,3 +290,23 @@ TEST(binary, complex_encode) {
   ASSERT_EQ(19, r2->bottom_right()->x());
   ASSERT_EQ(20, r2->bottom_right()->y());
 }
+
+TEST(binary, partial_encode) {
+  Point top_left(17, 18);
+  Rect rect(&top_left, NULL);
+  Arena arena;
+  Native n = arena.new_native(Rect::type(), &rect);
+  BinaryWriter out;
+  out.write(n);
+  TypeRegistry registry;
+  registry.register_type(Point::type());
+  registry.register_type(Rect::type());
+  BinaryReader in(&arena);
+  in.set_type_registry(&registry);
+  Native value = in.parse(*out, out.size());
+  ASSERT_TRUE(value.is_native());
+  Rect *r2 = value.as(Rect::type());
+  ASSERT_EQ(17, r2->top_left()->x());
+  ASSERT_EQ(18, r2->top_left()->y());
+  ASSERT_EQ(NULL, r2->bottom_right());
+}
