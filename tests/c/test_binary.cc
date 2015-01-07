@@ -79,22 +79,28 @@ TEST(binary, string_encodings) {
 
 class Point {
 public:
-  Point(int x, int y) : x_(x), y_(y) { }
-  static Point *new_instance(Variant header, Factory* factory) {
-    return new (*factory) Point(0, 0);
-  }
-  void init(Object payload, Factory* factory) {
-    x_ = payload.get_field("x").integer_value();
-    y_ = payload.get_field("y").integer_value();
-  }
+  Point(int x, int y)
+    : x_(x)
+    , y_(y) { }
   int x() { return x_; }
   int y() { return y_; }
   static ObjectType<Point> *type() { return &kType; }
 private:
+  static Point *new_instance(Variant header, Factory* factory);
+  void init(Object payload, Factory* factory);
   static ObjectType<Point> kType;
   int x_;
   int y_;
 };
+
+Point *Point::new_instance(Variant header, Factory* factory) {
+  return new (*factory) Point(0, 0);
+}
+
+void Point::init(Object payload, Factory* factory) {
+  x_ = payload.get_field("x").integer_value();
+  y_ = payload.get_field("y").integer_value();
+}
 
 ObjectType<Point> Point::kType("Point",
     tclib::new_callback(Point::new_instance),

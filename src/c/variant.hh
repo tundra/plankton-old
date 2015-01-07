@@ -175,7 +175,7 @@ public:
   // Returns a raw pointer to the native object. The only really safe way to
   // get access to the value under its type is using ::as so be careful with
   // this one. If this is not a native return NULL.
-  void *native_value();
+  void *native_object();
 
   // Returns the number of mappings in this map, if this is a map, otherwise
   // 0.
@@ -285,6 +285,9 @@ public:
 
   // Is this the null value?
   inline bool is_null() const;
+
+  // Is this a native object?
+  inline bool is_native() const;
 
   // Returns this value viewed as the C type for variants.
   inline pton_variant_t to_c() { return value_; }
@@ -502,7 +505,7 @@ public:
   // Returns a raw pointer to the native object. The only really safe way to
   // get access to the value under its type is using ::as so be careful with
   // this one. If this is not a native return NULL.
-  void *value() { return native_value(); }
+  void *value() { return native_object(); }
 
   // Returns this native variant viewed under the given type, but only if this
   // is a native that has that type. If not, NULL is returned.
@@ -525,7 +528,7 @@ public:
   virtual Object new_object() = 0;
 
   // Creates a new native plankton object of the given type.
-  virtual Variant new_native_object(AbstractObjectType *type, void *object) = 0;
+  virtual Native new_native(AbstractObjectType *type, void *object) = 0;
 
   // Creates and returns a new mutable blob value of the given size.
   virtual Blob new_blob(uint32_t size) = 0;
@@ -612,7 +615,8 @@ public:
   template <typename T>
   T *alloc_value();
 
-  Variant new_native_object(AbstractObjectType *type, void *object);
+  // Creates a new native object of the given type.
+  Native new_native(AbstractObjectType *type, void *object);
 
   // Creates and returns a new mutable array value.
   Array new_array();

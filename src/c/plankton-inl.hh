@@ -72,6 +72,10 @@ bool Variant::is_null() const {
   return repr_tag() == header_t::PTON_REPR_NULL;
 }
 
+bool Variant::is_native() const {
+  return repr_tag() == header_t::PTON_REPR_ARNA_NATIVE;
+}
+
 Arena::Arena() { }
 
 template <typename T>

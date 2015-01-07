@@ -31,7 +31,8 @@ typedef enum pton_type_t {
   PTON_ARRAY = 0x06,
   PTON_MAP = 0x07,
   PTON_ID = 0x08,
-  PTON_OBJECT = 0x09
+  PTON_OBJECT = 0x09,
+  PTON_NATIVE = 0x0A
 } pton_type_t;
 
 // The charsets supported by plankton.

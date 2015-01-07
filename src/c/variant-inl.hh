@@ -10,7 +10,7 @@ namespace plankton {
 
 template <typename T>
 inline T *Variant::native_as(ConcreteObjectType<T> *type) {
-  return type->cast(native_type(), native_value());
+  return type->cast(native_type(), native_object());
 }
 
 template <typename T>
@@ -21,7 +21,7 @@ T *ConcreteObjectType<T>::cast(AbstractObjectType *type, void *object) {
 template <typename T>
 Variant ObjectType<T>::get_initial_instance(Variant header, Factory *arena) {
   T *instance = (create_)(header, arena);
-  return arena->new_native_object(this, instance);
+  return arena->new_native(this, instance);
 }
 
 template <typename T>
