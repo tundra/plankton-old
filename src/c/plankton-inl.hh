@@ -7,6 +7,7 @@
 #define _PLANKTON_INL
 
 #include "plankton.hh"
+#include "variant-inl.hh"
 
 namespace plankton {
 

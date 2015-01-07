@@ -755,7 +755,6 @@ private:
   complete_instance_t complete_;
 };
 
-
 } // namespace plankton
 
 #endif // _PLANKTON_HH

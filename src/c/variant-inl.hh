@@ -5,6 +5,8 @@
 #define _VARIANT_INL_HH
 
 #include "variant.hh"
+#include "std/stdhashmap.hh"
+#include "std/stdvector.hh"
 
 namespace plankton {
 
@@ -41,6 +43,84 @@ ObjectType<T>::ObjectType(Variant header, new_instance_t create, complete_instan
   : header_(header)
   , create_(create)
   , complete_(complete) { }
+
+// A mapping from variants to values. This is different from a variant map in
+// that the values can be of any type. A variant map also does not keep track
+// of insertion order.
+template <typename T>
+class VariantMap {
+public:
+  // Maps the given key to the given value.
+  void set(Variant key, const T &value);
+
+  // Returns the binding for the given key, if there is one, otherwise NULL.
+  // If the map is subsequently modified the pointer is no longer guaranteed
+  // to be valid.
+  T *operator[](Variant key);
+
+  // A non special case mapping.
+  struct GenericMapping {
+    Variant key;
+    T value;
+  };
+
+private:
+  typedef platform_hash_map<const char *, T> StringMap;
+  typedef std::vector<GenericMapping> GenericVector;
+
+  // Looks up a binding in the generic mappings.
+  T *get_generic(Variant key);
+
+  // Add a mapping to the generic mappings.
+  void set_generic(Variant key, const T &value);
+
+  // All string mappings are stored here, for more efficient access.
+  StringMap strings_;
+
+  // Mappings that don't belong anywhere else.
+  GenericVector generic_;
+};
+
+template <typename T>
+void VariantMap<T>::set(Variant key, const T &value) {
+  if (key.is_string()) {
+    strings_[key.string_chars()] = value;
+  } else {
+    set_generic(key, value);
+  }
+}
+
+template <typename T>
+void VariantMap<T>::set_generic(Variant key, const T &value) {
+  T *existing = get_generic(key);
+  if (existing == NULL) {
+    GenericMapping mapping = {key, value};
+    generic_.push_back(mapping);
+  } else {
+    *existing = value;
+  }
+}
+
+template <typename T>
+T *VariantMap<T>::operator[](Variant key) {
+  if (key.is_string()) {
+    typename StringMap::iterator i = strings_.find(key.string_chars());
+    return (i == strings_.end()) ? NULL : &i->second;
+  } else {
+    return get_generic(key);
+  }
+}
+
+template <typename T>
+T *VariantMap<T>::get_generic(Variant key) {
+  for (typename GenericVector::iterator i = generic_.begin();
+       i != generic_.end();
+       i++) {
+    if (i->key == key)
+      return &i->value;
+  }
+  return NULL;
+}
 
 } // namespace plankton
 
