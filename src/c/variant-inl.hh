@@ -43,10 +43,20 @@ Variant ObjectType<T>::get_complete_instance(Variant initial, Variant payload,
 }
 
 template <typename T>
-ObjectType<T>::ObjectType(Variant header, new_instance_t create, complete_instance_t complete)
+Variant ObjectType<T>::encode_instance(Native wrapped, Factory *factory) {
+  T *value = wrapped.as(this);
+  if (value == NULL || encode_.is_empty())
+    return Variant::null();
+  return (encode_)(value, factory);
+}
+
+template <typename T>
+ObjectType<T>::ObjectType(Variant header, new_instance_t create,
+    complete_instance_t complete, encode_instance_t encode)
   : header_(header)
   , create_(create)
-  , complete_(complete) { }
+  , complete_(complete)
+  , encode_(encode) { }
 
 // A mapping from variants to values. This is different from a variant map in
 // that the values can be of any type. A variant map also does not keep track

@@ -88,6 +88,7 @@ public:
 private:
   static Point *new_instance(Variant header, Factory* factory);
   void init(Object payload, Factory* factory);
+  Variant to_plankton(Factory *factory);
   static ObjectType<Point> kType;
   int x_;
   int y_;
@@ -102,9 +103,18 @@ void Point::init(Object payload, Factory* factory) {
   y_ = payload.get_field("y").integer_value();
 }
 
+Variant Point::to_plankton(Factory *factory) {
+  Object obj = factory->new_object();
+  obj.set_header(type()->header());
+  obj.set_field("x", x_);
+  obj.set_field("y", y_);
+  return obj;
+}
+
 ObjectType<Point> Point::kType("binary.Point",
     tclib::new_callback(Point::new_instance),
-    tclib::new_callback(&Point::init));
+    tclib::new_callback(&Point::init),
+    tclib::new_callback(&Point::to_plankton));
 
 TEST(binary, object_type) {
   Arena arena;
@@ -229,4 +239,22 @@ TEST(binary, invalid_auto_object) {
   ASSERT_EQ(13, rect->top_left()->x());
   ASSERT_EQ(14, rect->top_left()->y());
   ASSERT_EQ(NULL, rect->bottom_right());
+}
+
+TEST(binary, simple_encode) {
+  Arena arena;
+  Point p(15, 16);
+  Native n = arena.new_native(Point::type(), &p);
+  BinaryWriter out;
+  out.write(n);
+  TypeRegistry registry;
+  registry.register_type(Point::type());
+  registry.register_type(Rect::type());
+  BinaryReader in(&arena);
+  in.set_type_registry(&registry);
+  Native value = in.parse(*out, out.size());
+  ASSERT_TRUE(value.is_native());
+  Point *p2 = value.as(Point::type());
+  ASSERT_EQ(15, p2->x());
+  ASSERT_EQ(16, p2->y());
 }

@@ -260,7 +260,10 @@ public:
 
   void encode_object(Object value);
 
+  void encode_native(Native value);
+
 private:
+  Arena scratch_;
   Assembler *assm_;
   Assembler *assm() { return assm_; }
 };
@@ -288,6 +291,9 @@ void VariantWriter::encode(Variant value) {
       break;
     case PTON_OBJECT:
       encode_object(value);
+      break;
+    case PTON_NATIVE:
+      encode_native(value);
       break;
     case PTON_BOOL:
       assm()->emit_bool(value.bool_value());
@@ -342,6 +348,12 @@ void VariantWriter::encode_object(Object value) {
     encode(i->key());
     encode(i->value());
   }
+}
+
+void VariantWriter::encode_native(Native value) {
+  AbstractObjectType *type = value.type();
+  Variant replacement = type->encode_instance(value, &scratch_);
+  encode(replacement);
 }
 
 void BinaryWriter::write(Variant value) {

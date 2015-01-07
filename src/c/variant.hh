@@ -716,6 +716,9 @@ public:
   // instance that is the value you want to return here too.
   virtual Variant get_complete_instance(Variant initial, Variant payload, Factory *factory) = 0;
 
+  // Given a native value, returns the value to use as a replacement.
+  virtual Variant encode_instance(Native value, Factory *factory) = 0;
+
   // Returns the header value that identifies instance of this type.
   virtual Variant header() = 0;
 };
@@ -739,20 +742,24 @@ class ObjectType : public ConcreteObjectType<T> {
 public:
   typedef tclib::callback_t<T*(Variant, Factory*)> new_instance_t;
   typedef tclib::callback_t<void(T*, Object, Factory*)> complete_instance_t;
+  typedef tclib::callback_t<Variant(T*, Factory*)> encode_instance_t;
 
   // Constructs an object type for plankton objects that have the given value
   // as header. Instances will be constructed using new_instance and completed
   // using complete_instance.
-  ObjectType(Variant header, new_instance_t new_instance, complete_instance_t complete_instance);
+  ObjectType(Variant header, new_instance_t new_instance, complete_instance_t complete_instance,
+      encode_instance_t encode = tclib::empty_callback());
 
   virtual Variant get_initial_instance(Variant header, Factory *arena);
   virtual Variant get_complete_instance(Variant initial, Variant payload, Factory *arena);
+  virtual Variant encode_instance(Native value, Factory *factory);
   virtual Variant header() { return header_; }
 
 private:
   Variant header_;
   new_instance_t create_;
   complete_instance_t complete_;
+  encode_instance_t encode_;
 };
 
 } // namespace plankton
