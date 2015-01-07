@@ -12,6 +12,7 @@
 typedef struct pton_arena_array_t pton_arena_array_t;
 typedef struct pton_arena_blob_t pton_arena_blob_t;
 typedef struct pton_arena_map_t pton_arena_map_t;
+typedef struct pton_arena_native_t pton_arena_native_t;
 typedef struct pton_arena_object_t pton_arena_object_t;
 typedef struct pton_arena_string_t pton_arena_string_t;
 typedef struct pton_arena_t pton_arena_t;
@@ -66,7 +67,8 @@ typedef struct {
         PTON_REPR_ARNA_ARRAY = 0x60,
         PTON_REPR_ARNA_MAP = 0x70,
         PTON_REPR_INLN_ID = 0x80,
-        PTON_REPR_ARNA_OBJECT = 0x90
+        PTON_REPR_ARNA_OBJECT = 0x90,
+        PTON_REPR_ARNA_NATIVE = 0xA0
     } repr_tag_ IF_MSVC(, : 8);
     // A tag used to identify the version of plankton that produced this value.
     // All variants returned from a binary plankton implementation will have the
@@ -91,6 +93,7 @@ typedef struct {
     pton_arena_value_t *as_arena_value_;
     pton_arena_array_t *as_arena_array_;
     pton_arena_map_t *as_arena_map_;
+    pton_arena_native_t *as_arena_native_;
     pton_arena_object_t *as_arena_object_;
     pton_arena_string_t *as_arena_string_;
     pton_arena_blob_t *as_arena_blob_;

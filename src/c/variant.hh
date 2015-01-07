@@ -13,6 +13,7 @@ BEGIN_C_INCLUDES
 #include "utils/alloc.h"
 END_C_INCLUDES
 
+#include "callback.hh"
 #include "std/stdvector.hh"
 
 // This is really just an opaque name for c api arenas but it does need a tiny
@@ -28,6 +29,8 @@ class Variant;
 class Sink;
 class disposable_t;
 class Map_Iterator;
+class AbstractObjectType;
+template <typename T> class ConcreteObjectType;
 
 // A plankton variant. A variant can represent any of the plankton data types.
 // Some variant values, like integers and external strings, can be constructed
@@ -160,6 +163,13 @@ public:
   // Adds an initially null value to this array, access to which is returned
   // as a sink so setting the sink will cause the array value to be set.
   Sink array_add_sink();
+
+  template <typename T>
+  inline T *native_get_value(ConcreteObjectType<T> *type);
+
+  AbstractObjectType *native_get_type();
+
+  void *native_get_raw_value();
 
   // Returns the number of mappings in this map, if this is a map, otherwise
   // 0.
@@ -489,6 +499,9 @@ public:
   // Creates and returns a new mutable object value.
   virtual Object new_object() = 0;
 
+  // Creates a new native plankton object of the given type.
+  virtual Variant new_native_object(AbstractObjectType *type, void *object) = 0;
+
   // Creates and returns a new mutable blob value of the given size.
   virtual Blob new_blob(uint32_t size) = 0;
 
@@ -500,6 +513,10 @@ public:
   // string is fully owned by the arena so the character array can be disposed
   // after this call returns.
   virtual String new_string(const char *str, uint32_t length) = 0;
+
+  // Allocates a raw chunk of memory. Typically you don't want to use this
+  // directly but through the 'new' operator, which calls it.
+  virtual void *alloc_raw(size_t size) = 0;
 };
 
 // A sink is like a pointer to a variant except that it also has access to an
@@ -570,6 +587,8 @@ public:
   template <typename T>
   T *alloc_value();
 
+  Variant new_native_object(AbstractObjectType *type, void *object);
+
   // Creates and returns a new mutable array value.
   Array new_array();
 
@@ -623,6 +642,9 @@ public:
   // given output parameter.
   Sink new_sink(plankton::Variant *out);
 
+  // Allocates a raw block of memory.
+  void *alloc_raw(size_t size);
+
   // Given a C arena, returns the C++ view of it.
   static Arena *from_c(pton_arena_t *c_arena) {
     return static_cast<Arena*>(c_arena);
@@ -633,9 +655,6 @@ private:
   friend struct ::pton_arena_array_t;
   friend struct ::pton_arena_map_t;
 
-  // Allocates a raw block of memory.
-  void *alloc_raw(uint32_t size);
-
   // Allocates the backing storage for a sink value.
   template <typename S>
   S *alloc_sink();
@@ -643,6 +662,70 @@ private:
   // The raw pages of memory allocated for this arena.
   std::vector<uint8_t*> blocks_;
 };
+
+// An object type handles the process of constructing a custom object in place
+// of a plankton object. Typically you won't implement this directly but one of
+// the two subtypes, ObjectType and AtomicObjectType. The plain version does
+// construction in two steps: creates an empty instance in the first step after
+// just the header has been read and then after the payload has been read sets
+// the instance's contents. The atomic version is created in a single step after
+// both the header and payload have been seen. Atomic object cannot contain
+// references to themselves or appear in cycles.
+class AbstractObjectType {
+public:
+  virtual ~AbstractObjectType() { }
+
+  // Called immediately after the object header has been read. The value
+  // returned here will be used as the value to be referenced while reading the
+  // rest of the object.
+  virtual Variant get_initial_instance(Variant header, Factory *factory) = 0;
+
+  // Initializes the initial instance and/or returns a new instance. This is
+  // called after the entire payload of the object has been read. The value
+  // returned here will be used as the value to be referenced from the end of
+  // the object on. Usually, if a nontrivial value was returned as the initial
+  // instance that is the value you want to return here too.
+  virtual Variant get_complete_instance(Variant initial, Variant payload, Factory *factory) = 0;
+
+  // Returns the header value that identifies instance of this type.
+  virtual Variant header() = 0;
+};
+
+// A concrete object type binds the type of instances and contains the common
+// functionality between ObjectType and AtomicObjectType.
+template <typename T>
+class ConcreteObjectType : public AbstractObjectType {
+public:
+  // Given an object pointer and its type, returns the type viewed as the type
+  // represented by this type object. If the object doesn't have this type
+  // NULL is returned.
+  inline T *cast(AbstractObjectType *type, void *object);
+};
+
+// An object type describes a type that can be constructed in two steps: first
+// created and then completed. The type implements this using two callbacks:
+// one for construction and one for completion.
+template <typename T>
+class ObjectType : public ConcreteObjectType<T> {
+public:
+  typedef tclib::callback_t<T*(Variant, Factory*)> new_instance_t;
+  typedef tclib::callback_t<void(T*, Object, Factory*)> complete_instance_t;
+
+  // Constructs an object type for plankton objects that have the given value
+  // as header. Instances will be constructed using new_instance and completed
+  // using complete_instance.
+  ObjectType(Variant header, new_instance_t new_instance, complete_instance_t complete_instance);
+
+  virtual Variant get_initial_instance(Variant header, Factory *arena);
+  virtual Variant get_complete_instance(Variant initial, Variant payload, Factory *arena);
+  virtual Variant header() { return header_; }
+
+private:
+  Variant header_;
+  new_instance_t create_;
+  complete_instance_t complete_;
+};
+
 
 } // namespace plankton
 

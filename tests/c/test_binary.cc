@@ -4,6 +4,8 @@
 #include "test/asserts.hh"
 #include "test/unittest.hh"
 #include "plankton-binary.hh"
+#include "callback.hh"
+#include "variant-inl.hh"
 
 using namespace plankton;
 
@@ -73,4 +75,41 @@ TEST(binary, string_encodings) {
   BinaryReader reader(&arena);
   Variant decoded = reader.parse(*writer, writer.size());
   ASSERT_EQ(PTON_CHARSET_SHIFT_JIS, decoded.string_encoding());
+}
+
+class Point {
+public:
+  Point(int x, int y) : x_(x), y_(y) { }
+  static Point *new_instance(Variant header, Factory* factory) {
+    return new (*factory) Point(0, 0);
+  }
+  void init(Object payload, Factory* factory) {
+    x_ = payload.get_field("x").integer_value();
+    y_ = payload.get_field("y").integer_value();
+  }
+  int x() { return x_; }
+  int y() { return y_; }
+  static ObjectType<Point> *type() { return &kType; }
+private:
+  static ObjectType<Point> kType;
+  int x_;
+  int y_;
+};
+
+ObjectType<Point> Point::kType("Point",
+    tclib::new_callback(Point::new_instance),
+    tclib::new_callback(&Point::init));
+
+TEST(binary, builder) {
+  Arena arena;
+  Object obj = arena.new_object();
+  obj.set_header("Point");
+  obj.set_field("x", 10);
+  obj.set_field("y", 18);
+  Variant value = Point::type()->get_initial_instance(obj.header(), &arena);
+  Point::type()->get_complete_instance(value, obj, &arena);
+  Point *p = value.native_get_value(Point::type());
+  ASSERT_TRUE(p != NULL);
+  ASSERT_EQ(10, p->x());
+  ASSERT_EQ(18, p->y());
 }

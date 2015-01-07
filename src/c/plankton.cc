@@ -56,6 +56,19 @@ private:
   Variant *elms_;
 };
 
+// An arena-allocated native object handle.
+struct pton_arena_native_t : public pton_arena_value_t {
+public:
+  pton_arena_native_t(Arena *origin, AbstractObjectType *type, void *object);
+
+private:
+  friend class plankton::Variant;
+  friend class plankton::Arena;
+  Arena *origin_;
+  AbstractObjectType *type_;
+  void *object_;
+};
+
 struct pton_arena_map_t : public pton_arena_value_t {
 public:
   struct entry_t {
@@ -155,7 +168,7 @@ void pton_dispose_arena(pton_arena_t *arena) {
   delete arena;
 }
 
-void *Arena::alloc_raw(uint32_t bytes) {
+void *Arena::alloc_raw(size_t bytes) {
   uint8_t *result = new uint8_t[bytes];
   blocks_.push_back(result);
   return result;
@@ -164,6 +177,12 @@ void *Arena::alloc_raw(uint32_t bytes) {
 Arena::~Arena() {
   for (size_t i = 0; i < blocks_.size(); i++)
     delete[] blocks_[i];
+}
+
+Variant Arena::new_native_object(AbstractObjectType *type, void *object) {
+  pton_arena_native_t *data = alloc_value<pton_arena_native_t>();
+  Variant result(header_t::PTON_REPR_ARNA_NATIVE, new (data) pton_arena_native_t(this, type, object));
+  return result;
 }
 
 Array Arena::new_array() {
@@ -183,7 +202,7 @@ Variant::Variant(repr_tag_t tag, pton_arena_value_t *arena_value) {
 Array Arena::new_array(uint32_t init_capacity) {
   pton_arena_array_t *data = alloc_value<pton_arena_array_t>();
   Variant result(header_t::PTON_REPR_ARNA_ARRAY, new (data) pton_arena_array_t(this, init_capacity));
-  return Array(result);
+  return result;
 }
 
 pton_variant_t pton_new_array_with_capacity(pton_arena_t *arena, uint32_t init_capacity) {
@@ -522,9 +541,26 @@ pton_sink_t *pton_arena_array_t::add_sink() {
   return result;
 }
 
+pton_arena_native_t::pton_arena_native_t(Arena *origin, AbstractObjectType *type, void *object)
+  : origin_(origin)
+  , type_(type)
+  , object_(object) { }
+
 uint32_t pton_map_size(pton_variant_t variant) {
   pton_check_binary_version(variant);
   return pton_is_map(variant) ? variant.payload_.as_arena_map_->size() : 0;
+}
+
+AbstractObjectType *Variant::native_get_type() {
+  return (repr_tag() == pton_variant_t::pton_variant_header_t::PTON_REPR_ARNA_NATIVE)
+       ? payload()->as_arena_native_->type_
+       : NULL;
+}
+
+void *Variant::native_get_raw_value() {
+  return (repr_tag() == pton_variant_t::pton_variant_header_t::PTON_REPR_ARNA_NATIVE)
+       ? payload()->as_arena_native_->object_
+       : NULL;
 }
 
 uint32_t Variant::map_size() const {
