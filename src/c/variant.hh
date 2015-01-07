@@ -164,12 +164,18 @@ public:
   // as a sink so setting the sink will cause the array value to be set.
   Sink array_add_sink();
 
+  // Returns this native variant viewed under the given type, but only if this
+  // is a native that has that type. If not, NULL is returned.
   template <typename T>
-  inline T *native_get_value(ConcreteObjectType<T> *type);
+  inline T *native_as(ConcreteObjectType<T> *type);
 
-  AbstractObjectType *native_get_type();
+  // Returns the type of this native object, or NULL if this is not native.
+  AbstractObjectType *native_type();
 
-  void *native_get_raw_value();
+  // Returns a raw pointer to the native object. The only really safe way to
+  // get access to the value under its type is using ::as so be careful with
+  // this one. If this is not a native return NULL.
+  void *native_value();
 
   // Returns the number of mappings in this map, if this is a map, otherwise
   // 0.
@@ -482,7 +488,26 @@ public:
   const void *data() const { return blob_data(); }
 
   void *mutable_data() { return blob_mutable_data(); }
+};
 
+class Native : public Variant {
+public:
+  Native() : Variant() { }
+  Native(Variant variant) : Variant(variant) { }
+
+  // Returns the type of this native object. If this is not a native returns
+  // NULL.
+  AbstractObjectType *type() { return native_type(); }
+
+  // Returns a raw pointer to the native object. The only really safe way to
+  // get access to the value under its type is using ::as so be careful with
+  // this one. If this is not a native return NULL.
+  void *value() { return native_value(); }
+
+  // Returns this native variant viewed under the given type, but only if this
+  // is a native that has that type. If not, NULL is returned.
+  template <typename T>
+  T *as(ConcreteObjectType<T> *type) { return native_as(type); }
 };
 
 // A factory is an object that can be used to create new values.

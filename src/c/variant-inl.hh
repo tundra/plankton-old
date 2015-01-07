@@ -9,8 +9,8 @@
 namespace plankton {
 
 template <typename T>
-inline T *Variant::native_get_value(ConcreteObjectType<T> *type) {
-  return type->cast(native_get_type(), native_get_raw_value());
+inline T *Variant::native_as(ConcreteObjectType<T> *type) {
+  return type->cast(native_type(), native_value());
 }
 
 template <typename T>
@@ -27,9 +27,12 @@ Variant ObjectType<T>::get_initial_instance(Variant header, Factory *arena) {
 template <typename T>
 Variant ObjectType<T>::get_complete_instance(Variant initial, Variant payload,
     Factory *factory) {
-  T *value = initial.native_get_value(this);
-  if (value != NULL)
-    (complete_)(value, payload, factory);
+  T *value = initial.native_as(this);
+  if (value == NULL)
+    // It's unclear how or if this can happen but just in case better handle it
+    // specially.
+    return initial;
+  (complete_)(value, payload, factory);
   return initial;
 }
 

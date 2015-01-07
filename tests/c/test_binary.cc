@@ -100,15 +100,15 @@ ObjectType<Point> Point::kType("Point",
     tclib::new_callback(Point::new_instance),
     tclib::new_callback(&Point::init));
 
-TEST(binary, builder) {
+TEST(binary, object_type) {
   Arena arena;
   Object obj = arena.new_object();
   obj.set_header("Point");
   obj.set_field("x", 10);
   obj.set_field("y", 18);
-  Variant value = Point::type()->get_initial_instance(obj.header(), &arena);
+  Native value = Point::type()->get_initial_instance(obj.header(), &arena);
   Point::type()->get_complete_instance(value, obj, &arena);
-  Point *p = value.native_get_value(Point::type());
+  Point *p = value.as(Point::type());
   ASSERT_TRUE(p != NULL);
   ASSERT_EQ(10, p->x());
   ASSERT_EQ(18, p->y());

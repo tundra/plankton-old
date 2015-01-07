@@ -551,13 +551,13 @@ uint32_t pton_map_size(pton_variant_t variant) {
   return pton_is_map(variant) ? variant.payload_.as_arena_map_->size() : 0;
 }
 
-AbstractObjectType *Variant::native_get_type() {
+AbstractObjectType *Variant::native_type() {
   return (repr_tag() == pton_variant_t::pton_variant_header_t::PTON_REPR_ARNA_NATIVE)
        ? payload()->as_arena_native_->type_
        : NULL;
 }
 
-void *Variant::native_get_raw_value() {
+void *Variant::native_value() {
   return (repr_tag() == pton_variant_t::pton_variant_header_t::PTON_REPR_ARNA_NATIVE)
        ? payload()->as_arena_native_->object_
        : NULL;
