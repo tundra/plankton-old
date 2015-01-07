@@ -164,4 +164,8 @@ TEST(variant_cpp, variant_map) {
   ASSERT_EQ(5, *ints["foo"]);
   ASSERT_EQ(4, *ints[Variant::yes()]);
   ASSERT_EQ(6, *ints[Variant::null()]);
+  ints.set(Variant::null(), 7);
+  ASSERT_EQ(5, *ints["foo"]);
+  ASSERT_EQ(4, *ints[Variant::yes()]);
+  ASSERT_EQ(7, *ints[Variant::null()]);
 }

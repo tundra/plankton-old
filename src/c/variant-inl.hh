@@ -50,7 +50,9 @@ ObjectType<T>::ObjectType(Variant header, new_instance_t create, complete_instan
 template <typename T>
 class VariantMap {
 public:
-  // Maps the given key to the given value.
+  // Maps the given key to the given value. If there is already a mapping it is
+  // replaced by this one. The map does not take ownership of the key, it is
+  // up to the caller to ensure that it's valid as long as the map exists.
   void set(Variant key, const T &value);
 
   // Returns the binding for the given key, if there is one, otherwise NULL.
@@ -58,13 +60,13 @@ public:
   // to be valid.
   T *operator[](Variant key);
 
+private:
   // A non special case mapping.
   struct GenericMapping {
     Variant key;
     T value;
   };
 
-private:
   typedef platform_hash_map<const char *, T> StringMap;
   typedef std::vector<GenericMapping> GenericVector;
 
