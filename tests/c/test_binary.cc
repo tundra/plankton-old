@@ -169,6 +169,7 @@ public:
 private:
   static Rect *new_instance(Variant header, Factory* factory);
   void init(Object payload, Factory* factory);
+  Variant to_plankton(Factory *factory);
   static ObjectType<Rect> kType;
   Point *top_left_;
   Point *bottom_right_;
@@ -183,9 +184,18 @@ void Rect::init(Object payload, Factory* factory) {
   bottom_right_ = payload.get_field("bottom_right").native_as(Point::type());
 }
 
+Variant Rect::to_plankton(Factory *factory) {
+  Object obj = factory->new_object();
+  obj.set_header(type()->header());
+  obj.set_field("top_left", factory->new_native(Point::type(), top_left_));
+  obj.set_field("bottom_right", factory->new_native(Point::type(), bottom_right_));
+  return obj;
+}
+
 ObjectType<Rect> Rect::kType("binary.Rect",
     tclib::new_callback(Rect::new_instance),
-    tclib::new_callback(&Rect::init));
+    tclib::new_callback(&Rect::init),
+    tclib::new_callback(&Rect::to_plankton));
 
 TEST(binary, complex_auto_object) {
   Arena arena;
@@ -242,8 +252,8 @@ TEST(binary, invalid_auto_object) {
 }
 
 TEST(binary, simple_encode) {
-  Arena arena;
   Point p(15, 16);
+  Arena arena;
   Native n = arena.new_native(Point::type(), &p);
   BinaryWriter out;
   out.write(n);
@@ -257,4 +267,26 @@ TEST(binary, simple_encode) {
   Point *p2 = value.as(Point::type());
   ASSERT_EQ(15, p2->x());
   ASSERT_EQ(16, p2->y());
+}
+
+TEST(binary, complex_encode) {
+  Point top_left(17, 18);
+  Point bottom_right(19, 20);
+  Rect rect(&top_left, &bottom_right);
+  Arena arena;
+  Native n = arena.new_native(Rect::type(), &rect);
+  BinaryWriter out;
+  out.write(n);
+  TypeRegistry registry;
+  registry.register_type(Point::type());
+  registry.register_type(Rect::type());
+  BinaryReader in(&arena);
+  in.set_type_registry(&registry);
+  Native value = in.parse(*out, out.size());
+  ASSERT_TRUE(value.is_native());
+  Rect *r2 = value.as(Rect::type());
+  ASSERT_EQ(17, r2->top_left()->x());
+  ASSERT_EQ(18, r2->top_left()->y());
+  ASSERT_EQ(19, r2->bottom_right()->x());
+  ASSERT_EQ(20, r2->bottom_right()->y());
 }
