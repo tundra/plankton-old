@@ -129,7 +129,7 @@ TEST(binary, registry) {
   ASSERT_TRUE(registry.resolve_type("blah") == NULL);
 }
 
-TEST(binary, auto_object) {
+TEST(binary, simple_auto_object) {
   Arena arena;
   Object obj = arena.new_object();
   obj.set_header("binary.Point");
@@ -146,4 +146,87 @@ TEST(binary, auto_object) {
   ASSERT_FALSE(pnt == NULL);
   ASSERT_EQ(11, pnt->x());
   ASSERT_EQ(12, pnt->y());
+}
+
+class Rect {
+public:
+  Rect(Point *top_left, Point *bottom_right)
+    : top_left_(top_left)
+    , bottom_right_(bottom_right) { }
+  Point *top_left() { return top_left_; }
+  Point *bottom_right() { return bottom_right_; }
+  static ObjectType<Rect> *type() { return &kType; }
+private:
+  static Rect *new_instance(Variant header, Factory* factory);
+  void init(Object payload, Factory* factory);
+  static ObjectType<Rect> kType;
+  Point *top_left_;
+  Point *bottom_right_;
+};
+
+Rect *Rect::new_instance(Variant header, Factory* factory) {
+  return new (*factory) Rect(NULL, NULL);
+}
+
+void Rect::init(Object payload, Factory* factory) {
+  top_left_ = payload.get_field("top_left").native_as(Point::type());
+  bottom_right_ = payload.get_field("bottom_right").native_as(Point::type());
+}
+
+ObjectType<Rect> Rect::kType("binary.Rect",
+    tclib::new_callback(Rect::new_instance),
+    tclib::new_callback(&Rect::init));
+
+TEST(binary, complex_auto_object) {
+  Arena arena;
+  Object top_left = arena.new_object();
+  top_left.set_header("binary.Point");
+  top_left.set_field("x", 13);
+  top_left.set_field("y", 14);
+  Object bottom_right = arena.new_object();
+  bottom_right.set_header("binary.Point");
+  bottom_right.set_field("x", 15);
+  bottom_right.set_field("y", 16);
+  Object obj = arena.new_object();
+  obj.set_header("binary.Rect");
+  obj.set_field("top_left", top_left);
+  obj.set_field("bottom_right", bottom_right);
+  BinaryWriter out;
+  out.write(obj);
+  TypeRegistry registry;
+  registry.register_type(Point::type());
+  registry.register_type(Rect::type());
+  BinaryReader in(&arena);
+  in.set_type_registry(&registry);
+  Native value = in.parse(*out, out.size());
+  ASSERT_TRUE(value.as(Point::type()) == NULL);
+  Rect *rect = value.as(Rect::type());
+  ASSERT_EQ(13, rect->top_left()->x());
+  ASSERT_EQ(14, rect->top_left()->y());
+  ASSERT_EQ(15, rect->bottom_right()->x());
+  ASSERT_EQ(16, rect->bottom_right()->y());
+}
+
+TEST(binary, invalid_auto_object) {
+  Arena arena;
+  Object top_left = arena.new_object();
+  top_left.set_header("binary.Point");
+  top_left.set_field("x", 13);
+  top_left.set_field("y", 14);
+  Object obj = arena.new_object();
+  obj.set_header("binary.Rect");
+  obj.set_field("top_left", top_left);
+  BinaryWriter out;
+  out.write(obj);
+  TypeRegistry registry;
+  registry.register_type(Point::type());
+  registry.register_type(Rect::type());
+  BinaryReader in(&arena);
+  in.set_type_registry(&registry);
+  Native value = in.parse(*out, out.size());
+  ASSERT_TRUE(value.as(Point::type()) == NULL);
+  Rect *rect = value.as(Rect::type());
+  ASSERT_EQ(13, rect->top_left()->x());
+  ASSERT_EQ(14, rect->top_left()->y());
+  ASSERT_EQ(NULL, rect->bottom_right());
 }
