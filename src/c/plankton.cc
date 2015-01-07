@@ -179,7 +179,7 @@ Arena::~Arena() {
     delete[] blocks_[i];
 }
 
-Native Arena::new_native(AbstractObjectType *type, void *object) {
+Native Arena::new_raw_native(void *object, AbstractObjectType *type) {
   pton_arena_native_t *data = alloc_value<pton_arena_native_t>();
   Variant result(header_t::PTON_REPR_ARNA_NATIVE,
       new (data) pton_arena_native_t(this, type, object));
@@ -220,9 +220,12 @@ pton_variant_t pton_new_map(pton_arena_t *arena) {
   return Arena::from_c(arena)->new_map().to_c();
 }
 
-Object Arena::new_object() {
+Object Arena::new_object(AbstractObjectType *type) {
   pton_arena_object_t *data = alloc_value<pton_arena_object_t>();
-  return Variant(header_t::PTON_REPR_ARNA_OBJECT, new (data) pton_arena_object_t(this));
+  Variant result = Variant(header_t::PTON_REPR_ARNA_OBJECT, new (data) pton_arena_object_t(this));
+  if (type != NULL)
+    result.object_set_header(type->header());
+  return result;
 }
 
 pton_variant_t pton_new_c_str(pton_arena_t *arena, const char *str) {

@@ -27,7 +27,7 @@ T *ConcreteObjectType<T>::cast(AbstractObjectType *type, void *object) {
 template <typename T>
 Variant ObjectType<T>::get_initial_instance(Variant header, Factory *arena) {
   T *instance = (create_)(header, arena);
-  return arena->new_native(this, instance);
+  return arena->new_native(instance, this);
 }
 
 template <typename T>

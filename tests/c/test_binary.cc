@@ -111,6 +111,10 @@ Variant Point::to_plankton(Factory *factory) {
   return obj;
 }
 
+template <> struct default_object_type<Point> {
+  static ObjectType<Point> *get() { return Point::type(); }
+};
+
 ObjectType<Point> Point::kType("binary.Point",
     tclib::new_callback(Point::new_instance),
     tclib::new_callback(&Point::init),
@@ -185,12 +189,15 @@ void Rect::init(Object payload, Factory* factory) {
 }
 
 Variant Rect::to_plankton(Factory *factory) {
-  Object obj = factory->new_object();
-  obj.set_header(type()->header());
-  obj.set_field("top_left", factory->new_native(Point::type(), top_left_));
-  obj.set_field("bottom_right", factory->new_native(Point::type(), bottom_right_));
+  Object obj = factory->new_object(type());
+  obj.set_field("top_left", factory->new_native(top_left_));
+  obj.set_field("bottom_right", factory->new_native(bottom_right_));
   return obj;
 }
+
+template <> struct default_object_type<Rect> {
+  static ObjectType<Rect> *get() { return Rect::type(); }
+};
 
 ObjectType<Rect> Rect::kType("binary.Rect",
     tclib::new_callback(Rect::new_instance),
@@ -254,7 +261,7 @@ TEST(binary, invalid_auto_object) {
 TEST(binary, simple_encode) {
   Point p(15, 16);
   Arena arena;
-  Native n = arena.new_native(Point::type(), &p);
+  Native n = arena.new_native(&p);
   BinaryWriter out;
   out.write(n);
   TypeRegistry registry;
@@ -274,7 +281,7 @@ TEST(binary, complex_encode) {
   Point bottom_right(19, 20);
   Rect rect(&top_left, &bottom_right);
   Arena arena;
-  Native n = arena.new_native(Rect::type(), &rect);
+  Native n = arena.new_native(&rect);
   BinaryWriter out;
   out.write(n);
   TypeRegistry registry;
@@ -295,7 +302,7 @@ TEST(binary, partial_encode) {
   Point top_left(17, 18);
   Rect rect(&top_left, NULL);
   Arena arena;
-  Native n = arena.new_native(Rect::type(), &rect);
+  Native n = arena.new_native(&rect);
   BinaryWriter out;
   out.write(n);
   TypeRegistry registry;

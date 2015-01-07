@@ -23,6 +23,11 @@ public:
   virtual ~pton_arena_t() { }
 };
 
+// This provides a mechanism for registering a default type value for a given
+// type. You don't have to use it but sometimes it makes things less verbose.
+template <typename T>
+class default_object_type { };
+
 namespace plankton {
 
 class Variant;
@@ -524,11 +529,21 @@ public:
   // Creates and returns a new mutable array value.
   virtual Array new_array() = 0;
 
-  // Creates and returns a new mutable object value.
-  virtual Object new_object() = 0;
+  // Creates and returns a new mutable object value. If a type is specified it
+  // is used to initialize the result.
+  virtual Object new_object(AbstractObjectType *type = NULL) = 0;
 
-  // Creates a new native plankton object of the given type.
-  virtual Native new_native(AbstractObjectType *type, void *object) = 0;
+  // Creates a new native object of the given type. If no type value is given
+  // explicitly then an attempt is made to resolve a default using the
+  // default_object_type struct.
+  template <typename T>
+  Native new_native(T *object, ConcreteObjectType<T> *type = default_object_type<T>::get()) {
+    return new_raw_native(object, type);
+  }
+
+  // Creates a new native plankton object of the given type. This avoids the
+  // template cleverness of new_native.
+  virtual Native new_raw_native(void *object, AbstractObjectType *type) = 0;
 
   // Creates and returns a new mutable blob value of the given size.
   virtual Blob new_blob(uint32_t size) = 0;
@@ -616,7 +631,7 @@ public:
   T *alloc_value();
 
   // Creates a new native object of the given type.
-  Native new_native(AbstractObjectType *type, void *object);
+  Native new_raw_native(void *object, AbstractObjectType *type);
 
   // Creates and returns a new mutable array value.
   Array new_array();
@@ -628,7 +643,7 @@ public:
   Map new_map();
 
   // Creates and returns a new mutable object value.
-  Object new_object();
+  Object new_object(AbstractObjectType *type = NULL);
 
   // Creates and returns a new variant string. The string is fully owned by
   // the arena so the character array can be disposed after this call returns.
