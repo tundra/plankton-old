@@ -6,6 +6,7 @@ filenames = [
   "plankton.cc",
   "plankton-binary.cc",
   "plankton-text.cc",
+  "rpc.cc",
 ]
 
 library = get_group("library")

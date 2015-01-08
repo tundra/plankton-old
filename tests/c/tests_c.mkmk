@@ -9,6 +9,7 @@ filenames = [
   "test_binary.cc",
   "test_generic.cc",
   "test_marshal.cc",
+  "test_rpc.cc",
   "test_socket.cc",
   "test_text.cc",
   "test_variant_c.cc",

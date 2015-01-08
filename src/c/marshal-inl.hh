@@ -5,11 +5,6 @@
 #define _MARSHAL_INL_HH
 
 #include "marshal.hh"
-#include "std/stdhashmap.hh"
-
-// TODO: move this into tclib and add something similar for windows.
-#include <hash_fun.h>
-#define platform_hash __gnu_cxx::hash
 
 namespace plankton {
 
@@ -57,51 +52,6 @@ ObjectType<T>::ObjectType(Variant header, new_instance_t create,
   , complete_(complete)
   , encode_(encode) { }
 
-// A mapping from variants to values. This is different from a variant map in
-// that the values can be of any type. A variant map also does not keep track
-// of insertion order.
-template <typename T>
-class VariantMap {
-public:
-  // Maps the given key to the given value. If there is already a mapping it is
-  // replaced by this one. The map does not take ownership of the key, it is
-  // up to the caller to ensure that it's valid as long as the map exists.
-  void set(Variant key, const T &value);
-
-  // Returns the binding for the given key, if there is one, otherwise NULL.
-  // If the map is subsequently modified the pointer is no longer guaranteed
-  // to be valid.
-  T *operator[](Variant key);
-
-private:
-  // Controls how strings are hashed in the string map.
-  struct StringHasher {
-  public:
-    size_t operator()(const String &key) const;
-  };
-
-  // A non special case mapping.
-  struct GenericMapping {
-    Variant key;
-    T value;
-  };
-
-  typedef platform_hash_map<String, T, StringHasher> StringMap;
-  typedef std::vector<GenericMapping> GenericVector;
-
-  // Looks up a binding in the generic mappings.
-  T *get_generic(Variant key);
-
-  // Add a mapping to the generic mappings.
-  void set_generic(Variant key, const T &value);
-
-  // All string mappings are stored here, for more efficient access.
-  StringMap strings_;
-
-  // Mappings that don't belong anywhere else.
-  GenericVector generic_;
-};
-
 template <typename T>
 void VariantMap<T>::set(Variant key, const T &value) {
   if (key.is_string()) {
@@ -148,28 +98,6 @@ size_t VariantMap<T>::StringHasher::operator()(const String &key) const {
   platform_hash<const char*> hasher;
   return hasher(key.string_chars());
 }
-
-// A registry that can resolve object types during parsing based on the objects'
-// headers.
-class AbstractTypeRegistry {
-public:
-  virtual ~AbstractTypeRegistry() { }
-
-  // Returns the type corresponding to the given header. If no type is known
-  // NULL is returned.
-  virtual AbstractObjectType *resolve_type(Variant header) = 0;
-};
-
-// A simple registry based on a mapping from headers to types.
-class TypeRegistry : public AbstractTypeRegistry {
-public:
-  // Adds the given type as the mapping for its header to this registry.
-  void register_type(AbstractObjectType *type);
-
-  virtual AbstractObjectType *resolve_type(Variant header);
-private:
-  VariantMap<AbstractObjectType*> types_;
-};
 
 } // namespace plankton
 

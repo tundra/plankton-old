@@ -22,11 +22,6 @@ public:
   virtual ~pton_arena_t() { }
 };
 
-// This provides a mechanism for registering a default type value for a given
-// type. You don't have to use it but sometimes it makes things less verbose.
-template <typename T>
-class default_object_type { };
-
 namespace plankton {
 
 class Variant;
@@ -35,6 +30,25 @@ class disposable_t;
 class Map_Iterator;
 class AbstractObjectType;
 template <typename T> class ConcreteObjectType;
+
+} // namespace plankton
+
+// This provides a mechanism for registering a default type value for a given
+// type. You don't have to use it but sometimes it makes things less verbose.
+// If the type has a static object_type() method it will automatically be used
+// to provide the default type.
+template <typename T> struct default_object_type {
+  // If you're getting an error here that type T doesn't have an object_type()
+  // member then it is likely because code somewhere is trying to create a
+  // native plankton object for that type in a way that expects a default type
+  // descriptor to be available, but there isn't one. The way to fix this is
+  // to either add a static create_type method, add an explicit specialization
+  // of default_object_type for the type, or pass a type explicitly in the code
+  // that is trying to create a plankton::Native.
+  static plankton::ConcreteObjectType<T> *get() { return T::object_type(); }
+};
+
+namespace plankton {
 
 // A plankton variant. A variant can represent any of the plankton data types.
 // Some variant values, like integers and external strings, can be constructed
@@ -108,7 +122,7 @@ public:
   // Explicit constructor for string-valued variants. Note that the variant does
   // not take ownership of the string so it must stay alive as long as the
   // variant does. Use an arena to create a variant that does take ownership.
-  static inline Variant string(const char *string);
+  static inline Variant string(const char *string) { return pton_c_str(string); }
 
   // Initializes a variant representing a string with the given contents. This
   // does not copy the string so it has to stay alive for as long as the

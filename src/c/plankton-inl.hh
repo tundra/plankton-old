@@ -19,10 +19,6 @@ Variant Variant::integer(int64_t value) {
 
 Variant::Variant(const char *string) : value_(pton_c_str(string)) { }
 
-Variant Variant::string(const char *string) {
-  return pton_c_str(string);
-}
-
 Variant::Variant(const char *string, uint32_t length)
   : value_(pton_string(string, length)) { }
 

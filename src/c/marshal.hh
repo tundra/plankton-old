@@ -1,7 +1,7 @@
 //- Copyright 2014 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
-/// C++ implementation of the plankton serialization format.
+/// Support for native C/C++ object marshalling.
 
 #ifndef _MARSHAL_HH
 #define _MARSHAL_HH
@@ -10,6 +10,12 @@
 
 #include "callback.hh"
 #include "variant.hh"
+
+#include "std/stdhashmap.hh"
+
+// TODO: move this into tclib and add something similar for windows.
+#include <hash_fun.h>
+#define platform_hash __gnu_cxx::hash
 
 namespace plankton {
 
@@ -68,7 +74,9 @@ public:
   // Constructs an object type for plankton objects that have the given value
   // as header. Instances will be constructed using new_instance and completed
   // using complete_instance.
-  ObjectType(Variant header, new_instance_t new_instance, complete_instance_t complete_instance,
+  ObjectType(Variant header,
+      new_instance_t new_instance = tclib::empty_callback(),
+      complete_instance_t complete_instance = tclib::empty_callback(),
       encode_instance_t encode = tclib::empty_callback());
 
   virtual Variant get_initial_instance(Variant header, Factory *arena);
@@ -81,6 +89,73 @@ private:
   new_instance_t create_;
   complete_instance_t complete_;
   encode_instance_t encode_;
+};
+
+// A mapping from variants to values. This is different from a variant map in
+// that the values can be of any type. A variant map also does not keep track
+// of insertion order.
+template <typename T>
+class VariantMap {
+public:
+  // Maps the given key to the given value. If there is already a mapping it is
+  // replaced by this one. The map does not take ownership of the key, it is
+  // up to the caller to ensure that it's valid as long as the map exists.
+  void set(Variant key, const T &value);
+
+  // Returns the binding for the given key, if there is one, otherwise NULL.
+  // If the map is subsequently modified the pointer is no longer guaranteed
+  // to be valid.
+  T *operator[](Variant key);
+
+private:
+  // Controls how strings are hashed in the string map.
+  struct StringHasher {
+  public:
+    size_t operator()(const String &key) const;
+  };
+
+  // A non special case mapping.
+  struct GenericMapping {
+    Variant key;
+    T value;
+  };
+
+  typedef platform_hash_map<String, T, StringHasher> StringMap;
+  typedef std::vector<GenericMapping> GenericVector;
+
+  // Looks up a binding in the generic mappings.
+  T *get_generic(Variant key);
+
+  // Add a mapping to the generic mappings.
+  void set_generic(Variant key, const T &value);
+
+  // All string mappings are stored here, for more efficient access.
+  StringMap strings_;
+
+  // Mappings that don't belong anywhere else.
+  GenericVector generic_;
+};
+
+// A registry that can resolve object types during parsing based on the objects'
+// headers.
+class AbstractTypeRegistry {
+public:
+  virtual ~AbstractTypeRegistry() { }
+
+  // Returns the type corresponding to the given header. If no type is known
+  // NULL is returned.
+  virtual AbstractObjectType *resolve_type(Variant header) = 0;
+};
+
+// A simple registry based on a mapping from headers to types.
+class TypeRegistry : public AbstractTypeRegistry {
+public:
+  // Adds the given type as the mapping for its header to this registry.
+  void register_type(AbstractObjectType *type);
+
+  virtual AbstractObjectType *resolve_type(Variant header);
+private:
+  VariantMap<AbstractObjectType*> types_;
 };
 
 } // namespace plankton
