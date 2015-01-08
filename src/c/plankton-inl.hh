@@ -89,28 +89,6 @@ T *Arena::alloc_value() {
   return static_cast<T*>(alloc_raw(sizeof(T)));
 }
 
-// A registry that can resolve object types during parsing based on the objects'
-// headers.
-class AbstractTypeRegistry {
-public:
-  virtual ~AbstractTypeRegistry() { }
-
-  // Returns the type corresponding to the given header. If no type is known
-  // NULL is returned.
-  virtual AbstractObjectType *resolve_type(Variant header) = 0;
-};
-
-// A simple registry based on a mapping from headers to types.
-class TypeRegistry : public AbstractTypeRegistry {
-public:
-  // Adds the given type as the mapping for its header to this registry.
-  void register_type(AbstractObjectType *type);
-
-  virtual AbstractObjectType *resolve_type(Variant header);
-private:
-  VariantMap<AbstractObjectType*> types_;
-};
-
 } // namespace plankton
 
 #endif // _PLANKTON

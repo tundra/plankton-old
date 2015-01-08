@@ -8,6 +8,7 @@ filenames = [
   "test_arena_cpp.cc",
   "test_binary.cc",
   "test_generic.cc",
+  "test_marshal.cc",
   "test_socket.cc",
   "test_text.cc",
   "test_variant_c.cc",

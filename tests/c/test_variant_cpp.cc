@@ -146,26 +146,3 @@ TEST(variant_cpp, object) {
   ASSERT_FALSE(obj.set_field("blah", 44));
   ASSERT_FALSE(obj.set_field("blub", 45));
 }
-
-TEST(variant_cpp, variant_map) {
-  VariantMap<int> ints;
-  ASSERT_TRUE(ints["foo"] == NULL);
-  ints.set("foo", 3);
-  ASSERT_EQ(3, *ints["foo"]);
-  ASSERT_TRUE(ints[Variant::yes()] == NULL);
-  ints.set(Variant::yes(), 4);
-  ASSERT_EQ(3, *ints["foo"]);
-  ASSERT_EQ(4, *ints[Variant::yes()]);
-  ints.set("foo", 5);
-  ASSERT_EQ(5, *ints["foo"]);
-  ASSERT_EQ(4, *ints[Variant::yes()]);
-  ASSERT_TRUE(ints[Variant::null()] == NULL);
-  ints.set(Variant::null(), 6);
-  ASSERT_EQ(5, *ints["foo"]);
-  ASSERT_EQ(4, *ints[Variant::yes()]);
-  ASSERT_EQ(6, *ints[Variant::null()]);
-  ints.set(Variant::null(), 7);
-  ASSERT_EQ(5, *ints["foo"]);
-  ASSERT_EQ(4, *ints[Variant::yes()]);
-  ASSERT_EQ(7, *ints[Variant::null()]);
-}

@@ -2,6 +2,7 @@
 # Licensed under the Apache License, Version 2.0 (see LICENSE).
 
 filenames = [
+  "marshal.cc",
   "plankton.cc",
   "plankton-binary.cc",
   "plankton-text.cc",
