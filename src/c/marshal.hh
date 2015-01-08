@@ -13,10 +13,6 @@
 
 #include "std/stdhashmap.hh"
 
-// TODO: move this into tclib and add something similar for windows.
-#include <hash_fun.h>
-#define platform_hash __gnu_cxx::hash
-
 namespace plankton {
 
 // An object type handles the process of constructing a custom object in place
