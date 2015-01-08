@@ -42,9 +42,9 @@ ByteBufferStream::ByteBufferStream(size_t capacity)
   , readable_(0)
   , writable_(capacity)
   , buffer_(new byte_t[capacity]) {
-  readable_.initialize();
-  writable_.initialize();
-  buffer_mutex_.initialize();
+  ASSERT_TRUE(readable_.initialize());
+  ASSERT_TRUE(writable_.initialize());
+  ASSERT_TRUE(buffer_mutex_.initialize());
 }
 
 ByteBufferStream::~ByteBufferStream() {
@@ -198,6 +198,7 @@ TEST(rpc, concurrent) {
   ByteBufferStream nexus(41);
   Slice *slices[Slice::kSliceCount];
   NativeSemaphore lets_go(0);
+  ASSERT_TRUE(lets_go.initialize());
   for (size_t i = 0; i < Slice::kSliceCount; i++)
     slices[i] = new Slice(&nexus, &lets_go, slices, i);
   for (size_t i = 0; i < Slice::kSliceCount; i++)
