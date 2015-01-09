@@ -28,7 +28,7 @@ template <typename T>
 Variant ObjectType<T>::get_complete_instance(Variant initial, Variant payload,
     Factory *factory) {
   T *value = initial.native_as(this);
-  if (value == NULL)
+  if (value == NULL || complete_.is_empty())
     // It's unclear how or if this can happen but just in case better handle it
     // specially.
     return initial;

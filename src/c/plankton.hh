@@ -116,7 +116,7 @@ class AbstractTypeRegistry;
 class BinaryReader {
 public:
   // Creates a new reader that allocates values from the given arena.
-  BinaryReader(Arena *arena);
+  BinaryReader(Factory *factory);
 
   // Deserializes the given input and returns the result as a variant.
   Variant parse(const void *data, size_t size);
@@ -126,7 +126,7 @@ public:
 
 private:
   friend class BinaryReaderImpl;
-  Arena *arena_;
+  Factory *factory_;
   AbstractTypeRegistry *type_registry_;
 };
 

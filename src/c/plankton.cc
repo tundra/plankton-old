@@ -1204,7 +1204,8 @@ void StreamId::dispose() {
 InputSocket::InputSocket(tclib::IoStream *src)
   : src_(src)
   , has_been_inited_(false)
-  , cursor_(0) {
+  , cursor_(0)
+  , default_type_registry_(NULL) {
   stream_factory_ = tclib::new_callback(new_default_stream);
 }
 
@@ -1226,37 +1227,57 @@ bool InputSocket::set_stream_factory(InputStreamFactory factory) {
   return true;
 }
 
-InputStream *InputSocket::new_default_stream(StreamId id) {
-  return new BufferInputStream(id);
+InputStream *InputSocket::new_default_stream(InputStreamConfig *config) {
+  return new BufferInputStream(config);
 }
 
-BufferInputStream::BufferInputStream(StreamId id) : InputStream(id) { }
+BufferInputStream::BufferInputStream(InputStreamConfig *config)
+  : InputStream(config)
+  , type_registry_(config->default_type_registry()) { }
 
 void BufferInputStream::receive_block(MessageData *message) {
   pending_messages_.push_back(message);
 }
 
-Variant BufferInputStream::pull_message(Arena *arena) {
+Variant BufferInputStream::pull_message(Factory *factory) {
   if (pending_messages_.empty())
     return Variant::null();
   MessageData *message = pending_messages_.front();
   pending_messages_.erase(pending_messages_.begin());
-  BinaryReader reader(arena);
+  BinaryReader reader(factory);
+  reader.set_type_registry(type_registry_);
   Variant result = reader.parse(message->data(), message->size());
   delete message;
   return result;
 }
 
-PushInputStream::PushInputStream(StreamId id, MessageAction action)
-  : InputStream(id)
-  , action_(action) { }
+PushInputStream::PushInputStream(InputStreamConfig *config, MessageAction action)
+  : InputStream(config)
+  , type_registry_(config->default_type_registry()) {
+  if (!action.is_empty())
+    actions_.push_back(action);
+}
+
+InputStream *PushInputStream::new_instance(InputStreamConfig *config) {
+  return new PushInputStream(config);
+}
 
 void PushInputStream::receive_block(MessageData *message) {
   Arena arena;
   BinaryReader reader(&arena);
+  reader.set_type_registry(type_registry_);
   Variant value = reader.parse(message->data(), message->size());
   delete message;
-  action_(value);
+  for (std::vector<MessageAction>::iterator i = actions_.begin();
+       i != actions_.end();
+       i++) {
+    MessageAction &action = *i;
+    action(value);
+  }
+}
+
+void PushInputStream::add_action(MessageAction action) {
+  actions_.push_back(action);
 }
 
 // The raw underlying data of the root id.
@@ -1270,7 +1291,8 @@ bool InputSocket::init() {
       return false;
   }
   StreamId id = root_id();
-  InputStream *root_stream = stream_factory_(id);
+  InputStreamConfig config(id, default_type_registry_);
+  InputStream *root_stream = stream_factory_(&config);
   streams_[id] = root_stream;
   has_been_inited_ = true;
   return true;

@@ -59,8 +59,8 @@ static void handle_push_message(int *call_count, Variant value) {
   (*call_count)++;
 }
 
-static InputStream *new_push_stream(int *call_count, StreamId id) {
-  return new PushInputStream(id, tclib::new_callback(handle_push_message, call_count));
+static InputStream *new_push_stream(int *call_count, InputStreamConfig *config) {
+  return new PushInputStream(config, tclib::new_callback(handle_push_message, call_count));
 }
 
 TEST(socket, push_stream) {

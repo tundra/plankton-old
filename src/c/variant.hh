@@ -542,6 +542,9 @@ public:
   // Creates and returns a new mutable array value.
   virtual Array new_array() = 0;
 
+  // Creates and returns a new mutable array value.
+  virtual Array new_array(uint32_t init_capacity) = 0;
+
   // Creates and returns a new mutable object value. If a type is specified it
   // is used to initialize the result.
   virtual Object new_object(AbstractObjectType *type = NULL) = 0;
@@ -569,6 +572,20 @@ public:
   // string is fully owned by the arena so the character array can be disposed
   // after this call returns.
   virtual String new_string(const char *str, uint32_t length) = 0;
+
+  // Creates and returns a new mutable variant string of the given length with
+  // the given encoding, initialized to all '\0's. Note that this doesn't mean
+  // that the string is initially empty. Variant strings can handle null
+  // characters so what you get is a 'length' long string where all the
+  // characters are null. The null terminator is implicitly allocated in
+  // addition to the requested length, so you only need to worry about the
+  // non-null characters.
+  virtual String new_string(uint32_t length, pton_charset_t encoding) = 0;
+
+  // Creates and returns a new mutable variant string of the given length with
+  // the default encoding, initialized to all '\0's. See the new_string method
+  // that takes an explicit encoding for more details.
+  virtual String new_string(uint32_t length) = 0;
 
   // Allocates a raw chunk of memory. Typically you don't want to use this
   // directly but through the 'new' operator, which calls it.

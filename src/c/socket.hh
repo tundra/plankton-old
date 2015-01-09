@@ -6,11 +6,12 @@
 #ifndef _SOCKET_HH
 #define _SOCKET_HH
 
-#include "io/file.hh"
-#include "variant.hh"
-#include "plankton.hh"
 #include "callback.hh"
+#include "io/file.hh"
+#include "marshal.hh"
+#include "plankton.hh"
 #include "std/stdhashmap.hh"
+#include "variant.hh"
 
 namespace plankton {
 
@@ -114,11 +115,24 @@ private:
   bool owns_key_;
 };
 
+// Data used when initializing new streams.
+class InputStreamConfig {
+public:
+  InputStreamConfig(StreamId id, TypeRegistry *default_type_registry)
+    : id_(id)
+    , default_type_registry_(default_type_registry) { }
+  StreamId id() { return id_; }
+  TypeRegistry *default_type_registry() { return default_type_registry_; }
+private:
+  StreamId id_;
+  TypeRegistry *default_type_registry_;
+};
+
 // An input stream is an abstract type that receives data received through a
 // socket.
 class InputStream {
 public:
-  InputStream(StreamId id) : id_(id) { }
+  InputStream(InputStreamConfig *config) : id_(config->id()) { }
 
   virtual ~InputStream() { }
 
@@ -137,17 +151,24 @@ private:
 // be vigilant about processing messages as they come in.
 class BufferInputStream : public InputStream {
 public:
-  BufferInputStream(StreamId id);
+  BufferInputStream(InputStreamConfig *config);
 
   // Buffer the next block.
   virtual void receive_block(MessageData *message);
 
+  // Sets the type registry to use when decoding values on this stream.
+  void set_type_registry(TypeRegistry *value) { type_registry_ = value; }
+
   // Decodes and returns the next pending message, acquiring storage from the
   // given arena.
-  Variant pull_message(Arena *arena);
+  Variant pull_message(Factory *factory);
+
+  // Returns true iff there are no messages to pull.
+  bool is_empty() { return pending_messages_.empty(); }
 
 private:
   std::vector<MessageData*> pending_messages_;
+  TypeRegistry *type_registry_;
 };
 
 // An input stream that parses and handles messages immediately.
@@ -158,17 +179,30 @@ public:
   // Creates a new input stream that performs the given action on each message
   // it receives. The variant value passed to the action is valid during the
   // call only, the behavior of variants past the end of the call is undefined.
-  PushInputStream(StreamId id, MessageAction action);
+  PushInputStream(InputStreamConfig *config, MessageAction action = tclib::empty_callback());
+
+  // Static method for creating push input streams that conform to the type
+  // expected for an input stream factory.
+  static InputStream *new_instance(InputStreamConfig *config);
+
+  // Sets the type registry to use when decoding values on this stream.
+  void set_type_registry(TypeRegistry *value) { type_registry_ = value; }
 
   virtual void receive_block(MessageData *message);
 
+  // Adds an action to be performed when messages are received. This new action
+  // will be performed when the actions that have already been registered have
+  // been performed.
+  void add_action(MessageAction action);
+
 private:
-  MessageAction action_;
+  std::vector<MessageAction> actions_;
+  TypeRegistry *type_registry_;
 };
 
 class InputSocket {
 public:
-  typedef tclib::callback_t<InputStream*(StreamId)> InputStreamFactory;
+  typedef tclib::callback_t<InputStream*(InputStreamConfig*)> InputStreamFactory;
 
   // Create a new input socket that fetches data from the given source.
   InputSocket(tclib::IoStream *src);
@@ -177,6 +211,8 @@ public:
   // stream factory you have to do it before calling init(). Returns true if
   // setting succeeded, false if not.
   bool set_stream_factory(InputStreamFactory factory);
+
+  void set_default_type_registry(TypeRegistry *value) { default_type_registry_ = value; }
 
   // Free all the data associated with this socket, including all the streams.
   // Once this method is called it is no longer safe to use any of the streams
@@ -214,7 +250,7 @@ private:
   byte_t *read_value(size_t *size_out);
 
   // The default stream factory function.
-  static InputStream *new_default_stream(StreamId id);
+  static InputStream *new_default_stream(InputStreamConfig *config);
 
   // Returns the id of the root stream.
   static StreamId root_id();
@@ -230,6 +266,7 @@ private:
   size_t cursor_;
   InputStreamFactory stream_factory_;
   StreamMap streams_;
+  TypeRegistry *default_type_registry_;
 };
 
 } // namespace plankton

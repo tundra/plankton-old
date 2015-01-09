@@ -1,13 +1,14 @@
 //- Copyright 2015 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#include "io/file.hh"
+#include "marshal-inl.hh"
+#include "rpc.hh"
+#include "sync/mutex.hh"
+#include "sync/semaphore.hh"
+#include "sync/thread.hh"
 #include "test/asserts.hh"
 #include "test/unittest.hh"
-#include "rpc.hh"
-#include "io/file.hh"
-#include "sync/semaphore.hh"
-#include "sync/mutex.hh"
-#include "sync/thread.hh"
 
 using namespace plankton;
 using namespace tclib;
@@ -187,7 +188,7 @@ void *Slice::run_validator() {
   return NULL;
 }
 
-TEST(rpc, concurrent) {
+TEST(rpc, byte_buffer_concurrent) {
   // This is a bit intricate. It works like this. There's N producers all
   // writing concurrently to the same stream, the nexus. Then there's N threads,
   // the distributers, reading values back out from the nexus. Each value is
@@ -209,4 +210,30 @@ TEST(rpc, concurrent) {
     slices[i]->join();
   for (size_t i = 0; i < Slice::kSliceCount; i++)
     delete slices[i];
+}
+
+static void handle_request(bool *has_run, Request *request, MessageSocket::ResponseHandler handler) {
+  ASSERT_TRUE(request->subject_ == Variant("test_subject"));
+  ASSERT_TRUE(request->selector_ == Variant("test_selector"));
+  ASSERT_TRUE(request->arguments_ == Variant("test_arguments"));
+  *has_run = true;
+}
+
+TEST(rpc, whatever) {
+  ByteBufferStream bytes(1024);
+  OutputSocket outsock(&bytes);
+  outsock.init();
+  InputSocket insock(&bytes);
+  insock.set_stream_factory(PushInputStream::new_instance);
+  ASSERT_TRUE(insock.init());
+  bool has_run = false;
+  MessageSocket sock(static_cast<PushInputStream*>(insock.root_stream()), &outsock,
+      new_callback(handle_request, &has_run));
+  Request request;
+  request.set_subject("test_subject");
+  request.set_selector("test_selector");
+  request.set_arguments("test_arguments");
+  sock.send_request(&request);
+  while (!has_run)
+    ASSERT_TRUE(insock.process_next_instruction());
 }
