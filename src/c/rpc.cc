@@ -169,6 +169,8 @@ void MessageSocket::on_incoming_response(ResponseMessage *message) {
   }
   PendingMessage *pending = pendings->second;
   OutgoingResponse &response = message->response();
+  // TODO: ownership of the payloads should be transferred to the outgoing
+  //   response.
   if (response.is_success()) {
     pending->promise().fulfill(response.payload());
   } else {

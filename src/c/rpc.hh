@@ -14,14 +14,21 @@
 
 namespace plankton {
 
+// The raw data of an rpc request.
 class Request {
 public:
+  // The subject, the receiver of the request.
   void set_subject(Variant value) { subject_ = value; }
   Variant subject() { return subject_; }
+
+  // The selector, the name of the operation to be performed on the subject.
   void set_selector(Variant value) { selector_ = value; }
   Variant selector() { return selector_; }
+
+  // The arguments, typically a dictionary of values to pass to the operation.
   void set_arguments(Variant value) { arguments_ = value; }
   Variant arguments() { return arguments_; }
+
 private:
   Variant subject_;
   Variant selector_;
