@@ -1,6 +1,7 @@
 //- Copyright 2015 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#include "async/promise-inl.hh"
 #include "io/file.hh"
 #include "marshal-inl.hh"
 #include "rpc.hh"
@@ -112,7 +113,7 @@ public:
   void start();
   void join();
   static const size_t kSliceCount = 16;
-  static const size_t kStepCount = 10000;
+  static const size_t kStepCount = 1600;
 private:
   void *run_producer();
   void *run_distributer();
@@ -212,28 +213,37 @@ TEST(rpc, byte_buffer_concurrent) {
     delete slices[i];
 }
 
-static void handle_request(bool *has_run, Request *request, MessageSocket::ResponseHandler handler) {
-  ASSERT_TRUE(request->subject_ == Variant("test_subject"));
-  ASSERT_TRUE(request->selector_ == Variant("test_selector"));
-  ASSERT_TRUE(request->arguments_ == Variant("test_arguments"));
-  *has_run = true;
+static void handle_request(MessageSocket::ResponseHandler *handler_out,
+    Request *request, MessageSocket::ResponseHandler handler) {
+  ASSERT_TRUE(request->subject() == Variant("test_subject"));
+  ASSERT_TRUE(request->selector() == Variant("test_selector"));
+  ASSERT_TRUE(request->arguments() == Variant("test_arguments"));
+  *handler_out = handler;
 }
 
-TEST(rpc, whatever) {
+TEST(rpc, roundtrip) {
   ByteBufferStream bytes(1024);
   OutputSocket outsock(&bytes);
   outsock.init();
   InputSocket insock(&bytes);
   insock.set_stream_factory(PushInputStream::new_instance);
   ASSERT_TRUE(insock.init());
-  bool has_run = false;
+  MessageSocket::ResponseHandler on_response;
   MessageSocket sock(static_cast<PushInputStream*>(insock.root_stream()), &outsock,
-      new_callback(handle_request, &has_run));
+      new_callback(handle_request, &on_response));
   Request request;
   request.set_subject("test_subject");
   request.set_selector("test_selector");
   request.set_arguments("test_arguments");
-  sock.send_request(&request);
-  while (!has_run)
+  IncomingResponse& incoming = *sock.send_request(&request);
+  ASSERT_TRUE(incoming->is_empty());
+  while (on_response.is_empty())
     ASSERT_TRUE(insock.process_next_instruction());
+  ASSERT_TRUE(incoming->is_empty());
+  OutgoingResponse outgoing(OutgoingResponse::SUCCESS, Variant::integer(18));
+  on_response(&outgoing);
+  while (incoming->is_empty())
+    ASSERT_TRUE(insock.process_next_instruction());
+  ASSERT_TRUE(Variant::integer(18) == incoming->peek_value(Variant::null()));
+  delete &incoming;
 }

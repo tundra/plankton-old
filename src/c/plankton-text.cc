@@ -1,6 +1,7 @@
 //- Copyright 2014 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#include "marshal-inl.hh"
 #include "plankton-inl.hh"
 #include "stdc.h"
 #include "utils-inl.hh"
@@ -86,6 +87,9 @@ private:
   // Writes an object value.
   void write_object(Object obj);
 
+  // Writes a native value.
+  void write_native(Native obj);
+
   // Writes the given identity token.
   void write_id(uint32_t size, uint64_t value);
 
@@ -111,6 +115,7 @@ private:
   // of subtrees for every variant.
   static size_t get_short_length(Variant variant, size_t offset);
 
+  Arena scratch_;
   Buffer<char> chars_;
   size_t indent_;
   bool has_pending_newline_;
@@ -148,6 +153,9 @@ void TextWriterImpl::write(Variant value) {
       break;
     case PTON_OBJECT:
       write_object(value);
+      break;
+    case PTON_NATIVE:
+      write_native(value);
       break;
     default:
       write_raw_string("?");
@@ -413,6 +421,12 @@ void TextWriterImpl::write_object(Object obj) {
   if (is_long)
     deindent();
   write_raw_char('}');
+}
+
+void TextWriterImpl::write_native(Native value) {
+  AbstractObjectType *type = value.type();
+  Variant replacement = type->encode_instance(value, &scratch_);
+  write(replacement);
 }
 
 void TextWriterImpl::write_id(uint32_t size, uint64_t value) {

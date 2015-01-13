@@ -23,7 +23,7 @@ pton_filenames = [
 pton = c.get_executable("pton")
 pton.add_object(library)
 pton.add_object(get_dep_external('tclib', 'src', 'c', 'io', 'library'))
-pton.add_object(get_dep_external('tclib', 'src', 'c', 'utils', 'library'))
+pton.add_object(get_dep_external('tclib', 'src', 'c', 'sync', 'library'))
 
 for filename in pton_filenames:
   source = c.get_source_file(filename)
