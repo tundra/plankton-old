@@ -25,7 +25,7 @@ public:
 
   bool begin_map(uint32_t length);
 
-  bool begin_seed(uint32_t fieldc);
+  bool begin_seed(uint32_t headerc, uint32_t fieldc);
 
   bool emit_bool(bool value);
 
@@ -83,12 +83,12 @@ bool pton_assembler_t::emit_bool(bool value) {
   return write_byte(value ? boTrue : boFalse);
 }
 
-bool pton_assembler_t::begin_seed(uint32_t fieldc) {
-  return write_byte(boSeed) && write_uint64(fieldc);
+bool pton_assembler_t::begin_seed(uint32_t headerc, uint32_t fieldc) {
+  return write_byte(boSeed) && write_uint64(headerc) && write_uint64(fieldc);
 }
 
-bool pton_assembler_begin_seed(pton_assembler_t *assm, uint32_t fieldc) {
-  return assm->begin_seed(fieldc);
+bool pton_assembler_begin_seed(pton_assembler_t *assm, uint32_t headerc, uint32_t fieldc) {
+  return assm->begin_seed(headerc, fieldc);
 }
 
 bool pton_assembler_emit_bool(pton_assembler_t *assm, bool value) {
@@ -344,7 +344,7 @@ void VariantWriter::encode_map(Map value) {
 }
 
 void VariantWriter::encode_seed(Seed value) {
-  assm()->begin_seed(value.field_count());
+  assm()->begin_seed(1, value.field_count());
   encode(value.header());
   for (Seed::Iterator i = value.fields_begin(); i != value.fields_end(); i++) {
     encode(i->key());
@@ -382,7 +382,7 @@ private:
   bool decode_map(uint64_t size, Variant *result_out);
 
   // Read an seed's payload.
-  bool decode_seed(uint64_t fieldc, Variant *result_out);
+  bool decode_seed(uint64_t headerc, uint64_t fieldc, Variant *result_out);
 
   // Convert default-encoding string data into a string variant.
   bool decode_default_string(pton_instr_t *instr, Variant *result_out);
@@ -502,7 +502,9 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
       instr_out->payload.bool_value = (opcode == BinaryImplUtils::boTrue);
       break;
     case BinaryImplUtils::boSeed:
-      if (!decode_uint64(&instr_out->payload.seed_fieldc))
+      if (!decode_uint64(&instr_out->payload.seed_data.headerc))
+        return false;
+      if (!decode_uint64(&instr_out->payload.seed_data.fieldc))
         return false;
       instr_out->opcode = PTON_OPCODE_BEGIN_SEED;
       break;
@@ -633,7 +635,8 @@ bool BinaryReaderImpl::decode(Variant *result_out) {
     case PTON_OPCODE_BEGIN_MAP:
       return decode_map(instr.payload.map_size, result_out);
     case PTON_OPCODE_BEGIN_SEED:
-      return decode_seed(instr.payload.seed_fieldc, result_out);
+      return decode_seed(instr.payload.seed_data.headerc,
+          instr.payload.seed_data.fieldc, result_out);
     case PTON_OPCODE_NULL:
       return succeed(Variant::null(), result_out);
     case PTON_OPCODE_BOOL:
@@ -694,17 +697,29 @@ bool BinaryReaderImpl::decode_map(uint64_t size, Variant *result_out) {
   return succeed(result, result_out);
 }
 
-bool BinaryReaderImpl::decode_seed(uint64_t size, Variant *result_out) {
-  Variant header;
-  if (!decode(&header))
-    return false;
+bool BinaryReaderImpl::decode_seed(uint64_t headerc, uint64_t size, Variant *result_out) {
   Seed seed = reader_->factory_->new_seed();
-  seed.set_header(header);
   AbstractTypeRegistry *registry = reader_->type_registry_;
-  AbstractSeedType *type = registry == NULL ? NULL : registry->resolve_type(header);
+  AbstractSeedType *type = NULL;
+  for (size_t i = 0; i < headerc; i++) {
+    // Scan through and read the headers, resolving them to types as we go.
+    Variant header;
+    if (!decode(&header))
+      return false;
+    if (i == 0)
+      // We set the header to the first, most specific, one.
+      seed.set_header(header);
+    if (type == NULL && registry != NULL) {
+      // If there is a registry and we still haven't recognized a type we try to
+      // resolve the current header to a type.
+      type = registry->resolve_type(header);
+    }
+  }
+  // Note that when building the instance we're not giving the type's own header
+  // necessarily, the header we're giving may be more specific.
   Variant result = (type == NULL)
     ? seed
-    : type->get_initial_instance(header, reader_->factory_);
+    : type->get_initial_instance(seed.header(), reader_->factory_);
   for (size_t i = 0; i < size; i++) {
     Variant key;
     if (!decode(&key))

@@ -320,7 +320,7 @@ bool pton_assembler_begin_array(pton_assembler_t *assm, uint32_t length);
 bool pton_assembler_begin_map(pton_assembler_t *assm, uint32_t size);
 
 // Writes a seed header.
-bool pton_assembler_begin_seed(pton_assembler_t *assm, uint32_t fieldc);
+bool pton_assembler_begin_seed(pton_assembler_t *assm, uint32_t headerc, uint32_t fieldc);
 
 // Writes the given boolean value.
 bool pton_assembler_emit_bool(pton_assembler_t *assm, bool value);
@@ -376,7 +376,10 @@ typedef struct {
     int64_t int64_value;
     uint64_t array_length;
     uint64_t map_size;
-    uint64_t seed_fieldc;
+    struct {
+      uint64_t headerc;
+      uint64_t fieldc;
+    } seed_data;
     struct {
       uint64_t length;
       const uint8_t *contents;

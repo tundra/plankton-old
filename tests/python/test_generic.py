@@ -88,6 +88,7 @@ class GenericTest(unittest.TestCase):
       self.assertEquals(expected_type, found_type)
 
   def test_transcoding(self):
+    raise Exception(plankton.__file__)
     for test_case in self.get_test("transcoding"):
       value = test_case["value"]
       binary = test_case["binary"]

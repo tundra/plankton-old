@@ -17,7 +17,7 @@ _MAP_TAG = 3
 _NULL_TAG = 4
 _TRUE_TAG = 5
 _FALSE_TAG = 6
-_OBJECT_TAG = 7
+_SEED_TAG = 7
 _REFERENCE_TAG = 8
 _BLOB_TAG = 12
 _STRING_TAG = 13
@@ -175,7 +175,8 @@ class DataOutputStream(object):
       index = self.acquire_offset()
       header = meta_info.get_header(obj)
       fields = meta_info.get_payload(obj)
-      self.assm.tag(_OBJECT_TAG)
+      self.assm.tag(_SEED_TAG)
+      self.assm.uint32(1)
       self.assm.uint32(len(fields))
       self.object_index[obj] = -1
       self.write_object(header)
@@ -214,8 +215,8 @@ class DataInputStream(object):
       return True
     elif tag == _FALSE_TAG:
       return False
-    elif tag == _OBJECT_TAG:
-      return self._decode_object()
+    elif tag == _SEED_TAG:
+      return self._decode_seed()
     elif tag == _REFERENCE_TAG:
       return self._decode_reference()
     elif tag == _BLOB_TAG:
@@ -239,8 +240,8 @@ class DataInputStream(object):
       return "%strue" % indent
     elif tag == _FALSE_TAG:
       return "%sfalse" % indent
-    elif tag == _OBJECT_TAG:
-      return self._disassemble_object(indent)
+    elif tag == _SEED_TAG:
+      return self._disassemble_seed(indent)
     elif tag == _REFERENCE_TAG:
       return self._disassemble_reference(indent)
     else:
@@ -330,11 +331,15 @@ class DataInputStream(object):
     return "%smap %i\n%s" % (indent, length, "\n".join(children))
 
   # Reads a naked object from the stream.
-  def _decode_object(self):
+  def _decode_seed(self):
+    headerc = self._decode_uint32()
     fieldc = self._decode_uint32()
     index = self.grab_index()
     self.object_index[index] = None
-    header = self.read_object()
+    headers = []
+    for i in xrange(0, headerc):
+      headers.append(self.read_object())
+    header = headers[0]
     meta_info = _CLASS_REGISTRY.get_meta_info_by_header(header)
     if not meta_info is None:
       instance = meta_info.new_empty_instance(header)
@@ -348,7 +353,7 @@ class DataInputStream(object):
       instance.set_contents(payload)
     return instance
 
-  def _disassemble_object(self, indent):
+  def _disassemble_seed(self, indent):
     index = self.grab_index()
     header = self.disassemble_object(indent + "^ ")
     payload = self.disassemble_object(indent + "  ")
