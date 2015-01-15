@@ -28,24 +28,24 @@ class Variant;
 class Sink;
 class disposable_t;
 class Map_Iterator;
-class AbstractObjectType;
-template <typename T> class ConcreteObjectType;
+class AbstractSeedType;
+template <typename T> class ConcreteSeedType;
 
 } // namespace plankton
 
 // This provides a mechanism for registering a default type value for a given
 // type. You don't have to use it but sometimes it makes things less verbose.
-// If the type has a static object_type() method it will automatically be used
+// If the type has a static seed_type() method it will automatically be used
 // to provide the default type.
-template <typename T> struct default_object_type {
-  // If you're getting an error here that type T doesn't have an object_type()
+template <typename T> struct default_seed_type {
+  // If you're getting an error here that type T doesn't have a seed_type()
   // member then it is likely because code somewhere is trying to create a
   // native plankton object for that type in a way that expects a default type
   // descriptor to be available, but there isn't one. The way to fix this is
   // to either add a static create_type method, add an explicit specialization
-  // of default_object_type for the type, or pass a type explicitly in the code
+  // of default_seed_type for the type, or pass a type explicitly in the code
   // that is trying to create a plankton::Native.
-  static plankton::ConcreteObjectType<T> *get() { return T::object_type(); }
+  static plankton::ConcreteSeedType<T> *get() { return T::seed_type(); }
 };
 
 namespace plankton {
@@ -185,10 +185,10 @@ public:
   // Returns this native variant viewed under the given type, but only if this
   // is a native that has that type. If not, NULL is returned.
   template <typename T>
-  inline T *native_as(ConcreteObjectType<T> *type);
+  inline T *native_as(ConcreteSeedType<T> *type);
 
   // Returns the type of this native object, or NULL if this is not native.
-  AbstractObjectType *native_type();
+  AbstractSeedType *native_type();
 
   // Returns a raw pointer to the native object. The only really safe way to
   // get access to the value under its type is using ::as so be careful with
@@ -216,31 +216,31 @@ public:
 
   Map_Iterator map_end() const;
 
-  // Returns the header of this object, if this is an object, otherwise null.
-  Variant object_header() const;
+  // Returns the header of this seed, if this is a seed, otherwise null.
+  Variant seed_header() const;
 
-  // Sets the header of this object if this is a mutable object. Returns true if
+  // Sets the header of this seed if this is a mutable seed. Returns true if
   // setting succeeded, otherwise false.
-  bool object_set_header(Variant value);
+  bool seed_set_header(Variant value);
 
-  // Sets the value of a field if this is a mutable object. Returns true if
+  // Sets the value of a field if this is a mutable seed. Returns true if
   // setting succeeded, otherwise false.
-  bool object_set_field(Variant key, Variant value);
+  bool seed_set_field(Variant key, Variant value);
 
-  // If this is an object with a field with the given key, returns the value of
+  // If this is a seed with a field with the given key, returns the value of
   // that field. Otherwise returns the null value.
-  Variant object_get_field(Variant key);
+  Variant seed_get_field(Variant key);
 
-  // If this is an object, returns the number of fields it contains. If not
-  // returns 0.
-  uint32_t object_field_count();
+  // If this is a seed, returns the number of fields it contains. If not returns
+  // 0.
+  uint32_t seed_field_count();
 
-  // Returns an iterator for traversing the fields of this object.
-  Map_Iterator object_fields_begin();
+  // Returns an iterator for traversing the fields of this seed.
+  Map_Iterator seed_fields_begin();
 
   // Returns an iterator that indicates the limit when traversing the fields
-  // of this object.
-  Map_Iterator object_fields_end();
+  // of this seed.
+  Map_Iterator seed_fields_end();
 
   // Returns the size in bits of this id value or 0 if this is not an id.
   uint32_t id_size() const;
@@ -292,8 +292,8 @@ public:
   // Is this value an array?
   inline bool is_array() const;
 
-  // Is this value an object?
-  inline bool is_object() const;
+  // Is this value a seed?
+  inline bool is_seed() const;
 
   // Is this value a string?
   inline bool is_string() const;
@@ -400,38 +400,38 @@ private:
   Entry entry_;
 };
 
-// A variant that represents a user-defined object type.
-class Object : public Variant {
+// A variant that represents a user-defined seed type.
+class Seed : public Variant {
 public:
-  // This is the name you'd typically use for an iterator.
+  // This is the name you'd typically use for a seed iterator.
   typedef Map_Iterator Iterator;
 
-  // Creates a new empty object.
-  Object() : Variant() { }
+  // Creates a new empty seed.
+  Seed() : Variant() { }
 
-  // Wrap some value as an object.
-  Object(Variant variant) : Variant(variant) { }
+  // Wrap some value as a seed.
+  Seed(Variant variant) : Variant(variant) { }
 
-  // Returns this object's header.
-  Variant header() { return object_header(); }
+  // Returns this seed's header.
+  Variant header() { return seed_header(); }
 
-  // Sets this object's header. Returns true iff setting succeeded.
-  bool set_header(Variant value) { return object_set_header(value); }
-
-  // Sets the value of the given field to the given value. Returns true iff
-  // setting succeeded.
-  bool set_field(Variant key, Variant value) { return object_set_field(key, value); }
+  // Sets this seed's header. Returns true iff setting succeeded.
+  bool set_header(Variant value) { return seed_set_header(value); }
 
   // Sets the value of the given field to the given value. Returns true iff
   // setting succeeded.
-  Variant get_field(Variant key) { return object_get_field(key); }
+  bool set_field(Variant key, Variant value) { return seed_set_field(key, value); }
 
-  // Returns the number of fields this object contains.
-  size_t field_count() { return object_field_count(); }
+  // Sets the value of the given field to the given value. Returns true iff
+  // setting succeeded.
+  Variant get_field(Variant key) { return seed_get_field(key); }
 
-  Iterator fields_begin() { return object_fields_begin(); }
+  // Returns the number of fields this seed contains.
+  size_t field_count() { return seed_field_count(); }
 
-  Iterator fields_end() { return object_fields_end(); }
+  Iterator fields_begin() { return seed_fields_begin(); }
+
+  Iterator fields_end() { return seed_fields_end(); }
 
 };
 
@@ -518,7 +518,7 @@ public:
 
   // Returns the type of this native object. If this is not a native returns
   // NULL.
-  AbstractObjectType *type() { return native_type(); }
+  AbstractSeedType *type() { return native_type(); }
 
   // Returns a raw pointer to the native object. The only really safe way to
   // get access to the value under its type is using ::as so be careful with
@@ -528,7 +528,7 @@ public:
   // Returns this native variant viewed under the given type, but only if this
   // is a native that has that type. If not, NULL is returned.
   template <typename T>
-  T *as(ConcreteObjectType<T> *type) { return native_as(type); }
+  T *as(ConcreteSeedType<T> *type) { return native_as(type); }
 };
 
 // A factory is an object that can be used to create new values.
@@ -545,21 +545,21 @@ public:
   // Creates and returns a new mutable array value.
   virtual Array new_array(uint32_t init_capacity) = 0;
 
-  // Creates and returns a new mutable object value. If a type is specified it
+  // Creates and returns a new mutable seed value. If a type is specified it
   // is used to initialize the result.
-  virtual Object new_object(AbstractObjectType *type = NULL) = 0;
+  virtual Seed new_seed(AbstractSeedType *type = NULL) = 0;
 
   // Creates a new native object of the given type. If no type value is given
   // explicitly then an attempt is made to resolve a default using the
-  // default_object_type struct.
+  // default_seed_type struct.
   template <typename T>
-  Native new_native(T *object, ConcreteObjectType<T> *type = default_object_type<T>::get()) {
+  Native new_native(T *object, ConcreteSeedType<T> *type = default_seed_type<T>::get()) {
     return new_raw_native(object, type);
   }
 
   // Creates a new native plankton object of the given type. This avoids the
   // template cleverness of new_native.
-  virtual Native new_raw_native(void *object, AbstractObjectType *type) = 0;
+  virtual Native new_raw_native(void *object, AbstractSeedType *type) = 0;
 
   // Creates and returns a new mutable blob value of the given size.
   virtual Blob new_blob(uint32_t size) = 0;
@@ -607,9 +607,9 @@ public:
   // the value of this sink, and returns it.
   Map as_map();
 
-  // If this sink has not already been assigned, creates an object, stores it as
+  // If this sink has not already been assigned, creates a seed, stores it as
   // the value of this sink, and returns it.
-  Object as_object();
+  Seed as_seed();
 
   // If this sink has not already been assigned, creates a blob, stores it as
   // the value of this sink, and returns it.
@@ -661,7 +661,7 @@ public:
   T *alloc_value();
 
   // Creates a new native object of the given type.
-  Native new_raw_native(void *object, AbstractObjectType *type);
+  Native new_raw_native(void *object, AbstractSeedType *type);
 
   // Creates and returns a new mutable array value.
   Array new_array();
@@ -672,8 +672,8 @@ public:
   // Creates and returns a new mutable map value.
   Map new_map();
 
-  // Creates and returns a new mutable object value.
-  Object new_object(AbstractObjectType *type = NULL);
+  // Creates and returns a new mutable seed value.
+  Seed new_seed(AbstractSeedType *type = NULL);
 
   // Creates and returns a new variant string. The string is fully owned by
   // the arena so the character array can be disposed after this call returns.

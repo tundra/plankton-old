@@ -8,11 +8,11 @@
 
 using namespace plankton;
 
-void TypeRegistry::register_type(AbstractObjectType *type) {
+void TypeRegistry::register_type(AbstractSeedType *type) {
   types_.set(type->header(), type);
 }
 
-AbstractObjectType *TypeRegistry::resolve_type(Variant header) {
-  AbstractObjectType **type = types_[header];
+AbstractSeedType *TypeRegistry::resolve_type(Variant header) {
+  AbstractSeedType **type = types_[header];
   return (type == NULL) ? NULL : *type;
 }

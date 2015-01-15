@@ -25,38 +25,38 @@ public:
   RequestMessage(Request *request, uint64_t serial)
     : request_(*request)
     , serial_(serial) { }
-  static ObjectType<RequestMessage> *object_type() { return &kObjectType; }
+  static SeedType<RequestMessage> *seed_type() { return &kSeedType; }
   Request &request() { return request_; }
   uint64_t serial() { return serial_; }
 public:
-  Variant to_plankton(Factory *factory);
+  Variant to_seed(Factory *factory);
   static RequestMessage *new_instance(Variant header, Factory *factory);
-  void init(Object payload, Factory *factory);
-  static ObjectType<RequestMessage> kObjectType;
+  void init(Seed payload, Factory *factory);
+  static SeedType<RequestMessage> kSeedType;
   Request request_;
   uint64_t serial_;
 };
 
 }
 
-ObjectType<RequestMessage> RequestMessage::kObjectType("rpc.Request",
+SeedType<RequestMessage> RequestMessage::kSeedType("rpc.Request",
     RequestMessage::new_instance,
     new_callback(&RequestMessage::init),
-    new_callback(&RequestMessage::to_plankton));
+    new_callback(&RequestMessage::to_seed));
 
 RequestMessage *RequestMessage::new_instance(Variant header, Factory *factory) {
   return new (factory) RequestMessage();
 }
 
-void RequestMessage::init(Object payload, Factory *factory) {
+void RequestMessage::init(Seed payload, Factory *factory) {
   serial_ = payload.get_field("serial").integer_value();
   request().set_subject(payload.get_field("subject"));
   request().set_selector(payload.get_field("selector"));
   request().set_arguments(payload.get_field("arguments"));
 }
 
-Variant RequestMessage::to_plankton(Factory *factory) {
-  Object result = factory->new_object(object_type());
+Variant RequestMessage::to_seed(Factory *factory) {
+  Seed result = factory->new_seed(seed_type());
   result.set_field("serial", serial_);
   result.set_field("subject", request().subject());
   result.set_field("selector", request().selector());
@@ -77,28 +77,28 @@ public:
     , serial_(serial) { }
   uint64_t serial() { return serial_; }
   OutgoingResponse &response() { return response_; }
-  static ObjectType<ResponseMessage> *object_type() { return &kObjectType; }
+  static SeedType<ResponseMessage> *seed_type() { return &kSeedType; }
 private:
-  Variant to_plankton(Factory *factory);
+  Variant to_seed(Factory *factory);
   static ResponseMessage *new_instance(Variant header, Factory *factory);
-  void init(Object payload, Factory *factory);
-  static ObjectType<ResponseMessage> kObjectType;
+  void init(Seed payload, Factory *factory);
+  static SeedType<ResponseMessage> kSeedType;
   OutgoingResponse response_;
   uint64_t serial_;
 };
 
 }
 
-ObjectType<ResponseMessage> ResponseMessage::kObjectType("rpc.Response",
+SeedType<ResponseMessage> ResponseMessage::kSeedType("rpc.Response",
     ResponseMessage::new_instance,
     new_callback(&ResponseMessage::init),
-    new_callback(&ResponseMessage::to_plankton));
+    new_callback(&ResponseMessage::to_seed));
 
 ResponseMessage *ResponseMessage::new_instance(Variant header, Factory *factory) {
   return new (factory) ResponseMessage();
 }
 
-void ResponseMessage::init(Object payload, Factory *factory) {
+void ResponseMessage::init(Seed payload, Factory *factory) {
   serial_ = payload.get_field("serial").integer_value();
   OutgoingResponse::Status status = payload.get_field("is_success").bool_value()
       ? OutgoingResponse::SUCCESS
@@ -106,8 +106,8 @@ void ResponseMessage::init(Object payload, Factory *factory) {
   response_ = OutgoingResponse(status, payload.get_field("payload"));
 }
 
-Variant ResponseMessage::to_plankton(Factory *factory) {
-  Object result = factory->new_object(object_type());
+Variant ResponseMessage::to_seed(Factory *factory) {
+  Seed result = factory->new_seed(seed_type());
   result.set_field("serial", serial_);
   result.set_field("is_success", Variant::boolean(response().is_success()));
   result.set_field("payload", response().payload());
@@ -129,19 +129,19 @@ MessageSocket::MessageSocket(PushInputStream *in, OutputSocket *out, RequestHand
   , out_(out)
   , handler_(handler)
   , next_serial_(1) {
-  types_.register_type(RequestMessage::object_type());
-  types_.register_type(ResponseMessage::object_type());
+  types_.register_type(RequestMessage::seed_type());
+  types_.register_type(ResponseMessage::seed_type());
   in_->set_type_registry(&types_);
   in_->add_action(tclib::new_callback(&MessageSocket::on_incoming_message, this));
 }
 
 void MessageSocket::on_incoming_message(Variant message) {
-  RequestMessage *request = message.native_as(RequestMessage::object_type());
+  RequestMessage *request = message.native_as(RequestMessage::seed_type());
   if (request != NULL) {
     on_incoming_request(request);
     return;
   }
-  ResponseMessage *response = message.native_as(ResponseMessage::object_type());
+  ResponseMessage *response = message.native_as(ResponseMessage::seed_type());
   if (response != NULL) {
     on_incoming_response(response);
     return;

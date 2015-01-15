@@ -23,7 +23,7 @@ public:
     boNull = 4,
     boTrue = 5,
     boFalse = 6,
-    boObject = 7,
+    boSeed = 7,
     boReference = 8,
     boStringWithEncoding = 10,
     boId = 11,

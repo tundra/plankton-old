@@ -26,9 +26,9 @@ public:
   // followed immediately by the mappings, keys and values alternating.
   bool begin_map(uint32_t size) { return pton_assembler_begin_map(assm_, size); }
 
-  // Writes an object header for an object with the given number of fields. This
-  // must be followed immediately by the header and body of the object.
-  bool begin_object(uint32_t fieldc) { return pton_assembler_begin_object(assm_, fieldc); }
+  // Writes a seed header for a seed with the given number of fields. This must
+  // be followed immediately by the header and body of the seed.
+  bool begin_seed(uint32_t fieldc) { return pton_assembler_begin_seed(assm_, fieldc); }
 
   // Writes the given boolean value.
   bool emit_bool(bool value) { return pton_assembler_emit_bool(assm_, value); }

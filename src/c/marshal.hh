@@ -15,25 +15,25 @@
 
 namespace plankton {
 
-// An object type handles the process of constructing a custom object in place
-// of a plankton object. Typically you won't implement this directly but one of
-// the two subtypes, ObjectType and AtomicObjectType. The plain version does
-// construction in two steps: creates an empty instance in the first step after
-// just the header has been read and then after the payload has been read sets
-// the instance's contents. The atomic version is created in a single step after
-// both the header and payload have been seen. Atomic object cannot contain
-// references to themselves or appear in cycles.
-class AbstractObjectType {
+// A seed type handles the process of growing a custom object in place of a
+// seed. Typically you won't implement this directly but one of the two
+// subtypes, SeedType and AtomicSeedType. The plain version does construction in
+// two steps: creates an empty instance in the first step after just the header
+// has been read and then after the payload has been read sets the instance's
+// contents. The atomic version is created in a single step after both the
+// header and payload have been seen. Atomic objects cannot contain references
+// to themselves or appear in cycles.
+class AbstractSeedType {
 public:
-  virtual ~AbstractObjectType() { }
+  virtual ~AbstractSeedType() { }
 
-  // Called immediately after the object header has been read. The value
+  // Called immediately after the seed header has been read. The value
   // returned here will be used as the value to be referenced while reading the
-  // rest of the object.
+  // rest of the seed.
   virtual Variant get_initial_instance(Variant header, Factory *factory) = 0;
 
   // Initializes the initial instance and/or returns a new instance. This is
-  // called after the entire payload of the object has been read. The value
+  // called after the entire payload of the seed has been read. The value
   // returned here will be used as the value to be referenced from the end of
   // the object on. Usually, if a nontrivial value was returned as the initial
   // instance that is the value you want to return here too.
@@ -46,31 +46,31 @@ public:
   virtual Variant header() = 0;
 };
 
-// A concrete object type binds the type of instances and contains the common
-// functionality between ObjectType and AtomicObjectType.
+// A concrete seed type binds the type of instances and contains the common
+// functionality between SeedType and AtomicSeedType.
 template <typename T>
-class ConcreteObjectType : public AbstractObjectType {
+class ConcreteSeedType : public AbstractSeedType {
 public:
   // Given an object pointer and its type, returns the type viewed as the type
   // represented by this type object. If the object doesn't have this type
   // NULL is returned.
-  inline T *cast(AbstractObjectType *type, void *object);
+  inline T *cast(AbstractSeedType *type, void *object);
 };
 
-// An object type describes a type that can be constructed in two steps: first
-// created and then completed. The type implements this using two callbacks:
+// An seed type describes a type that can be constructed in two steps: first
+// grown and then completed. The type implements this using two callbacks:
 // one for construction and one for completion.
 template <typename T>
-class ObjectType : public ConcreteObjectType<T> {
+class SeedType : public ConcreteSeedType<T> {
 public:
   typedef tclib::callback_t<T*(Variant, Factory*)> new_instance_t;
-  typedef tclib::callback_t<void(T*, Object, Factory*)> complete_instance_t;
+  typedef tclib::callback_t<void(T*, Seed, Factory*)> complete_instance_t;
   typedef tclib::callback_t<Variant(T*, Factory*)> encode_instance_t;
 
   // Constructs an object type for plankton objects that have the given value
   // as header. Instances will be constructed using new_instance and completed
   // using complete_instance.
-  ObjectType(Variant header,
+  SeedType(Variant header,
       new_instance_t new_instance = tclib::empty_callback(),
       complete_instance_t complete_instance = tclib::empty_callback(),
       encode_instance_t encode = tclib::empty_callback());
@@ -132,7 +132,7 @@ private:
   GenericVector generic_;
 };
 
-// A registry that can resolve object types during parsing based on the objects'
+// A registry that can resolve object types during parsing based on the seed's
 // headers.
 class AbstractTypeRegistry {
 public:
@@ -140,18 +140,18 @@ public:
 
   // Returns the type corresponding to the given header. If no type is known
   // NULL is returned.
-  virtual AbstractObjectType *resolve_type(Variant header) = 0;
+  virtual AbstractSeedType *resolve_type(Variant header) = 0;
 };
 
 // A simple registry based on a mapping from headers to types.
 class TypeRegistry : public AbstractTypeRegistry {
 public:
   // Adds the given type as the mapping for its header to this registry.
-  void register_type(AbstractObjectType *type);
+  void register_type(AbstractSeedType *type);
 
-  virtual AbstractObjectType *resolve_type(Variant header);
+  virtual AbstractSeedType *resolve_type(Variant header);
 private:
-  VariantMap<AbstractObjectType*> types_;
+  VariantMap<AbstractSeedType*> types_;
 };
 
 } // namespace plankton

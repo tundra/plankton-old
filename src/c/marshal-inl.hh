@@ -9,23 +9,23 @@
 namespace plankton {
 
 template <typename T>
-inline T *Variant::native_as(ConcreteObjectType<T> *type) {
+inline T *Variant::native_as(ConcreteSeedType<T> *type) {
   return type->cast(native_type(), native_object());
 }
 
 template <typename T>
-T *ConcreteObjectType<T>::cast(AbstractObjectType *type, void *object) {
+T *ConcreteSeedType<T>::cast(AbstractSeedType *type, void *object) {
   return (this == type) ? static_cast<T*>(object) : NULL;
 }
 
 template <typename T>
-Variant ObjectType<T>::get_initial_instance(Variant header, Factory *arena) {
+Variant SeedType<T>::get_initial_instance(Variant header, Factory *arena) {
   T *instance = (create_)(header, arena);
   return arena->new_native(instance, this);
 }
 
 template <typename T>
-Variant ObjectType<T>::get_complete_instance(Variant initial, Variant payload,
+Variant SeedType<T>::get_complete_instance(Variant initial, Variant payload,
     Factory *factory) {
   T *value = initial.native_as(this);
   if (value == NULL || complete_.is_empty())
@@ -37,7 +37,7 @@ Variant ObjectType<T>::get_complete_instance(Variant initial, Variant payload,
 }
 
 template <typename T>
-Variant ObjectType<T>::encode_instance(Native wrapped, Factory *factory) {
+Variant SeedType<T>::encode_instance(Native wrapped, Factory *factory) {
   T *value = wrapped.as(this);
   if (value == NULL || encode_.is_empty())
     return Variant::null();
@@ -45,7 +45,7 @@ Variant ObjectType<T>::encode_instance(Native wrapped, Factory *factory) {
 }
 
 template <typename T>
-ObjectType<T>::ObjectType(Variant header, new_instance_t create,
+SeedType<T>::SeedType(Variant header, new_instance_t create,
     complete_instance_t complete, encode_instance_t encode)
   : header_(header)
   , create_(create)

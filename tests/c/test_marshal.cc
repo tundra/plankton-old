@@ -15,12 +15,12 @@ public:
     , y_(y) { }
   int x() { return x_; }
   int y() { return y_; }
-  static ObjectType<Point> *type() { return &kType; }
+  static SeedType<Point> *seed_type() { return &kType; }
 private:
   static Point *new_instance(Variant header, Factory* factory);
-  void init(Object payload, Factory* factory);
-  Variant to_plankton(Factory *factory);
-  static ObjectType<Point> kType;
+  void init(Seed payload, Factory* factory);
+  Variant to_seed(Factory *factory);
+  static SeedType<Point> kType;
   int x_;
   int y_;
 };
@@ -29,37 +29,32 @@ Point *Point::new_instance(Variant header, Factory* factory) {
   return new (*factory) Point(0, 0);
 }
 
-void Point::init(Object payload, Factory* factory) {
+void Point::init(Seed payload, Factory* factory) {
   x_ = payload.get_field("x").integer_value();
   y_ = payload.get_field("y").integer_value();
 }
 
-Variant Point::to_plankton(Factory *factory) {
-  Object obj = factory->new_object();
-  obj.set_header(type()->header());
+Variant Point::to_seed(Factory *factory) {
+  Seed obj = factory->new_seed(Point::seed_type());
   obj.set_field("x", x_);
   obj.set_field("y", y_);
   return obj;
 }
 
-template <> struct default_object_type<Point> {
-  static ObjectType<Point> *get() { return Point::type(); }
-};
-
-ObjectType<Point> Point::kType("binary.Point",
+SeedType<Point> Point::kType("binary.Point",
     tclib::new_callback(Point::new_instance),
     tclib::new_callback(&Point::init),
-    tclib::new_callback(&Point::to_plankton));
+    tclib::new_callback(&Point::to_seed));
 
-TEST(marshal, object_type) {
+TEST(marshal, seed_type) {
   Arena arena;
-  Object obj = arena.new_object();
+  Seed obj = arena.new_seed();
   obj.set_header("binary.Point");
   obj.set_field("x", 10);
   obj.set_field("y", 18);
-  Native value = Point::type()->get_initial_instance(obj.header(), &arena);
-  Point::type()->get_complete_instance(value, obj, &arena);
-  Point *p = value.as(Point::type());
+  Native value = Point::seed_type()->get_initial_instance(obj.header(), &arena);
+  Point::seed_type()->get_complete_instance(value, obj, &arena);
+  Point *p = value.as(Point::seed_type());
   ASSERT_TRUE(p != NULL);
   ASSERT_EQ(10, p->x());
   ASSERT_EQ(18, p->y());
@@ -67,27 +62,27 @@ TEST(marshal, object_type) {
 
 TEST(marshal, registry) {
   TypeRegistry registry;
-  registry.register_type(Point::type());
-  ASSERT_TRUE(registry.resolve_type("binary.Point") == Point::type());
+  registry.register_type(Point::seed_type());
+  ASSERT_TRUE(registry.resolve_type("binary.Point") == Point::seed_type());
   char other[13] = "binary.Point";
-  ASSERT_TRUE(registry.resolve_type(other) == Point::type());
+  ASSERT_TRUE(registry.resolve_type(other) == Point::seed_type());
   ASSERT_TRUE(registry.resolve_type("blah") == NULL);
 }
 
 TEST(marshal, simple_auto_object) {
   Arena arena;
-  Object obj = arena.new_object();
+  Seed obj = arena.new_seed();
   obj.set_header("binary.Point");
   obj.set_field("x", 11);
   obj.set_field("y", 12);
   BinaryWriter out;
   out.write(obj);
   TypeRegistry registry;
-  registry.register_type(Point::type());
+  registry.register_type(Point::seed_type());
   BinaryReader in(&arena);
   in.set_type_registry(&registry);
   Native value = in.parse(*out, out.size());
-  Point *pnt = value.as(Point::type());
+  Point *pnt = value.as(Point::seed_type());
   ASSERT_FALSE(pnt == NULL);
   ASSERT_EQ(11, pnt->x());
   ASSERT_EQ(12, pnt->y());
@@ -100,12 +95,12 @@ public:
     , bottom_right_(bottom_right) { }
   Point *top_left() { return top_left_; }
   Point *bottom_right() { return bottom_right_; }
-  static ObjectType<Rect> *type() { return &kType; }
+  static SeedType<Rect> *seed_type() { return &kType; }
 private:
   static Rect *new_instance(Variant header, Factory* factory);
-  void init(Object payload, Factory* factory);
-  Variant to_plankton(Factory *factory);
-  static ObjectType<Rect> kType;
+  void init(Seed payload, Factory* factory);
+  Variant to_seed(Factory *factory);
+  static SeedType<Rect> kType;
   Point *top_left_;
   Point *bottom_right_;
 };
@@ -114,51 +109,47 @@ Rect *Rect::new_instance(Variant header, Factory* factory) {
   return new (*factory) Rect(NULL, NULL);
 }
 
-void Rect::init(Object payload, Factory* factory) {
-  top_left_ = payload.get_field("top_left").native_as(Point::type());
-  bottom_right_ = payload.get_field("bottom_right").native_as(Point::type());
+void Rect::init(Seed payload, Factory* factory) {
+  top_left_ = payload.get_field("top_left").native_as(Point::seed_type());
+  bottom_right_ = payload.get_field("bottom_right").native_as(Point::seed_type());
 }
 
-Variant Rect::to_plankton(Factory *factory) {
-  Object obj = factory->new_object(type());
+Variant Rect::to_seed(Factory *factory) {
+  Seed obj = factory->new_seed(seed_type());
   obj.set_field("top_left", factory->new_native(top_left_));
   obj.set_field("bottom_right", factory->new_native(bottom_right_));
   return obj;
 }
 
-template <> struct default_object_type<Rect> {
-  static ObjectType<Rect> *get() { return Rect::type(); }
-};
-
-ObjectType<Rect> Rect::kType("binary.Rect",
+SeedType<Rect> Rect::kType("binary.Rect",
     tclib::new_callback(Rect::new_instance),
     tclib::new_callback(&Rect::init),
-    tclib::new_callback(&Rect::to_plankton));
+    tclib::new_callback(&Rect::to_seed));
 
 TEST(marshal, complex_auto_object) {
   Arena arena;
-  Object top_left = arena.new_object();
+  Seed top_left = arena.new_seed();
   top_left.set_header("binary.Point");
   top_left.set_field("x", 13);
   top_left.set_field("y", 14);
-  Object bottom_right = arena.new_object();
+  Seed bottom_right = arena.new_seed();
   bottom_right.set_header("binary.Point");
   bottom_right.set_field("x", 15);
   bottom_right.set_field("y", 16);
-  Object obj = arena.new_object();
+  Seed obj = arena.new_seed();
   obj.set_header("binary.Rect");
   obj.set_field("top_left", top_left);
   obj.set_field("bottom_right", bottom_right);
   BinaryWriter out;
   out.write(obj);
   TypeRegistry registry;
-  registry.register_type(Point::type());
-  registry.register_type(Rect::type());
+  registry.register_type(Point::seed_type());
+  registry.register_type(Rect::seed_type());
   BinaryReader in(&arena);
   in.set_type_registry(&registry);
   Native value = in.parse(*out, out.size());
-  ASSERT_TRUE(value.as(Point::type()) == NULL);
-  Rect *rect = value.as(Rect::type());
+  ASSERT_TRUE(value.as(Point::seed_type()) == NULL);
+  Rect *rect = value.as(Rect::seed_type());
   ASSERT_EQ(13, rect->top_left()->x());
   ASSERT_EQ(14, rect->top_left()->y());
   ASSERT_EQ(15, rect->bottom_right()->x());
@@ -167,23 +158,23 @@ TEST(marshal, complex_auto_object) {
 
 TEST(marshal, invalid_auto_object) {
   Arena arena;
-  Object top_left = arena.new_object();
+  Seed top_left = arena.new_seed();
   top_left.set_header("binary.Point");
   top_left.set_field("x", 13);
   top_left.set_field("y", 14);
-  Object obj = arena.new_object();
+  Seed obj = arena.new_seed();
   obj.set_header("binary.Rect");
   obj.set_field("top_left", top_left);
   BinaryWriter out;
   out.write(obj);
   TypeRegistry registry;
-  registry.register_type(Point::type());
-  registry.register_type(Rect::type());
+  registry.register_type(Point::seed_type());
+  registry.register_type(Rect::seed_type());
   BinaryReader in(&arena);
   in.set_type_registry(&registry);
   Native value = in.parse(*out, out.size());
-  ASSERT_TRUE(value.as(Point::type()) == NULL);
-  Rect *rect = value.as(Rect::type());
+  ASSERT_TRUE(value.as(Point::seed_type()) == NULL);
+  Rect *rect = value.as(Rect::seed_type());
   ASSERT_EQ(13, rect->top_left()->x());
   ASSERT_EQ(14, rect->top_left()->y());
   ASSERT_EQ(NULL, rect->bottom_right());
@@ -196,13 +187,13 @@ TEST(marshal, simple_encode) {
   BinaryWriter out;
   out.write(n);
   TypeRegistry registry;
-  registry.register_type(Point::type());
-  registry.register_type(Rect::type());
+  registry.register_type(Point::seed_type());
+  registry.register_type(Rect::seed_type());
   BinaryReader in(&arena);
   in.set_type_registry(&registry);
   Native value = in.parse(*out, out.size());
   ASSERT_TRUE(value.is_native());
-  Point *p2 = value.as(Point::type());
+  Point *p2 = value.as(Point::seed_type());
   ASSERT_EQ(15, p2->x());
   ASSERT_EQ(16, p2->y());
 }
@@ -216,13 +207,13 @@ TEST(marshal, complex_encode) {
   BinaryWriter out;
   out.write(n);
   TypeRegistry registry;
-  registry.register_type(Point::type());
-  registry.register_type(Rect::type());
+  registry.register_type(Point::seed_type());
+  registry.register_type(Rect::seed_type());
   BinaryReader in(&arena);
   in.set_type_registry(&registry);
   Native value = in.parse(*out, out.size());
   ASSERT_TRUE(value.is_native());
-  Rect *r2 = value.as(Rect::type());
+  Rect *r2 = value.as(Rect::seed_type());
   ASSERT_EQ(17, r2->top_left()->x());
   ASSERT_EQ(18, r2->top_left()->y());
   ASSERT_EQ(19, r2->bottom_right()->x());
@@ -237,13 +228,13 @@ TEST(marshal, partial_encode) {
   BinaryWriter out;
   out.write(n);
   TypeRegistry registry;
-  registry.register_type(Point::type());
-  registry.register_type(Rect::type());
+  registry.register_type(Point::seed_type());
+  registry.register_type(Rect::seed_type());
   BinaryReader in(&arena);
   in.set_type_registry(&registry);
   Native value = in.parse(*out, out.size());
   ASSERT_TRUE(value.is_native());
-  Rect *r2 = value.as(Rect::type());
+  Rect *r2 = value.as(Rect::seed_type());
   ASSERT_EQ(17, r2->top_left()->x());
   ASSERT_EQ(18, r2->top_left()->y());
   ASSERT_EQ(NULL, r2->bottom_right());

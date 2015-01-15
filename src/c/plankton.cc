@@ -60,13 +60,13 @@ private:
 // An arena-allocated native object handle.
 struct pton_arena_native_t : public pton_arena_value_t {
 public:
-  pton_arena_native_t(Arena *origin, AbstractObjectType *type, void *object);
+  pton_arena_native_t(Arena *origin, AbstractSeedType *type, void *object);
 
 private:
   friend class plankton::Variant;
   friend class plankton::Arena;
   Arena *origin_;
-  AbstractObjectType *type_;
+  AbstractSeedType *type_;
   void *object_;
 };
 
@@ -98,9 +98,9 @@ private:
   entry_t *elms_;
 };
 
-struct pton_arena_object_t : public pton_arena_value_t {
+struct pton_arena_seed_t : public pton_arena_value_t {
 public:
-  explicit pton_arena_object_t(Arena *origin);
+  explicit pton_arena_seed_t(Arena *origin);
 
   virtual void ensure_frozen();
 
@@ -111,7 +111,7 @@ private:
   Map fields_;
 };
 
-void pton_arena_object_t::ensure_frozen() {
+void pton_arena_seed_t::ensure_frozen() {
   fields_.ensure_frozen();
   pton_arena_value_t::ensure_frozen();
 }
@@ -180,7 +180,7 @@ Arena::~Arena() {
     delete[] blocks_[i];
 }
 
-Native Arena::new_raw_native(void *object, AbstractObjectType *type) {
+Native Arena::new_raw_native(void *object, AbstractSeedType *type) {
   pton_arena_native_t *data = alloc_value<pton_arena_native_t>();
   Variant result(header_t::PTON_REPR_ARNA_NATIVE,
       new (data) pton_arena_native_t(this, type, object));
@@ -221,11 +221,11 @@ pton_variant_t pton_new_map(pton_arena_t *arena) {
   return Arena::from_c(arena)->new_map().to_c();
 }
 
-Object Arena::new_object(AbstractObjectType *type) {
-  pton_arena_object_t *data = alloc_value<pton_arena_object_t>();
-  Variant result = Variant(header_t::PTON_REPR_ARNA_OBJECT, new (data) pton_arena_object_t(this));
+Seed Arena::new_seed(AbstractSeedType *type) {
+  pton_arena_seed_t *data = alloc_value<pton_arena_seed_t>();
+  Variant result = Variant(header_t::PTON_REPR_ARNA_SEED, new (data) pton_arena_seed_t(this));
   if (type != NULL)
-    result.object_set_header(type->header());
+    result.seed_set_header(type->header());
   return result;
 }
 
@@ -402,7 +402,7 @@ bool pton_is_frozen(pton_variant_t variant) {
     case header_t::PTON_REPR_ARNA_MAP:
     case header_t::PTON_REPR_ARNA_STRING:
     case header_t::PTON_REPR_ARNA_BLOB:
-    case header_t::PTON_REPR_ARNA_OBJECT:
+    case header_t::PTON_REPR_ARNA_SEED:
       return variant.payload_.as_arena_value_->is_frozen();
     default:
       return false;
@@ -420,7 +420,7 @@ void pton_ensure_frozen(pton_variant_t variant) {
     case header_t::PTON_REPR_ARNA_MAP:
     case header_t::PTON_REPR_ARNA_STRING:
     case header_t::PTON_REPR_ARNA_BLOB:
-    case header_t::PTON_REPR_ARNA_OBJECT:
+    case header_t::PTON_REPR_ARNA_SEED:
       variant.payload_.as_arena_value_->ensure_frozen();
       break;
     default:
@@ -546,7 +546,7 @@ pton_sink_t *pton_arena_array_t::add_sink() {
   return result;
 }
 
-pton_arena_native_t::pton_arena_native_t(Arena *origin, AbstractObjectType *type, void *object)
+pton_arena_native_t::pton_arena_native_t(Arena *origin, AbstractSeedType *type, void *object)
   : origin_(origin)
   , type_(type)
   , object_(object) { }
@@ -556,7 +556,7 @@ uint32_t pton_map_size(pton_variant_t variant) {
   return pton_is_map(variant) ? variant.payload_.as_arena_map_->size() : 0;
 }
 
-AbstractObjectType *Variant::native_type() {
+AbstractSeedType *Variant::native_type() {
   return is_native()
        ? payload()->as_arena_native_->type_
        : NULL;
@@ -631,57 +631,57 @@ uint32_t pton_id_size(pton_variant_t variant) {
       : 0;
 }
 
-Variant Variant::object_header() const {
+Variant Variant::seed_header() const {
   pton_check_binary_version(value_);
-  return is_object() ? value_.payload_.as_arena_object_->header_ : null();
+  return is_seed() ? value_.payload_.as_arena_seed_->header_ : null();
 }
 
-bool Variant::object_set_header(Variant value) {
+bool Variant::seed_set_header(Variant value) {
   pton_check_binary_version(value_);
   pton_check_binary_version(value.value_);
-  if (is_object() && !is_frozen()) {
-    value_.payload_.as_arena_object_->header_ = value;
+  if (is_seed() && !is_frozen()) {
+    value_.payload_.as_arena_seed_->header_ = value;
     return true;
   } else {
     return false;
   }
 }
 
-bool Variant::object_set_field(Variant key, Variant value) {
+bool Variant::seed_set_field(Variant key, Variant value) {
   pton_check_binary_version(value_);
   pton_check_binary_version(key.value_);
   pton_check_binary_version(value.value_);
-  return is_object()
-      ? value_.payload_.as_arena_object_->fields_.set(key, value)
+  return is_seed()
+      ? value_.payload_.as_arena_seed_->fields_.set(key, value)
       : false;
 }
 
-Variant Variant::object_get_field(Variant key) {
+Variant Variant::seed_get_field(Variant key) {
   pton_check_binary_version(value_);
   pton_check_binary_version(key.value_);
-  return is_object()
-      ? value_.payload_.as_arena_object_->fields_[key]
+  return is_seed()
+      ? value_.payload_.as_arena_seed_->fields_[key]
       : null();
 }
 
-uint32_t Variant::object_field_count() {
+uint32_t Variant::seed_field_count() {
   pton_check_binary_version(value_);
-  return is_object()
-      ? value_.payload_.as_arena_object_->fields_.size()
+  return is_seed()
+      ? value_.payload_.as_arena_seed_->fields_.size()
       : 0;
 }
 
-Map_Iterator Variant::object_fields_begin() {
+Map_Iterator Variant::seed_fields_begin() {
   pton_check_binary_version(value_);
-  return is_object()
-      ? value_.payload_.as_arena_object_->fields_.begin()
+  return is_seed()
+      ? value_.payload_.as_arena_seed_->fields_.begin()
       : Map_Iterator();
 }
 
-Map_Iterator Variant::object_fields_end() {
+Map_Iterator Variant::seed_fields_end() {
   pton_check_binary_version(value_);
-  return is_object()
-      ? value_.payload_.as_arena_object_->fields_.end()
+  return is_seed()
+      ? value_.payload_.as_arena_seed_->fields_.end()
       : Map_Iterator();
 }
 
@@ -810,7 +810,7 @@ Variant pton_arena_map_t::get(Variant key) const {
   return Variant::null();
 }
 
-pton_arena_object_t::pton_arena_object_t(Arena *origin)
+pton_arena_seed_t::pton_arena_seed_t(Arena *origin)
   : origin_(origin) {
   fields_ = origin->new_map();
 }
@@ -961,10 +961,10 @@ Map Sink::as_map() {
   return set(value) ? value : Variant::null();
 }
 
-Object Sink::as_object() {
+Seed Sink::as_seed() {
   if (!can_be_set())
     return Variant::null();
-  Variant value = factory()->new_object();
+  Variant value = factory()->new_seed();
   return set(value) ? value : Variant::null();
 }
 

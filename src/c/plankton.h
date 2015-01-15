@@ -13,7 +13,7 @@ typedef struct pton_arena_array_t pton_arena_array_t;
 typedef struct pton_arena_blob_t pton_arena_blob_t;
 typedef struct pton_arena_map_t pton_arena_map_t;
 typedef struct pton_arena_native_t pton_arena_native_t;
-typedef struct pton_arena_object_t pton_arena_object_t;
+typedef struct pton_arena_seed_t pton_arena_seed_t;
 typedef struct pton_arena_string_t pton_arena_string_t;
 typedef struct pton_arena_t pton_arena_t;
 typedef struct pton_arena_value_t pton_arena_value_t;
@@ -31,7 +31,7 @@ typedef enum pton_type_t {
   PTON_ARRAY = 0x06,
   PTON_MAP = 0x07,
   PTON_ID = 0x08,
-  PTON_OBJECT = 0x09,
+  PTON_SEED = 0x09,
   PTON_NATIVE = 0x0A
 } pton_type_t;
 
@@ -68,7 +68,7 @@ typedef struct {
         PTON_REPR_ARNA_ARRAY = 0x60,
         PTON_REPR_ARNA_MAP = 0x70,
         PTON_REPR_INLN_ID = 0x80,
-        PTON_REPR_ARNA_OBJECT = 0x90,
+        PTON_REPR_ARNA_SEED = 0x90,
         PTON_REPR_ARNA_NATIVE = 0xA0
     } repr_tag_ IF_MSVC(, : 8);
     // A tag used to identify the version of plankton that produced this value.
@@ -95,7 +95,7 @@ typedef struct {
     pton_arena_array_t *as_arena_array_;
     pton_arena_map_t *as_arena_map_;
     pton_arena_native_t *as_arena_native_;
-    pton_arena_object_t *as_arena_object_;
+    pton_arena_seed_t *as_arena_seed_;
     pton_arena_string_t *as_arena_string_;
     pton_arena_blob_t *as_arena_blob_;
     const void *as_external_blob_data_;
@@ -239,7 +239,7 @@ bool pton_is_frozen(pton_variant_t variant);
 
 // Renders the value locally immutable. Values referenced from this one may
 // be mutable so it may still change indirectly, just not this concrete
-// object. This function is idempotent.
+// value. This function is idempotent.
 void pton_ensure_frozen(pton_variant_t);
 
 // Creates and returns new plankton arena.
@@ -319,8 +319,8 @@ bool pton_assembler_begin_array(pton_assembler_t *assm, uint32_t length);
 // followed immediately by the mappings, keys and values alternating.
 bool pton_assembler_begin_map(pton_assembler_t *assm, uint32_t size);
 
-// Writes an object header.
-bool pton_assembler_begin_object(pton_assembler_t *assm, uint32_t fieldc);
+// Writes a seed header.
+bool pton_assembler_begin_seed(pton_assembler_t *assm, uint32_t fieldc);
 
 // Writes the given boolean value.
 bool pton_assembler_emit_bool(pton_assembler_t *assm, bool value);
@@ -346,7 +346,7 @@ bool pton_assembler_emit_string_with_encoding(pton_assembler_t *assm,
 bool pton_assembler_emit_id64(pton_assembler_t *assm, uint32_t size,
     uint64_t value);
 
-// Writes a reference to the previously seen object at the given offset.
+// Writes a reference to the previously seen value at the given offset.
 bool pton_assembler_emit_reference(pton_assembler_t *assm, uint64_t offset);
 
 // Returns the code written by the assembler. The result is still owned by the
@@ -363,7 +363,7 @@ typedef enum pton_instr_opcode_t {
   PTON_OPCODE_BEGIN_MAP,
   PTON_OPCODE_NULL,
   PTON_OPCODE_BOOL,
-  PTON_OPCODE_BEGIN_OBJECT,
+  PTON_OPCODE_BEGIN_SEED,
   PTON_OPCODE_REFERENCE
 } pton_instr_opcode_t;
 
@@ -376,7 +376,7 @@ typedef struct {
     int64_t int64_value;
     uint64_t array_length;
     uint64_t map_size;
-    uint64_t object_fieldc;
+    uint64_t seed_fieldc;
     struct {
       uint64_t length;
       const uint8_t *contents;

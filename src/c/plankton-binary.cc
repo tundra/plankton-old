@@ -25,7 +25,7 @@ public:
 
   bool begin_map(uint32_t length);
 
-  bool begin_object(uint32_t fieldc);
+  bool begin_seed(uint32_t fieldc);
 
   bool emit_bool(bool value);
 
@@ -83,12 +83,12 @@ bool pton_assembler_t::emit_bool(bool value) {
   return write_byte(value ? boTrue : boFalse);
 }
 
-bool pton_assembler_t::begin_object(uint32_t fieldc) {
-  return write_byte(boObject) && write_uint64(fieldc);
+bool pton_assembler_t::begin_seed(uint32_t fieldc) {
+  return write_byte(boSeed) && write_uint64(fieldc);
 }
 
-bool pton_assembler_begin_object(pton_assembler_t *assm, uint32_t fieldc) {
-  return assm->begin_object(fieldc);
+bool pton_assembler_begin_seed(pton_assembler_t *assm, uint32_t fieldc) {
+  return assm->begin_seed(fieldc);
 }
 
 bool pton_assembler_emit_bool(pton_assembler_t *assm, bool value) {
@@ -260,7 +260,7 @@ public:
 
   void encode_map(Map value);
 
-  void encode_object(Object value);
+  void encode_seed(Seed value);
 
   void encode_native(Native value);
 
@@ -291,8 +291,8 @@ void VariantWriter::encode(Variant value) {
     case PTON_MAP:
       encode_map(value);
       break;
-    case PTON_OBJECT:
-      encode_object(value);
+    case PTON_SEED:
+      encode_seed(value);
       break;
     case PTON_NATIVE:
       encode_native(value);
@@ -343,17 +343,17 @@ void VariantWriter::encode_map(Map value) {
   }
 }
 
-void VariantWriter::encode_object(Object value) {
-  assm()->begin_object(value.field_count());
+void VariantWriter::encode_seed(Seed value) {
+  assm()->begin_seed(value.field_count());
   encode(value.header());
-  for (Object::Iterator i = value.fields_begin(); i != value.fields_end(); i++) {
+  for (Seed::Iterator i = value.fields_begin(); i != value.fields_end(); i++) {
     encode(i->key());
     encode(i->value());
   }
 }
 
 void VariantWriter::encode_native(Native value) {
-  AbstractObjectType *type = value.type();
+  AbstractSeedType *type = value.type();
   Variant replacement = type->encode_instance(value, &scratch_);
   encode(replacement);
 }
@@ -381,8 +381,8 @@ private:
   // Read a map's payload.
   bool decode_map(uint64_t size, Variant *result_out);
 
-  // Read an object's payload.
-  bool decode_object(uint64_t fieldc, Variant *result_out);
+  // Read an seed's payload.
+  bool decode_seed(uint64_t fieldc, Variant *result_out);
 
   // Convert default-encoding string data into a string variant.
   bool decode_default_string(pton_instr_t *instr, Variant *result_out);
@@ -501,10 +501,10 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
       instr_out->opcode = PTON_OPCODE_BOOL;
       instr_out->payload.bool_value = (opcode == BinaryImplUtils::boTrue);
       break;
-    case BinaryImplUtils::boObject:
-      if (!decode_uint64(&instr_out->payload.object_fieldc))
+    case BinaryImplUtils::boSeed:
+      if (!decode_uint64(&instr_out->payload.seed_fieldc))
         return false;
-      instr_out->opcode = PTON_OPCODE_BEGIN_OBJECT;
+      instr_out->opcode = PTON_OPCODE_BEGIN_SEED;
       break;
     case BinaryImplUtils::boReference:
       if (!decode_uint64(&instr_out->payload.reference_offset))
@@ -632,8 +632,8 @@ bool BinaryReaderImpl::decode(Variant *result_out) {
       return decode_array(instr.payload.array_length, result_out);
     case PTON_OPCODE_BEGIN_MAP:
       return decode_map(instr.payload.map_size, result_out);
-    case PTON_OPCODE_BEGIN_OBJECT:
-      return decode_object(instr.payload.object_fieldc, result_out);
+    case PTON_OPCODE_BEGIN_SEED:
+      return decode_seed(instr.payload.seed_fieldc, result_out);
     case PTON_OPCODE_NULL:
       return succeed(Variant::null(), result_out);
     case PTON_OPCODE_BOOL:
@@ -694,16 +694,16 @@ bool BinaryReaderImpl::decode_map(uint64_t size, Variant *result_out) {
   return succeed(result, result_out);
 }
 
-bool BinaryReaderImpl::decode_object(uint64_t size, Variant *result_out) {
+bool BinaryReaderImpl::decode_seed(uint64_t size, Variant *result_out) {
   Variant header;
   if (!decode(&header))
     return false;
-  Object object = reader_->factory_->new_object();
-  object.set_header(header);
+  Seed seed = reader_->factory_->new_seed();
+  seed.set_header(header);
   AbstractTypeRegistry *registry = reader_->type_registry_;
-  AbstractObjectType *type = registry == NULL ? NULL : registry->resolve_type(header);
+  AbstractSeedType *type = registry == NULL ? NULL : registry->resolve_type(header);
   Variant result = (type == NULL)
-    ? object
+    ? seed
     : type->get_initial_instance(header, reader_->factory_);
   for (size_t i = 0; i < size; i++) {
     Variant key;
@@ -712,11 +712,11 @@ bool BinaryReaderImpl::decode_object(uint64_t size, Variant *result_out) {
     Variant value;
     if (!decode(&value))
       return false;
-    object.set_field(key, value);
+    seed.set_field(key, value);
   }
-  object.ensure_frozen();
+  seed.ensure_frozen();
   if (type != NULL)
-    result = type->get_complete_instance(result, object, reader_->factory_);
+    result = type->get_complete_instance(result, seed, reader_->factory_);
   return succeed(result, result_out);
 }
 

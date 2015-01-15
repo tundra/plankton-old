@@ -132,9 +132,9 @@ TEST(variant_cpp, array_sink) {
   ASSERT_EQ(PTON_STRING, array[2].type());
 }
 
-TEST(variant_cpp, object) {
+TEST(variant_cpp, seed) {
   Arena arena;
-  Object obj = arena.new_object();
+  Seed obj = arena.new_seed();
   ASSERT_TRUE(obj.header().is_null());
   ASSERT_TRUE(obj.set_header("foo"));
   ASSERT_TRUE(Variant("foo") == obj.header());

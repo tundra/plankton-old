@@ -84,8 +84,8 @@ private:
   // Writes a map value.
   void write_map(Map map);
 
-  // Writes an object value.
-  void write_object(Object obj);
+  // Writes a seed value.
+  void write_seed(Seed seed);
 
   // Writes a native value.
   void write_native(Native obj);
@@ -151,8 +151,8 @@ void TextWriterImpl::write(Variant value) {
     case PTON_MAP:
       write_map(value);
       break;
-    case PTON_OBJECT:
-      write_object(value);
+    case PTON_SEED:
+      write_seed(value);
       break;
     case PTON_NATIVE:
       write_native(value);
@@ -396,16 +396,16 @@ void TextWriterImpl::write_map(Map map) {
   write_raw_char('}');
 }
 
-void TextWriterImpl::write_object(Object obj) {
-  bool is_long = get_short_length(obj, indent_) >= kShortLengthLimit;
-  write(obj.header());
+void TextWriterImpl::write_seed(Seed seed) {
+  bool is_long = get_short_length(seed, indent_) >= kShortLengthLimit;
+  write(seed.header());
   write_raw_char(' ');
   write_raw_char('{');
   if (is_long) {
     indent();
     schedule_newline();
   }
-  for (Object::Iterator i = obj.fields_begin(); i != obj.fields_end(); i++) {
+  for (Seed::Iterator i = seed.fields_begin(); i != seed.fields_end(); i++) {
     write(i->key());
     write_raw_char(':');
     write_raw_char(' ');
@@ -424,7 +424,7 @@ void TextWriterImpl::write_object(Object obj) {
 }
 
 void TextWriterImpl::write_native(Native value) {
-  AbstractObjectType *type = value.type();
+  AbstractSeedType *type = value.type();
   Variant replacement = type->encode_instance(value, &scratch_);
   write(replacement);
 }

@@ -36,8 +36,8 @@ void disass_instr(pton_instr_t *instr, string_buffer_t *buf) {
     case PTON_OPCODE_BEGIN_MAP:
       string_buffer_printf(buf, "begin_map:%i", instr->payload.map_size);
       break;
-    case PTON_OPCODE_BEGIN_OBJECT:
-      string_buffer_printf(buf, "begin_object:%i", instr->payload.object_fieldc);
+    case PTON_OPCODE_BEGIN_SEED:
+      string_buffer_printf(buf, "begin_seed:%i", instr->payload.seed_fieldc);
       break;
     case PTON_OPCODE_NULL:
       string_buffer_printf(buf, "null");

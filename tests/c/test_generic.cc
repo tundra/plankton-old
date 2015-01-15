@@ -103,8 +103,8 @@ int YamlParser::handle_framework_read(void *yaml_file_ptr, unsigned char *buffer
   return true;
 }
 
-static bool adapt_object(Array fields, Sink sink) {
-  Object result = sink.as_object();
+static bool adapt_seed(Array fields, Sink sink) {
+  Seed result = sink.as_seed();
   for (size_t i = 0; i < fields.length(); i++) {
     Map field = fields[i];
     ASSERT_EQ(1, field.size());
@@ -157,7 +157,7 @@ bool YamlParser::read(Sink sink) {
       if (map.size() == 1) {
         Variant as_object = map["object"];
         if (as_object.is_array())
-          return adapt_object(as_object, sink);
+          return adapt_seed(as_object, sink);
         Variant as_blob = map["blob"];
         if (as_blob.is_array())
           return adapt_blob(as_blob, sink);
@@ -272,7 +272,7 @@ static Variant get_variant_type_name(Variant value) {
       return "array";
     case PTON_MAP:
       return "map";
-    case PTON_OBJECT:
+    case PTON_SEED:
       return "obj";
     case PTON_BLOB:
       return "blob";
