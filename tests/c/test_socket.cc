@@ -42,7 +42,7 @@ TEST(socket, values) {
   ASSERT_EQ(42, ain[1].integer_value());
 }
 
-static void handle_push_message(int *call_count, Variant value) {
+static void handle_push_message(int *call_count, Arena *owner, Variant value) {
   switch (*call_count) {
     case 0:
       ASSERT_TRUE(value.is_integer());

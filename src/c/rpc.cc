@@ -64,6 +64,16 @@ Variant RequestMessage::to_seed(Factory *factory) {
   return result;
 }
 
+Request::Request(Variant subject, Variant selector, size_t argc, Variant *argv)
+  : subject_(subject)
+  , selector_(selector) {
+  if (argc == 0)
+    return;
+  arguments_ = arena_.new_map();
+  for (size_t i = 0; i < argc; i++)
+    arguments_.map_set(i, argv[i]);
+}
+
 namespace plankton {
 
 // The data for an RPC response that goes on the wire. It's basically a plain
@@ -120,22 +130,35 @@ public:
   virtual ~PendingMessage() { }
   virtual sync_promise_t<Variant, Variant> *operator->() { return &promise_; }
 private:
+  friend class MessageSocket;
+  Arena arena_;
   uint64_t serial_;
   sync_promise_t<Variant, Variant> promise_;
 };
 
 MessageSocket::MessageSocket(PushInputStream *in, OutputSocket *out, RequestHandler handler)
-  : in_(in)
-  , out_(out)
-  , handler_(handler)
+  : in_(NULL)
+  , out_(NULL)
   , next_serial_(1) {
+  init(in, out, handler);
+}
+
+MessageSocket::MessageSocket()
+  : in_(NULL)
+  , out_(NULL)
+  , next_serial_(1) { }
+
+void MessageSocket::init(PushInputStream *in, OutputSocket *out, RequestHandler handler) {
+  in_ = in;
+  out_ = out;
+  handler_ = handler;
   types_.register_type(RequestMessage::seed_type());
   types_.register_type(ResponseMessage::seed_type());
   in_->set_type_registry(&types_);
   in_->add_action(tclib::new_callback(&MessageSocket::on_incoming_message, this));
 }
 
-void MessageSocket::on_incoming_message(Variant message) {
+void MessageSocket::on_incoming_message(Arena *owner, Variant message) {
   RequestMessage *request = message.native_as(RequestMessage::seed_type());
   if (request != NULL) {
     on_incoming_request(request);
@@ -143,7 +166,7 @@ void MessageSocket::on_incoming_message(Variant message) {
   }
   ResponseMessage *response = message.native_as(ResponseMessage::seed_type());
   if (response != NULL) {
-    on_incoming_response(response);
+    on_incoming_response(owner, response);
     return;
   }
   // An unexpected message. Log but ignore.
@@ -159,7 +182,7 @@ void MessageSocket::on_incoming_request(RequestMessage *message) {
       this, serial));
 }
 
-void MessageSocket::on_incoming_response(ResponseMessage *message) {
+void MessageSocket::on_incoming_response(Arena *owner, ResponseMessage *message) {
   uint64_t serial = message->serial();
   PendingMessageMap::iterator pendings = pending_messages_.find(serial);
   if (pendings == pending_messages_.end()) {
@@ -168,9 +191,11 @@ void MessageSocket::on_incoming_response(ResponseMessage *message) {
     return;
   }
   PendingMessage *pending = pendings->second;
+  // The response is currently owned by a transient arena somewhere else. Since
+  // we're going to be storing it indefinitely in the pending message the
+  // message needs to adopt ownership of that arena and hence the whole message.
+  pending->arena_.adopt_ownership(owner);
   OutgoingResponse &response = message->response();
-  // TODO: ownership of the payloads should be transferred to the outgoing
-  //   response.
   if (response.is_success()) {
     pending->promise().fulfill(response.payload());
   } else {
@@ -180,8 +205,8 @@ void MessageSocket::on_incoming_response(ResponseMessage *message) {
 }
 
 void MessageSocket::on_outgoing_response(uint64_t serial, OutgoingResponse *response) {
-  Arena arena;
   ResponseMessage message(response, serial);
+  Arena arena;
   Native value = arena.new_native(&message);
   out_->send_value(value);
 }
@@ -207,3 +232,34 @@ OutgoingResponse::OutgoingResponse()
 OutgoingResponse::OutgoingResponse(Status status, Variant payload)
   : status_(status)
   , payload_(payload) { }
+
+Service::Service()
+  : handler_(new_callback(&Service::on_request, this)) { }
+
+void Service::register_method(Variant selector, MethodZero handler) {
+  methods_.set(selector, tclib::new_callback(method_zero_trampoline, handler));
+}
+
+void Service::register_method(Variant selector, MethodOne handler) {
+  methods_.set(selector, tclib::new_callback(method_one_trampoline, handler));
+}
+
+void Service::on_request(Request* request, ResponseCallback response) {
+  GenericMethod *method = methods_[request->selector()];
+  if (method == NULL) {
+    OutgoingResponse reply(OutgoingResponse::FAILURE, Variant::null());
+    response(&reply);
+  } else {
+    (*method)(request->arguments(), response);
+  }
+}
+
+void Service::method_zero_trampoline(MethodZero delegate, Variant args,
+    ResponseCallback callback) {
+  delegate(callback);
+}
+
+void Service::method_one_trampoline(MethodOne delegate, Variant args,
+    ResponseCallback callback) {
+  delegate(args.map_get(Variant::integer(0)), callback);
+}

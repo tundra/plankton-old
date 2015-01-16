@@ -17,6 +17,9 @@ namespace plankton {
 // The raw data of an rpc request.
 class Request {
 public:
+  Request(Variant subject = Variant::null(), Variant selector = Variant::null(),
+      size_t argc = 0, Variant *argv = NULL);
+
   // The subject, the receiver of the request.
   void set_subject(Variant value) { subject_ = value; }
   Variant subject() { return subject_; }
@@ -30,6 +33,7 @@ public:
   Variant arguments() { return arguments_; }
 
 private:
+  Arena arena_;
   Variant subject_;
   Variant selector_;
   Variant arguments_;
@@ -85,6 +89,11 @@ public:
   typedef tclib::callback_t<void(OutgoingResponse*)> ResponseHandler;
   typedef tclib::callback_t<void(Request*, ResponseHandler)> RequestHandler;
 
+  // Initializes an empty socket. If this constructor is used you must then
+  // use init() to initialize the socket. Alternatively use the constructor
+  // below to both create an initialize the socket in one go.
+  MessageSocket();
+
   // Initializes a socket that receives incoming requests and responses through
   // the given input stream and sends its own requests and responses through the
   // output stream.
@@ -94,6 +103,9 @@ public:
   // response value is only valid until the callback returns.
   MessageSocket(PushInputStream *in, OutputSocket *out, RequestHandler handler);
 
+  // Initialize an empty socket.
+  void init(PushInputStream *in, OutputSocket *out, RequestHandler handler);
+
   // Writes a request to the outgoing socket and returns a promise for a
   // response received on the incoming socket.
   IncomingResponse *send_request(Request *request);
@@ -101,9 +113,9 @@ public:
 private:
   class PendingMessage;
   typedef platform_hash_map<uint64_t, PendingMessage*> PendingMessageMap;
-  void on_incoming_message(Variant message);
+  void on_incoming_message(Arena *owner, Variant message);
   void on_incoming_request(RequestMessage *request);
-  void on_incoming_response(ResponseMessage *response);
+  void on_incoming_response(Arena *owner, ResponseMessage *response);
   void on_outgoing_response(uint64_t serial, OutgoingResponse* message);
   PushInputStream *in_;
   OutputSocket *out_;
@@ -111,6 +123,39 @@ private:
   TypeRegistry types_;
   uint64_t next_serial_;
   PendingMessageMap pending_messages_;
+};
+
+class Service {
+public:
+  typedef tclib::callback_t<void(OutgoingResponse*)> ResponseCallback;
+  typedef tclib::callback_t<void(Variant, ResponseCallback)> GenericMethod;
+  typedef tclib::callback_t<void(ResponseCallback)> MethodZero;
+  typedef tclib::callback_t<void(Variant, ResponseCallback)> MethodOne;
+
+  Service();
+
+  // Adds a method to the set understood by this service.
+  void register_method(Variant selector, MethodZero handler);
+
+  // Adds a method to the set understood by this service.
+  void register_method(Variant selector, MethodOne handler);
+
+  // Returns the callback to pass to a message socket that will dispatch
+  // messages to this service.
+  MessageSocket::RequestHandler handler() { return handler_; }
+
+private:
+  // General handler for incoming requests.
+  void on_request(Request* request, ResponseCallback response);
+
+  static void method_zero_trampoline(MethodZero delegate, Variant args,
+      ResponseCallback callback);
+  static void method_one_trampoline(MethodOne delegate, Variant args,
+      ResponseCallback callback);
+
+  Arena arena_;
+  VariantMap<GenericMethod> methods_;
+  MessageSocket::RequestHandler handler_;
 };
 
 } // namespace plankton

@@ -1292,7 +1292,7 @@ void PushInputStream::receive_block(MessageData *message) {
        i != actions_.end();
        i++) {
     MessageAction &action = *i;
-    action(value);
+    action(&arena, value);
   }
 }
 

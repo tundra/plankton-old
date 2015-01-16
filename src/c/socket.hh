@@ -174,7 +174,7 @@ private:
 // An input stream that parses and handles messages immediately.
 class PushInputStream : public InputStream {
 public:
-  typedef tclib::callback_t<void(Variant)> MessageAction;
+  typedef tclib::callback_t<void(Arena*, Variant)> MessageAction;
 
   // Creates a new input stream that performs the given action on each message
   // it receives. The variant value passed to the action is valid during the
