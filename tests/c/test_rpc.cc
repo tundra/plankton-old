@@ -280,14 +280,14 @@ EchoService::EchoService() {
   register_method("ping", tclib::new_callback(&EchoService::ping, this));
 }
 
-void EchoService::echo(Variant value, ResponseCallback response) {
+void EchoService::echo(Variant value, ResponseCallback callback) {
   OutgoingResponse result(OutgoingResponse::SUCCESS, value);
-  response(&result);
+  callback(&result);
 }
 
-void EchoService::ping(ResponseCallback response) {
+void EchoService::ping(ResponseCallback callback) {
   OutgoingResponse result(OutgoingResponse::SUCCESS, "pong");
-  response(&result);
+  callback(&result);
 }
 
 TEST(rpc, service) {
@@ -305,4 +305,7 @@ TEST(rpc, service) {
   ASSERT_EQ(43, inc0->peek_value(Variant::null()).integer_value());
   ASSERT_TRUE(inc1->peek_value(10).is_null());
   ASSERT_TRUE(Variant::string("pong") == inc2->peek_value(10));
+  delete &inc0;
+  delete &inc1;
+  delete &inc2;
 }
