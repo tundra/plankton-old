@@ -74,7 +74,7 @@ bool Variant::is_native() const {
 }
 
 Arena::Arena()
-  : super_t(new ArenaData()) { }
+  : tclib::refcount_reference_t<ArenaData>(new ArenaData()) { }
 
 template <typename T>
 T *Arena::alloc_values(uint32_t elms) {

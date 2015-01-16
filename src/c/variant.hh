@@ -647,8 +647,8 @@ private:
 // is. The data is ref counted so more than one arena can share the same data.
 // You don't have to worry too much about this distinction when using arenas but
 // the ability to hang on to an arena's data even after the scope that owns the
-// arena has exited is useful because it allows ownership to be passed on from
-// one arena to another.
+// arena has exited is useful because it allows ownership to be passed on and
+// shared.
 class ArenaData : public tclib::refcount_shared_t {
 public:
   ~ArenaData();
@@ -683,9 +683,6 @@ class Arena
   , public tclib::refcount_reference_t<ArenaData>
   , public pton_arena_t {
 public:
-  // Shorthand for this uncomfortably verbose type.
-  typedef tclib::refcount_reference_t<ArenaData> super_t;
-
   // Creates a new empty arena.
   inline Arena();
 
@@ -763,8 +760,9 @@ public:
   //
   // Note that, importantly, ownership must be linear: so arena A may adopt
   // ownership of values from arena B, or B may adopt ownership of values from
-  // A, but if A adopts B _and_ B adopts A they will keep each other alive and
-  // the data will leak.
+  // A, but if A adopts B _and_ B adopts A they will keep each other alive
+  // indefinitely, even after both their scopes have exited, and the memory will
+  // leak.
   void adopt_ownership(Arena *arena);
 
   // Allocates a raw block of memory.
