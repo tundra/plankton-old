@@ -193,11 +193,21 @@ void *ArenaData::alloc_raw(size_t bytes) {
 }
 
 void Arena::adopt_ownership(Arena *arena) {
-  refcount_shared()->adopt_ownership(arena->refcount_shared());
+  data()->adopt_ownership(arena->data());
 }
 
 void *Arena::alloc_raw(size_t bytes) {
-  return refcount_shared()->alloc_raw(bytes);
+  return data()->alloc_raw(bytes);
+}
+
+ArenaData *Arena::data() {
+  ArenaData *shared = refcount_shared();
+  if (shared == NULL) {
+    shared = new ArenaData();
+    shared->ref();
+    tclib::refcount_reference_t<ArenaData>::set_refcount_shared(shared);
+  }
+  return shared;
 }
 
 Native Arena::new_raw_native(void *object, AbstractSeedType *type) {

@@ -778,6 +778,8 @@ private:
   friend struct ::pton_arena_array_t;
   friend struct ::pton_arena_map_t;
 
+  ArenaData *data();
+
   // Allocates the backing storage for a sink value.
   template <typename S>
   S *alloc_sink();

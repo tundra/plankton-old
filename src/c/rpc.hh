@@ -33,10 +33,10 @@ public:
   Variant arguments() { return arguments_; }
 
 private:
-  Arena arena_;
   Variant subject_;
   Variant selector_;
   Variant arguments_;
+  Arena arena_;
 };
 
 // An incoming response is responsible for access to the result of a request.
