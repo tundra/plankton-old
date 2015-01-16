@@ -73,7 +73,8 @@ bool Variant::is_native() const {
   return repr_tag() == header_t::PTON_REPR_ARNA_NATIVE;
 }
 
-Arena::Arena() { }
+Arena::Arena()
+  : super_t(new ArenaData()) { }
 
 template <typename T>
 T *Arena::alloc_values(uint32_t elms) {

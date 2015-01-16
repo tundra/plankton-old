@@ -100,3 +100,20 @@ TEST(arena_cpp, sink) {
   ASSERT_FALSE(s0.set(12));
   ASSERT_TRUE(out == Variant::integer(10));
 }
+
+TEST(arena_cpp, adopt_inner) {
+  Arena outer;
+  Array arr;
+  {
+    Arena inner;
+    arr = inner.new_array();
+    arr.add(6);
+    arr.add(5);
+    arr.add(4);
+    outer.adopt_ownership(&inner);
+  }
+  ASSERT_EQ(3, arr.length());
+  ASSERT_EQ(6, arr[0].integer_value());
+  ASSERT_EQ(5, arr[1].integer_value());
+  ASSERT_EQ(4, arr[2].integer_value());
+}

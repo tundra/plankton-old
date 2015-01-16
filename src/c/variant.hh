@@ -14,6 +14,7 @@ BEGIN_C_INCLUDES
 END_C_INCLUDES
 
 #include "std/stdvector.hh"
+#include "refcount.hh"
 
 // This is really just an opaque name for c api arenas but it does need a tiny
 // bit of functionality just to be on the safe side wrt. destruction.
@@ -641,15 +642,52 @@ private:
   pton_sink_t *data_;
 };
 
+// An arena is split into two parts: the arena and the arena's data. The arena
+// is really just a thin wrapper around the data which is where the actual state
+// is. The data is ref counted so more than one arena can share the same data.
+// You don't have to worry too much about this distinction when using arenas but
+// the ability to hang on to an arena's data even after the scope that owns the
+// arena has exited is useful because it allows ownership to be passed on from
+// one arena to another.
+class ArenaData : public tclib::refcount_shared_t {
+public:
+  ~ArenaData();
+
+  // Share in the ownership of values allocated in the given other arena.
+  void adopt_ownership(ArenaData *other);
+
+private:
+  friend class Arena;
+
+  // A block of memory allocated within this arena.
+  struct block_t {
+    uint8_t *memory;
+    size_t size;
+  };
+
+  // Allocates and returns a block of memory that holds at least the given
+  // number of bytes.
+  void *alloc_raw(size_t bytes);
+
+  // The raw pages of memory allocated for this arena.
+  std::vector<block_t> blocks_;
+
+  // Other arenas this one has adopted.
+  std::vector<ArenaData*> adopted_;
+};
+
 // An arena within which plankton values can be allocated. Once the values are
 // no longer needed all can be disposed by disposing the arena.
-class Arena : public Factory, public pton_arena_t {
+class Arena
+  : public Factory
+  , public tclib::refcount_reference_t<ArenaData>
+  , public pton_arena_t {
 public:
+  // Shorthand for this uncomfortably verbose type.
+  typedef tclib::refcount_reference_t<ArenaData> super_t;
+
   // Creates a new empty arena.
   inline Arena();
-
-  // Disposes all memory allocated within this arena.
-  ~Arena();
 
   // Allocates a new array of values the given size within this arena. Public
   // for testing only. The values are not initialized.
@@ -716,6 +754,19 @@ public:
   // given output parameter.
   Sink new_sink(plankton::Variant *out);
 
+  // Assume shared ownership of the values produced in the given arena. After
+  // this call, values returned from the given arena will be valid as long as
+  // either the given arena _or_ this arena exist. Or, indeed, any other arenas
+  // that have also adopted ownership -- ownership of data from an arena can be
+  // adopted by an arbitrary number of other arenas. New allocations made within
+  // this arena will still only be owned by this one.
+  //
+  // Note that, importantly, ownership must be linear: so arena A may adopt
+  // ownership of values from arena B, or B may adopt ownership of values from
+  // A, but if A adopts B _and_ B adopts A they will keep each other alive and
+  // the data will leak.
+  void adopt_ownership(Arena *arena);
+
   // Allocates a raw block of memory.
   void *alloc_raw(size_t size);
 
@@ -732,9 +783,6 @@ private:
   // Allocates the backing storage for a sink value.
   template <typename S>
   S *alloc_sink();
-
-  // The raw pages of memory allocated for this arena.
-  std::vector<uint8_t*> blocks_;
 };
 
 } // namespace plankton

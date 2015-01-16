@@ -169,15 +169,35 @@ void pton_dispose_arena(pton_arena_t *arena) {
   delete arena;
 }
 
-void *Arena::alloc_raw(size_t bytes) {
-  uint8_t *result = new uint8_t[bytes];
-  blocks_.push_back(result);
-  return result;
+ArenaData::~ArenaData() {
+  for (size_t i = 0; i < blocks_.size(); i++) {
+    block_t *block = &blocks_[i];
+    // For good measure, zap the memory before freeing it.
+    memset(block->memory, 0xCD, block->size);
+    delete[] block->memory;
+  }
+  for (size_t i = 0; i < adopted_.size(); i++)
+    adopted_[i]->deref();
 }
 
-Arena::~Arena() {
-  for (size_t i = 0; i < blocks_.size(); i++)
-    delete[] blocks_[i];
+void ArenaData::adopt_ownership(ArenaData *other) {
+  other->ref();
+  adopted_.push_back(other);
+}
+
+void *ArenaData::alloc_raw(size_t bytes) {
+  uint8_t *memory = new uint8_t[bytes];
+  block_t block = {memory, bytes};
+  blocks_.push_back(block);
+  return memory;
+}
+
+void Arena::adopt_ownership(Arena *arena) {
+  refcount_shared()->adopt_ownership(arena->refcount_shared());
+}
+
+void *Arena::alloc_raw(size_t bytes) {
+  return refcount_shared()->alloc_raw(bytes);
 }
 
 Native Arena::new_raw_native(void *object, AbstractSeedType *type) {
