@@ -215,7 +215,7 @@ TEST(rpc, byte_buffer_concurrent) {
 }
 
 static void handle_request(MessageSocket::ResponseHandler *handler_out,
-    Request *request, MessageSocket::ResponseHandler handler) {
+    OutgoingRequest *request, MessageSocket::ResponseHandler handler) {
   ASSERT_TRUE(request->subject() == Variant("test_subject"));
   ASSERT_TRUE(request->selector() == Variant("test_selector"));
   ASSERT_TRUE(request->arguments() == Variant("test_arguments"));
@@ -252,21 +252,17 @@ bool RpcChannel::process_next_instruction() {
 TEST(rpc, roundtrip) {
   MessageSocket::ResponseHandler on_response;
   RpcChannel channel(new_callback(handle_request, &on_response));
-  Request request;
-  request.set_subject("test_subject");
-  request.set_selector("test_selector");
+  OutgoingRequest request("test_subject", "test_selector");
   request.set_arguments("test_arguments");
-  IncomingResponse& incoming = *channel->send_request(&request);
-  ASSERT_TRUE(incoming->is_empty());
+  IncomingResponse incoming = channel->send_request(&request);
+  ASSERT_FALSE(incoming->is_resolved());
   while (on_response.is_empty())
     ASSERT_TRUE(channel.process_next_instruction());
-  ASSERT_TRUE(incoming->is_empty());
-  OutgoingResponse outgoing(OutgoingResponse::SUCCESS, Variant::integer(18));
-  on_response(&outgoing);
-  while (incoming->is_empty())
+  ASSERT_FALSE(incoming->is_resolved());
+  on_response(OutgoingResponse::success(Variant::integer(18)));
+  while (!incoming->is_resolved())
     ASSERT_TRUE(channel.process_next_instruction());
   ASSERT_TRUE(Variant::integer(18) == incoming->peek_value(Variant::null()));
-  delete &incoming;
 }
 
 class EchoService : public plankton::rpc::Service {
@@ -282,31 +278,26 @@ EchoService::EchoService() {
 }
 
 void EchoService::echo(Variant value, ResponseCallback callback) {
-  OutgoingResponse result(OutgoingResponse::SUCCESS, value);
-  callback(&result);
+  callback(OutgoingResponse::success(value));
 }
 
 void EchoService::ping(ResponseCallback callback) {
-  OutgoingResponse result(OutgoingResponse::SUCCESS, "pong");
-  callback(&result);
+  callback(OutgoingResponse::success("pong"));
 }
 
 TEST(rpc, service) {
   EchoService echo;
   RpcChannel channel(echo.handler());
   Variant args[1] = {43};
-  Request req0(Variant::null(), "echo", 1, args);
-  IncomingResponse &inc0 = *channel->send_request(&req0);
-  Request req1(Variant::null(), "echo");
-  IncomingResponse &inc1 = *channel->send_request(&req1);
-  Request req2(Variant::null(), "ping");
-  IncomingResponse &inc2 = *channel->send_request(&req2);
-  while (inc2->is_empty())
+  OutgoingRequest req0(Variant::null(), "echo", 1, args);
+  IncomingResponse inc0 = channel->send_request(&req0);
+  OutgoingRequest req1(Variant::null(), "echo");
+  IncomingResponse inc1 = channel->send_request(&req1);
+  OutgoingRequest req2(Variant::null(), "ping");
+  IncomingResponse inc2 = channel->send_request(&req2);
+  while (!inc2->is_resolved())
     channel.process_next_instruction();
   ASSERT_EQ(43, inc0->peek_value(Variant::null()).integer_value());
   ASSERT_TRUE(inc1->peek_value(10).is_null());
   ASSERT_TRUE(Variant::string("pong") == inc2->peek_value(10));
-  delete &inc0;
-  delete &inc1;
-  delete &inc2;
 }

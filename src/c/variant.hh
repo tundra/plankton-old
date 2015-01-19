@@ -613,6 +613,20 @@ public:
   // directly but through the 'new' operator, which calls it.
   virtual void *alloc_raw(size_t size) = 0;
 
+  // Assume shared ownership of the values produced in the given arena. After
+  // this call, values returned from the given arena will be valid as long as
+  // either the given arena _or_ this arena exist. Or, indeed, any other arenas
+  // that have also adopted ownership -- ownership of data from an arena can be
+  // adopted by an arbitrary number of other arenas. New allocations made within
+  // this arena will still only be owned by this one.
+  //
+  // Note that, importantly, ownership must be linear: so arena A may adopt
+  // ownership of values from arena B, or B may adopt ownership of values from
+  // A, but if A adopts B _and_ B adopts A they will keep each other alive
+  // indefinitely, even after both their scopes have exited, and the memory will
+  // leak.
+  virtual void adopt_ownership(VariantOwner *owner) = 0;
+
   // Allocate memory for holding an instance of T* and register a cleanup that
   // calls T's destructor on that instance when this arena is disposed. Note
   // that the result will be uninitialized so you have to initialize it

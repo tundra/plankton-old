@@ -10,16 +10,56 @@
 #include "io/file.hh"
 #include "marshal.hh"
 #include "plankton-inl.hh"
+#include "refcount.hh"
 #include "socket.hh"
+
+// Basic rpc mechanism. This lies above the raw socket support but below the
+// high-level service abstraction.
+//
+// The terminology is as follow: data you receive over the wire, whether it's
+// requests from others or responses to your own requests, are called incoming.
+// Requests you send out and responses to your requests are called incoming.
+// So you receive incoming requests and get back incoming responses, and you
+// construct and transmit outgoing requests and outgoing responses. These all
+// behave differently so they're represented by different but similar looking
+// types.
 
 namespace plankton {
 namespace rpc {
 
-// The raw data of an rpc request.
-class Request {
+namespace internal {
+
+// Data backing an incoming response. Don't use this directly.
+class IncomingResponseData : public tclib::refcount_shared_t {
 public:
-  Request(Variant subject = Variant::null(), Variant selector = Variant::null(),
-      size_t argc = 0, Variant *argv = NULL);
+  virtual ~IncomingResponseData() { }
+  virtual tclib::sync_promise_t<Variant, Variant> *result() = 0;
+};
+
+// Data backing an outgoing response. Don't use this directly.
+class OutgoingResponseData : public tclib::refcount_shared_t {
+public:
+  OutgoingResponseData(bool is_success, Variant payload);
+  ~OutgoingResponseData() { }
+  bool is_success() { return is_success_; }
+  Variant payload() { return payload_; }
+  Factory *factory() { return &arena_; }
+private:
+  Arena arena_;
+  bool is_success_;
+  Variant payload_;
+};
+
+class RequestMessage;
+class ResponseMessage;
+
+}
+
+// The raw data of an rpc request.
+class OutgoingRequest {
+public:
+  OutgoingRequest(Variant subject = Variant::null(),
+      Variant selector = Variant::null(), size_t argc = 0, Variant *argv = NULL);
 
   // The subject, the receiver of the request.
   void set_subject(Variant value) { subject_ = value; }
@@ -42,23 +82,36 @@ private:
 
 // An incoming response is responsible for access to the result of a request.
 // It provides a promise for the result and access to the resulting value or
-// error. Those values are valid as long as the response is; once the response
-// has been deleted any values will be disposed along with it.
-class IncomingResponse {
+// error.
+//
+// Incoming responses are backed by ref counted data so you can pass them around
+// by value and the data will be disposed when there are no more references
+// left.
+class IncomingResponse
+    : public tclib::refcount_reference_t<internal::IncomingResponseData> {
 public:
-  virtual ~IncomingResponse() { }
+  typedef tclib::refcount_reference_t<internal::IncomingResponseData> super_t;
 
   // Yields the promise that will resolve to the result of the request.
-  virtual tclib::sync_promise_t<Variant, Variant> *operator->() = 0;
+  tclib::sync_promise_t<Variant, Variant> *operator->() { return data()->result(); }
 
   // Basically the same as operator-> but under a different name.
-  tclib::sync_promise_t<Variant, Variant> &promise() { return *operator->(); }
+  tclib::sync_promise_t<Variant, Variant> &promise() { return *data()->result(); }
+
+private:
+  friend class MessageSocket;
+  IncomingResponse(internal::IncomingResponseData *data) : super_t(data) { }
+  internal::IncomingResponseData *data() { return refcount_shared(); }
 };
 
 // A result constructed by the handler of a request and returned to the rpc
 // framework as the result of an operation.
-class OutgoingResponse {
+class OutgoingResponse
+    : public tclib::refcount_reference_t<internal::OutgoingResponseData> {
 public:
+  typedef tclib::refcount_reference_t<internal::OutgoingResponseData> super_t;
+
+  // Response status codes.
   enum Status {
     SUCCESS,
     FAILURE
@@ -71,24 +124,31 @@ public:
   OutgoingResponse(Status status, Variant payload);
 
   // Is this a successful response?
-  bool is_success() { return status_ == SUCCESS; }
+  bool is_success() { return data()->is_success(); }
 
   // The value or error, depending on whether this is a successful response.
-  Variant payload() { return payload_; }
+  Variant payload() { return data()->payload(); }
+
+  // Returns a factory that can be used to allocate the response, or take
+  // ownership if it has been allocated elsewhere.
+  Factory *factory() { return data()->factory(); }
+
+  // Returns a successful response with the given value.
+  static OutgoingResponse success(Variant value);
+
+  // Returns a failure response with the given error.
+  static OutgoingResponse failure(Variant error);
 
 private:
-  Status status_;
-  Variant payload_;
-};
+  internal::OutgoingResponseData *data() { return refcount_shared(); }
 
-class RequestMessage;
-class ResponseMessage;
+};
 
 // A socket you can send and receive requests through.
 class MessageSocket {
 public:
-  typedef tclib::callback_t<void(OutgoingResponse*)> ResponseHandler;
-  typedef tclib::callback_t<void(Request*, ResponseHandler)> RequestHandler;
+  typedef tclib::callback_t<void(OutgoingResponse)> ResponseHandler;
+  typedef tclib::callback_t<void(OutgoingRequest*, ResponseHandler)> RequestHandler;
 
   // Initializes an empty socket. If this constructor is used you must then
   // use init() to initialize the socket. Alternatively use the constructor
@@ -109,15 +169,15 @@ public:
 
   // Writes a request to the outgoing socket and returns a promise for a
   // response received on the incoming socket.
-  IncomingResponse *send_request(Request *request);
+  IncomingResponse send_request(OutgoingRequest *request);
 
 private:
   class PendingMessage;
   typedef platform_hash_map<uint64_t, PendingMessage*> PendingMessageMap;
   void on_incoming_message(ParsedMessage *message);
-  void on_incoming_request(RequestMessage *request);
-  void on_incoming_response(VariantOwner *owner, ResponseMessage *response);
-  void on_outgoing_response(uint64_t serial, OutgoingResponse* message);
+  void on_incoming_request(internal::RequestMessage *request);
+  void on_incoming_response(VariantOwner *owner, internal::ResponseMessage *response);
+  void on_outgoing_response(uint64_t serial, OutgoingResponse message);
   PushInputStream *in_;
   OutputSocket *out_;
   RequestHandler handler_;
@@ -128,7 +188,7 @@ private:
 
 class Service {
 public:
-  typedef tclib::callback_t<void(OutgoingResponse*)> ResponseCallback;
+  typedef tclib::callback_t<void(OutgoingResponse)> ResponseCallback;
   typedef tclib::callback_t<void(Variant, ResponseCallback)> GenericMethod;
   typedef tclib::callback_t<void(ResponseCallback)> MethodZero;
   typedef tclib::callback_t<void(Variant, ResponseCallback)> MethodOne;
@@ -147,7 +207,7 @@ public:
 
 private:
   // General handler for incoming requests.
-  void on_request(Request* request, ResponseCallback response);
+  void on_request(OutgoingRequest* request, ResponseCallback response);
 
   static void method_zero_trampoline(MethodZero delegate, Variant args,
       ResponseCallback callback);

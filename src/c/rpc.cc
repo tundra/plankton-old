@@ -13,10 +13,12 @@ END_C_INCLUDES
 
 using namespace plankton;
 using namespace plankton::rpc;
+using namespace plankton::rpc::internal;
 using namespace tclib;
 
 namespace plankton {
 namespace rpc {
+namespace internal {
 
 // The data associated with an RPC request that goes on the wire. It's basically
 // a plain Request with a bit of extra data added.
@@ -24,21 +26,22 @@ class RequestMessage {
 public:
   RequestMessage()
     : serial_(0) { }
-  RequestMessage(Request *request, uint64_t serial)
+  RequestMessage(OutgoingRequest *request, uint64_t serial)
     : request_(*request)
     , serial_(serial) { }
   static SeedType<RequestMessage> *seed_type() { return &kSeedType; }
-  Request &request() { return request_; }
+  OutgoingRequest &request() { return request_; }
   uint64_t serial() { return serial_; }
 public:
   Variant to_seed(Factory *factory);
   static RequestMessage *new_instance(Variant header, Factory *factory);
   void init(Seed payload, Factory *factory);
   static SeedType<RequestMessage> kSeedType;
-  Request request_;
+  OutgoingRequest request_;
   uint64_t serial_;
 };
 
+}
 }
 }
 
@@ -67,7 +70,8 @@ Variant RequestMessage::to_seed(Factory *factory) {
   return result;
 }
 
-Request::Request(Variant subject, Variant selector, size_t argc, Variant *argv)
+OutgoingRequest::OutgoingRequest(Variant subject, Variant selector, size_t argc,
+    Variant *argv)
   : subject_(subject)
   , selector_(selector) {
   if (argc == 0)
@@ -79,6 +83,7 @@ Request::Request(Variant subject, Variant selector, size_t argc, Variant *argv)
 
 namespace plankton {
 namespace rpc {
+namespace internal {
 
 // The data for an RPC response that goes on the wire. It's basically a plain
 // OutgoingResponse with a bit of extra data added.
@@ -86,8 +91,8 @@ class ResponseMessage {
 public:
   ResponseMessage()
     : serial_(0) { }
-  ResponseMessage(OutgoingResponse *response, uint64_t serial)
-    : response_(*response)
+  ResponseMessage(OutgoingResponse response, uint64_t serial)
+    : response_(response)
     , serial_(serial) { }
   uint64_t serial() { return serial_; }
   OutgoingResponse &response() { return response_; }
@@ -101,6 +106,7 @@ private:
   uint64_t serial_;
 };
 
+}
 }
 }
 
@@ -129,11 +135,11 @@ Variant ResponseMessage::to_seed(Factory *factory) {
   return result;
 }
 
-class MessageSocket::PendingMessage : public IncomingResponse {
+class MessageSocket::PendingMessage : public internal::IncomingResponseData {
 public:
   PendingMessage(uint64_t serial);
   virtual ~PendingMessage() { }
-  virtual sync_promise_t<Variant, Variant> *operator->() { return &promise_; }
+  virtual sync_promise_t<Variant, Variant> *result() { return &promise_; }
 private:
   friend class MessageSocket;
   Arena arena_;
@@ -182,7 +188,7 @@ void MessageSocket::on_incoming_message(ParsedMessage *message) {
 }
 
 void MessageSocket::on_incoming_request(RequestMessage *message) {
-  Request *request = &message->request();
+  OutgoingRequest *request = &message->request();
   uint64_t serial = message->serial();
   (handler_)(request, new_callback(&MessageSocket::on_outgoing_response,
       this, serial));
@@ -203,14 +209,15 @@ void MessageSocket::on_incoming_response(VariantOwner *owner, ResponseMessage *m
   pending->arena_.adopt_ownership(owner);
   OutgoingResponse &response = message->response();
   if (response.is_success()) {
-    pending->promise().fulfill(response.payload());
+    pending->result()->fulfill(response.payload());
   } else {
-    pending->promise().fail(response.payload());
+    pending->result()->fail(response.payload());
   }
   pending_messages_.erase(serial);
+  pending->deref();
 }
 
-void MessageSocket::on_outgoing_response(uint64_t serial, OutgoingResponse *response) {
+void MessageSocket::on_outgoing_response(uint64_t serial, OutgoingResponse response) {
   ResponseMessage message(response, serial);
   Arena arena;
   Native value = arena.new_native(&message);
@@ -221,22 +228,38 @@ MessageSocket::PendingMessage::PendingMessage(uint64_t serial)
   : serial_(serial)
   , promise_(sync_promise_t<Variant, Variant>::empty()) { }
 
-IncomingResponse* MessageSocket::send_request(Request *request) {
+IncomingResponse MessageSocket::send_request(OutgoingRequest *request) {
   Arena arena;
   uint64_t serial = next_serial_++;
   RequestMessage message(request, serial);
   PendingMessage *pending = new PendingMessage(serial);
+  pending->ref();
   pending_messages_[serial] = pending;
   Native wrapped = arena.new_native(&message);
   out_->send_value(wrapped);
-  return pending;
+  return IncomingResponse(pending);
 }
 
 OutgoingResponse::OutgoingResponse()
-  : status_(SUCCESS) { }
+  : super_t(new internal::OutgoingResponseData(true, Variant::null())) { }
 
 OutgoingResponse::OutgoingResponse(Status status, Variant payload)
-  : status_(status)
+  : super_t(new internal::OutgoingResponseData(
+      status == SUCCESS,
+      payload)) { }
+
+OutgoingResponse OutgoingResponse::success(Variant value) {
+  return OutgoingResponse(SUCCESS, value);
+}
+
+OutgoingResponse OutgoingResponse::failure(Variant error) {
+  return OutgoingResponse(FAILURE, error);
+}
+
+
+internal::OutgoingResponseData::OutgoingResponseData(bool is_success,
+    Variant payload)
+  : is_success_(is_success)
   , payload_(payload) { }
 
 Service::Service()
@@ -250,11 +273,10 @@ void Service::register_method(Variant selector, MethodOne handler) {
   methods_.set(selector, tclib::new_callback(method_one_trampoline, handler));
 }
 
-void Service::on_request(Request* request, ResponseCallback response) {
+void Service::on_request(OutgoingRequest* request, ResponseCallback response) {
   GenericMethod *method = methods_[request->selector()];
   if (method == NULL) {
-    OutgoingResponse reply(OutgoingResponse::FAILURE, Variant::null());
-    response(&reply);
+    response(OutgoingResponse::failure(Variant::null()));
   } else {
     (*method)(request->arguments(), response);
   }
