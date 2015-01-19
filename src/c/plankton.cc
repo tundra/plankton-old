@@ -170,19 +170,30 @@ void pton_dispose_arena(pton_arena_t *arena) {
 }
 
 ArenaData::~ArenaData() {
+  // Invoke the scheduled cleanups.
+  for (size_t i = 0; i < cleanups_.size(); i++) {
+    tclib::callback_t<void(void)> &cleanup = cleanups_[i];
+    cleanup();
+  }
+  // Release any adopted owners.
+  for (size_t i = 0; i < adopted_.size(); i++)
+    adopted_[i]->unmark_adopted();
+  // Free memory.
   for (size_t i = 0; i < blocks_.size(); i++) {
     block_t *block = &blocks_[i];
     // For good measure, zap the memory before freeing it.
     memset(block->memory, 0xCD, block->size);
     delete[] block->memory;
   }
-  for (size_t i = 0; i < adopted_.size(); i++)
-    adopted_[i]->unmark_adopted();
 }
 
 void ArenaData::adopt_ownership(VariantOwner *owner) {
   owner->mark_adopted();
   adopted_.push_back(owner);
+}
+
+void ArenaData::register_cleanup(tclib::callback_t<void(void)> callback) {
+  cleanups_.push_back(callback);
 }
 
 void ArenaData::mark_adopted() {
@@ -210,6 +221,10 @@ void Arena::adopt_ownership(VariantOwner *owner) {
 
 void *Arena::alloc_raw(size_t bytes) {
   return data()->alloc_raw(bytes);
+}
+
+void Arena::register_cleanup(tclib::callback_t<void(void)> callback) {
+  data()->register_cleanup(callback);
 }
 
 void Arena::mark_adopted() {

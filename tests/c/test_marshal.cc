@@ -106,7 +106,7 @@ private:
 };
 
 Rect *Rect::new_instance(Variant header, Factory* factory) {
-  return new (*factory) Rect(NULL, NULL);
+  return new (factory) Rect(NULL, NULL);
 }
 
 void Rect::init(Seed payload, Factory* factory) {
@@ -261,4 +261,55 @@ TEST(marshal, variant_map) {
   ASSERT_EQ(5, *ints["foo"]);
   ASSERT_EQ(4, *ints[Variant::yes()]);
   ASSERT_EQ(7, *ints[Variant::null()]);
+}
+
+class A {
+public:
+  A(int *count) : count_(count) { inc(); }
+  ~A() { dec(); }
+  static A *new_instance(int *count, Variant header, Factory *factory);
+  Variant to_seed(Factory *factory);
+  void inc() { (*count_)++; }
+  void dec() { (*count_)--; }
+private:
+  int *count_;
+};
+
+A *A::new_instance(int *count, Variant header, Factory *factory) {
+  return factory->register_destructor(new (factory) A(count));
+}
+
+Variant A::to_seed(Factory *factory) {
+  Seed seed = factory->new_seed();
+  seed.set_header("A");
+  return seed;
+}
+
+TEST(marshal, destruct) {
+  int count = 0;
+  SeedType<A> a_type("A",
+      tclib::new_callback(A::new_instance, &count),
+      tclib::empty_callback(),
+      tclib::new_callback(&A::to_seed));
+  BinaryWriter writer;
+  {
+    A a0(&count);
+    Arena arena;
+    writer.write(arena.new_native(&a0, &a_type));
+  }
+  ASSERT_EQ(0, count);
+  {
+    Arena arena;
+    BinaryReader reader(&arena);
+    TypeRegistry registry;
+    registry.register_type(&a_type);
+    reader.set_type_registry(&registry);
+    ASSERT_EQ(0, count);
+    Native value = reader.parse(*writer, writer.size());
+    ASSERT_EQ(1, count);
+    A *a1 = value.as(&a_type);
+    ASSERT_FALSE(a1 == NULL);
+    ASSERT_EQ(1, count);
+  }
+  ASSERT_EQ(0, count);
 }

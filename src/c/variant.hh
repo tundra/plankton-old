@@ -13,8 +13,9 @@ BEGIN_C_INCLUDES
 #include "utils/alloc.h"
 END_C_INCLUDES
 
-#include "std/stdvector.hh"
+#include "callback.hh"
 #include "refcount.hh"
+#include "std/stdvector.hh"
 
 // This is really just an opaque name for c api arenas but it does need a tiny
 // bit of functionality just to be on the safe side wrt. destruction.
@@ -611,6 +612,27 @@ public:
   // Allocates a raw chunk of memory. Typically you don't want to use this
   // directly but through the 'new' operator, which calls it.
   virtual void *alloc_raw(size_t size) = 0;
+
+  // Allocate memory for holding an instance of T* and register a cleanup that
+  // calls T's destructor on that instance when this arena is disposed. Note
+  // that the result will be uninitialized so you have to initialize it
+  // properly, otherwise the behavior of the destructor will not be
+  // well-defined.
+  template <typename T>
+  void *alloc_and_register();
+
+  // Register a cleanup that calls the destructor on the given instance when
+  // this arena is disposed. Returns the instance. If you allocate data within
+  // an arena that has a nontrivial destructor you should register it to be
+  // called using this method, otherwise it won't be. Actually it's not a bad
+  // idea to always register instances since even for types that don't need
+  // explicit destruction it's easy to change them to require it and forget to
+  // change the arena allocation code.
+  template <typename T>
+  T *register_destructor(T *that);
+
+  // Register a callback to be invoked when this factory is disposed.
+  virtual void register_cleanup(tclib::callback_t<void(void)> callback) = 0;
 };
 
 // A sink is like a pointer to a variant except that it also has access to an
@@ -672,9 +694,8 @@ private:
 class ArenaData : public tclib::refcount_shared_t, VariantOwner {
 public:
   ~ArenaData();
-
-  // Share in the ownership of values allocated in the given other arena.
   void adopt_ownership(VariantOwner *other);
+  void register_cleanup(tclib::callback_t<void(void)> callback);
 
 protected:
   void mark_adopted();
@@ -699,6 +720,9 @@ private:
 
   // Other arenas this one has adopted.
   std::vector<VariantOwner*> adopted_;
+
+  // Callbacks to call when the arena is disposed.
+  std::vector< tclib::callback_t<void(void)> > cleanups_;
 };
 
 // An arena within which plankton values can be allocated. Once the values are
@@ -792,6 +816,9 @@ public:
 
   // Allocates a raw block of memory.
   void *alloc_raw(size_t size);
+
+  // Register a callback to be invoked when this factory is disposed.
+  virtual void register_cleanup(tclib::callback_t<void(void)> callback);
 
   // Given a C arena, returns the C++ view of it.
   static Arena *from_c(pton_arena_t *c_arena) {

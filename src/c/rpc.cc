@@ -48,7 +48,7 @@ SeedType<RequestMessage> RequestMessage::kSeedType("rpc.Request",
     new_callback(&RequestMessage::to_seed));
 
 RequestMessage *RequestMessage::new_instance(Variant header, Factory *factory) {
-  return new (factory) RequestMessage();
+  return factory->register_destructor(new (factory) RequestMessage());
 }
 
 void RequestMessage::init(Seed payload, Factory *factory) {
@@ -110,7 +110,7 @@ SeedType<ResponseMessage> ResponseMessage::kSeedType("rpc.Response",
     new_callback(&ResponseMessage::to_seed));
 
 ResponseMessage *ResponseMessage::new_instance(Variant header, Factory *factory) {
-  return new (factory) ResponseMessage();
+  return factory->register_destructor(new (factory) ResponseMessage());
 }
 
 void ResponseMessage::init(Seed payload, Factory *factory) {
