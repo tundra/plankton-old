@@ -12,6 +12,7 @@
 #include "test/unittest.hh"
 
 using namespace plankton;
+using namespace plankton::rpc;
 using namespace tclib;
 
 // A bounded concurrent io stream that allows any number of concurrent readers
@@ -268,7 +269,7 @@ TEST(rpc, roundtrip) {
   delete &incoming;
 }
 
-class EchoService : public plankton::Service {
+class EchoService : public plankton::rpc::Service {
 public:
   void echo(Variant value, ResponseCallback response);
   void ping(ResponseCallback response);

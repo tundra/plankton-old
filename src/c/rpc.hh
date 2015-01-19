@@ -13,6 +13,7 @@
 #include "socket.hh"
 
 namespace plankton {
+namespace rpc {
 
 // The raw data of an rpc request.
 class Request {
@@ -158,6 +159,7 @@ private:
   MessageSocket::RequestHandler handler_;
 };
 
+} // namespace rpc
 } // namespace plankton
 
 #endif // _RPC_HH

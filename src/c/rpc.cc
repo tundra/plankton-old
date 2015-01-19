@@ -12,9 +12,11 @@ BEGIN_C_INCLUDES
 END_C_INCLUDES
 
 using namespace plankton;
+using namespace plankton::rpc;
 using namespace tclib;
 
 namespace plankton {
+namespace rpc {
 
 // The data associated with an RPC request that goes on the wire. It's basically
 // a plain Request with a bit of extra data added.
@@ -37,6 +39,7 @@ public:
   uint64_t serial_;
 };
 
+}
 }
 
 SeedType<RequestMessage> RequestMessage::kSeedType("rpc.Request",
@@ -75,6 +78,7 @@ Request::Request(Variant subject, Variant selector, size_t argc, Variant *argv)
 }
 
 namespace plankton {
+namespace rpc {
 
 // The data for an RPC response that goes on the wire. It's basically a plain
 // OutgoingResponse with a bit of extra data added.
@@ -97,6 +101,7 @@ private:
   uint64_t serial_;
 };
 
+}
 }
 
 SeedType<ResponseMessage> ResponseMessage::kSeedType("rpc.Response",
