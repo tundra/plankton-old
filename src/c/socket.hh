@@ -171,10 +171,29 @@ private:
   TypeRegistry *type_registry_;
 };
 
+// Data associated with a pre-parsed message received through a socket.
+class ParsedMessage {
+public:
+  ParsedMessage(VariantOwner *owner, Variant value)
+    : owner_(owner)
+    , value_(value) { }
+
+  // Yields the object that owns the parsed value.
+  VariantOwner *owner() { return owner_; }
+
+  // Yields the parsed value. The value is owned by the object available through
+  // owner().
+  Variant value() { return value_; }
+
+private:
+  VariantOwner *owner_;
+  Variant value_;
+};
+
 // An input stream that parses and handles messages immediately.
 class PushInputStream : public InputStream {
 public:
-  typedef tclib::callback_t<void(Arena*, Variant)> MessageAction;
+  typedef tclib::callback_t<void(ParsedMessage*)> MessageAction;
 
   // Creates a new input stream that performs the given action on each message
   // it receives. The variant value passed to the action is valid during the

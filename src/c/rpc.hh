@@ -113,9 +113,9 @@ public:
 private:
   class PendingMessage;
   typedef platform_hash_map<uint64_t, PendingMessage*> PendingMessageMap;
-  void on_incoming_message(Arena *owner, Variant message);
+  void on_incoming_message(ParsedMessage *message);
   void on_incoming_request(RequestMessage *request);
-  void on_incoming_response(Arena *owner, ResponseMessage *response);
+  void on_incoming_response(VariantOwner *owner, ResponseMessage *response);
   void on_outgoing_response(uint64_t serial, OutgoingResponse* message);
   PushInputStream *in_;
   OutputSocket *out_;

@@ -532,8 +532,28 @@ public:
   T *as(ConcreteSeedType<T> *type) { return native_as(type); }
 };
 
+// Abstract type of something that can own values. This will almost always be an
+// arena but using one as the more abstract variant owner means that you don't
+// have to expose the allocation methods in arena, only the ones relevant to
+// passing ownership.
+class VariantOwner {
+protected:
+  friend class Arena;
+  friend class ArenaData;
+  virtual ~VariantOwner() { }
+
+  // Mark this owner as having been adopted.
+  virtual void mark_adopted() = 0;
+
+  // Inform this owner that something that had adopted it no longer has.
+  virtual void unmark_adopted() = 0;
+
+  // If this owner is really a proxy for another one, return that other one.
+  virtual VariantOwner *resolve_adopted() = 0;
+};
+
 // A factory is an object that can be used to create new values.
-class Factory {
+class Factory : public VariantOwner {
 public:
   virtual ~Factory() { }
 
@@ -649,12 +669,17 @@ private:
 // the ability to hang on to an arena's data even after the scope that owns the
 // arena has exited is useful because it allows ownership to be passed on and
 // shared.
-class ArenaData : public tclib::refcount_shared_t {
+class ArenaData : public tclib::refcount_shared_t, VariantOwner {
 public:
   ~ArenaData();
 
   // Share in the ownership of values allocated in the given other arena.
-  void adopt_ownership(ArenaData *other);
+  void adopt_ownership(VariantOwner *other);
+
+protected:
+  void mark_adopted();
+  void unmark_adopted();
+  VariantOwner *resolve_adopted();
 
 private:
   friend class Arena;
@@ -673,7 +698,7 @@ private:
   std::vector<block_t> blocks_;
 
   // Other arenas this one has adopted.
-  std::vector<ArenaData*> adopted_;
+  std::vector<VariantOwner*> adopted_;
 };
 
 // An arena within which plankton values can be allocated. Once the values are
@@ -763,7 +788,7 @@ public:
   // A, but if A adopts B _and_ B adopts A they will keep each other alive
   // indefinitely, even after both their scopes have exited, and the memory will
   // leak.
-  void adopt_ownership(Arena *arena);
+  void adopt_ownership(VariantOwner *owner);
 
   // Allocates a raw block of memory.
   void *alloc_raw(size_t size);
@@ -772,6 +797,12 @@ public:
   static Arena *from_c(pton_arena_t *c_arena) {
     return static_cast<Arena*>(c_arena);
   }
+
+protected:
+  // Hook into the ownership framework.
+  void mark_adopted();
+  void unmark_adopted();
+  VariantOwner *resolve_adopted();
 
 private:
   friend pton_sink_t *pton_new_sink(pton_arena_t *arena);

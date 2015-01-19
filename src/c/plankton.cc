@@ -177,12 +177,24 @@ ArenaData::~ArenaData() {
     delete[] block->memory;
   }
   for (size_t i = 0; i < adopted_.size(); i++)
-    adopted_[i]->deref();
+    adopted_[i]->unmark_adopted();
 }
 
-void ArenaData::adopt_ownership(ArenaData *other) {
-  other->ref();
-  adopted_.push_back(other);
+void ArenaData::adopt_ownership(VariantOwner *owner) {
+  owner->mark_adopted();
+  adopted_.push_back(owner);
+}
+
+void ArenaData::mark_adopted() {
+  ref();
+}
+
+void ArenaData::unmark_adopted() {
+  deref();
+}
+
+VariantOwner *ArenaData::resolve_adopted() {
+  return this;
 }
 
 void *ArenaData::alloc_raw(size_t bytes) {
@@ -192,12 +204,24 @@ void *ArenaData::alloc_raw(size_t bytes) {
   return memory;
 }
 
-void Arena::adopt_ownership(Arena *arena) {
-  data()->adopt_ownership(arena->data());
+void Arena::adopt_ownership(VariantOwner *owner) {
+  data()->adopt_ownership(owner->resolve_adopted());
 }
 
 void *Arena::alloc_raw(size_t bytes) {
   return data()->alloc_raw(bytes);
+}
+
+void Arena::mark_adopted() {
+  // ignore.
+}
+
+void Arena::unmark_adopted() {
+  // ignore
+}
+
+VariantOwner *Arena::resolve_adopted() {
+  return data();
 }
 
 ArenaData *Arena::data() {
@@ -1298,11 +1322,12 @@ void PushInputStream::receive_block(MessageData *message) {
   reader.set_type_registry(type_registry_);
   Variant value = reader.parse(message->data(), message->size());
   delete message;
+  ParsedMessage parsed(&arena, value);
   for (std::vector<MessageAction>::iterator i = actions_.begin();
        i != actions_.end();
        i++) {
     MessageAction &action = *i;
-    action(&arena, value);
+    action(&parsed);
   }
 }
 

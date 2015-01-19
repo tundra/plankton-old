@@ -158,20 +158,21 @@ void MessageSocket::init(PushInputStream *in, OutputSocket *out, RequestHandler 
   in_->add_action(tclib::new_callback(&MessageSocket::on_incoming_message, this));
 }
 
-void MessageSocket::on_incoming_message(Arena *owner, Variant message) {
-  RequestMessage *request = message.native_as(RequestMessage::seed_type());
+void MessageSocket::on_incoming_message(ParsedMessage *message) {
+  Variant value = message->value();
+  RequestMessage *request = value.native_as(RequestMessage::seed_type());
   if (request != NULL) {
     on_incoming_request(request);
     return;
   }
-  ResponseMessage *response = message.native_as(ResponseMessage::seed_type());
+  ResponseMessage *response = value.native_as(ResponseMessage::seed_type());
   if (response != NULL) {
-    on_incoming_response(owner, response);
+    on_incoming_response(message->owner(), response);
     return;
   }
   // An unexpected message. Log but ignore.
   TextWriter writer;
-  writer.write(message);
+  writer.write(value);
   WARN("Unexpected incoming message: %s", *writer);
 }
 
@@ -182,7 +183,7 @@ void MessageSocket::on_incoming_request(RequestMessage *message) {
       this, serial));
 }
 
-void MessageSocket::on_incoming_response(Arena *owner, ResponseMessage *message) {
+void MessageSocket::on_incoming_response(VariantOwner *owner, ResponseMessage *message) {
   uint64_t serial = message->serial();
   PendingMessageMap::iterator pendings = pending_messages_.find(serial);
   if (pendings == pending_messages_.end()) {
