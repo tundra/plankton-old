@@ -16,9 +16,9 @@
 // Basic rpc mechanism. This lies above the raw socket support but below the
 // high-level service abstraction.
 //
-// The terminology is as follow: data you receive over the wire, whether it's
+// The terminology is as follows: data you receive over the wire, whether it's
 // requests from others or responses to your own requests, are called incoming.
-// Requests you send out and responses to your requests are called incoming.
+// Requests you send out and responses to others' requests are called outgoing.
 // So you receive incoming requests and get back incoming responses, and you
 // construct and transmit outgoing requests and outgoing responses. These all
 // behave differently so they're represented by different but similar looking
@@ -53,7 +53,7 @@ private:
 class RequestMessage;
 class ResponseMessage;
 
-}
+} // namespace internal
 
 // The raw data of an rpc request.
 class OutgoingRequest {
@@ -78,6 +78,17 @@ private:
   Variant selector_;
   Variant arguments_;
   Arena arena_;
+};
+
+// An incoming request. It's basically a read-only view of an outgoing request.
+class IncomingRequest {
+public:
+  IncomingRequest(OutgoingRequest *outgoing) : outgoing_(outgoing) { }
+  Variant subject() { return outgoing_->subject(); }
+  Variant selector() { return outgoing_->selector(); }
+  Variant arguments() { return outgoing_->arguments(); }
+private:
+  OutgoingRequest *outgoing_;
 };
 
 // An incoming response is responsible for access to the result of a request.
@@ -147,8 +158,8 @@ private:
 // A socket you can send and receive requests through.
 class MessageSocket {
 public:
-  typedef tclib::callback_t<void(OutgoingResponse)> ResponseHandler;
-  typedef tclib::callback_t<void(OutgoingRequest*, ResponseHandler)> RequestHandler;
+  typedef tclib::callback_t<void(OutgoingResponse)> ResponseCallback;
+  typedef tclib::callback_t<void(IncomingRequest*, ResponseCallback)> RequestCallback;
 
   // Initializes an empty socket. If this constructor is used you must then
   // use init() to initialize the socket. Alternatively use the constructor
@@ -162,10 +173,10 @@ public:
   // The callback will be called on incoming requests; the first argument will
   // be the actual request, the second a callback to call with the response. The
   // response value is only valid until the callback returns.
-  MessageSocket(PushInputStream *in, OutputSocket *out, RequestHandler handler);
+  MessageSocket(PushInputStream *in, OutputSocket *out, RequestCallback handler);
 
   // Initialize an empty socket.
-  void init(PushInputStream *in, OutputSocket *out, RequestHandler handler);
+  void init(PushInputStream *in, OutputSocket *out, RequestCallback handler);
 
   // Writes a request to the outgoing socket and returns a promise for a
   // response received on the incoming socket.
@@ -180,7 +191,7 @@ private:
   void on_outgoing_response(uint64_t serial, OutgoingResponse message);
   PushInputStream *in_;
   OutputSocket *out_;
-  RequestHandler handler_;
+  RequestCallback handler_;
   TypeRegistry types_;
   uint64_t next_serial_;
   PendingMessageMap pending_messages_;
@@ -203,11 +214,11 @@ public:
 
   // Returns the callback to pass to a message socket that will dispatch
   // messages to this service.
-  MessageSocket::RequestHandler handler() { return handler_; }
+  MessageSocket::RequestCallback handler() { return handler_; }
 
 private:
   // General handler for incoming requests.
-  void on_request(OutgoingRequest* request, ResponseCallback response);
+  void on_request(IncomingRequest* request, ResponseCallback response);
 
   static void method_zero_trampoline(MethodZero delegate, Variant args,
       ResponseCallback callback);
@@ -216,7 +227,7 @@ private:
 
   Arena arena_;
   VariantMap<GenericMethod> methods_;
-  MessageSocket::RequestHandler handler_;
+  MessageSocket::RequestCallback handler_;
 };
 
 } // namespace rpc

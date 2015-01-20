@@ -214,17 +214,17 @@ TEST(rpc, byte_buffer_concurrent) {
     delete slices[i];
 }
 
-static void handle_request(MessageSocket::ResponseHandler *handler_out,
-    OutgoingRequest *request, MessageSocket::ResponseHandler handler) {
+static void handle_request(MessageSocket::ResponseCallback *callback_out,
+    IncomingRequest *request, MessageSocket::ResponseCallback callback) {
   ASSERT_TRUE(request->subject() == Variant("test_subject"));
   ASSERT_TRUE(request->selector() == Variant("test_selector"));
   ASSERT_TRUE(request->arguments() == Variant("test_arguments"));
-  *handler_out = handler;
+  *callback_out = callback;
 }
 
 class RpcChannel {
 public:
-  RpcChannel(MessageSocket::RequestHandler handler);
+  RpcChannel(MessageSocket::RequestCallback handler);
   bool process_next_instruction();
   MessageSocket *operator->() { return &sock_; }
 private:
@@ -234,7 +234,7 @@ private:
   MessageSocket sock_;
 };
 
-RpcChannel::RpcChannel(MessageSocket::RequestHandler handler)
+RpcChannel::RpcChannel(MessageSocket::RequestCallback handler)
   : bytes_(1024)
   , outsock_(&bytes_)
   , insock_(&bytes_) {
@@ -250,7 +250,7 @@ bool RpcChannel::process_next_instruction() {
 }
 
 TEST(rpc, roundtrip) {
-  MessageSocket::ResponseHandler on_response;
+  MessageSocket::ResponseCallback on_response;
   RpcChannel channel(new_callback(handle_request, &on_response));
   OutgoingRequest request("test_subject", "test_selector");
   request.set_arguments("test_arguments");

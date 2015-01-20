@@ -147,7 +147,8 @@ private:
   sync_promise_t<Variant, Variant> promise_;
 };
 
-MessageSocket::MessageSocket(PushInputStream *in, OutputSocket *out, RequestHandler handler)
+MessageSocket::MessageSocket(PushInputStream *in, OutputSocket *out,
+    RequestCallback handler)
   : in_(NULL)
   , out_(NULL)
   , next_serial_(1) {
@@ -159,7 +160,8 @@ MessageSocket::MessageSocket()
   , out_(NULL)
   , next_serial_(1) { }
 
-void MessageSocket::init(PushInputStream *in, OutputSocket *out, RequestHandler handler) {
+void MessageSocket::init(PushInputStream *in, OutputSocket *out,
+    RequestCallback handler) {
   in_ = in;
   out_ = out;
   handler_ = handler;
@@ -188,9 +190,9 @@ void MessageSocket::on_incoming_message(ParsedMessage *message) {
 }
 
 void MessageSocket::on_incoming_request(RequestMessage *message) {
-  OutgoingRequest *request = &message->request();
+  IncomingRequest request(&message->request());
   uint64_t serial = message->serial();
-  (handler_)(request, new_callback(&MessageSocket::on_outgoing_response,
+  (handler_)(&request, new_callback(&MessageSocket::on_outgoing_response,
       this, serial));
 }
 
@@ -273,7 +275,7 @@ void Service::register_method(Variant selector, MethodOne handler) {
   methods_.set(selector, tclib::new_callback(method_one_trampoline, handler));
 }
 
-void Service::on_request(OutgoingRequest* request, ResponseCallback response) {
+void Service::on_request(IncomingRequest* request, ResponseCallback response) {
   GenericMethod *method = methods_[request->selector()];
   if (method == NULL) {
     response(OutgoingResponse::failure(Variant::null()));
