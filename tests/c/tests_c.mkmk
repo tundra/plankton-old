@@ -29,14 +29,19 @@ test_library = get_group("library")
 tests_yaml = get_external("tests", "generic", "tests.yaml")
 tests_yaml_path = tests_yaml.get_input_file().get_path()
 
+DISABLE_YAML_TEST = False
+
 # Compile the test source files.
 for filename in filenames:
   source_file = c.get_source_file(filename)
   object_file = compile_test_file(source_file)
   object_file.add_library_requirement(posix="yaml")
   if filename == "test_generic.cc":
-    object_file.add_dependency(tests_yaml)
-  test_library.add_member(object_file)
+    if not DISABLE_YAML_TEST:
+      object_file.add_dependency(tests_yaml)
+      test_library.add_member(object_file)
+  else:
+    test_library.add_member(object_file)
 
 main_file_names = [
   "test.cc",

@@ -264,8 +264,9 @@ internal::OutgoingResponseData::OutgoingResponseData(bool is_success,
   : is_success_(is_success)
   , payload_(payload) { }
 
-Service::Service()
-  : handler_(new_callback(&Service::on_request, this)) { }
+Service::Service() {
+  handler_ = new_callback(&Service::on_request, this);
+}
 
 void Service::register_method(Variant selector, MethodZero handler) {
   methods_.set(selector, tclib::new_callback(method_zero_trampoline, handler));

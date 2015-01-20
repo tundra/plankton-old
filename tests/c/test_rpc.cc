@@ -137,10 +137,11 @@ Slice::Slice(ByteBufferStream *nexus, NativeSemaphore *lets_go, Slice **slices, 
   , lets_go_(lets_go)
   , stream_(57 + index)
   , slices_(slices)
-  , index_(index)
-  , producer_(new_callback(&Slice::run_producer, this))
-  , distributer_(new_callback(&Slice::run_distributer, this))
-  , validator_(new_callback(&Slice::run_validator, this)) { }
+  , index_(index) {
+  producer_ = new_callback(&Slice::run_producer, this);
+  distributer_ = new_callback(&Slice::run_distributer, this);
+  validator_ = new_callback(&Slice::run_validator, this);
+}
 
 void Slice::start() {
   validator_.start();

@@ -95,8 +95,23 @@ T *VariantMap<T>::get_generic(Variant key) {
 
 template <typename T>
 size_t VariantMap<T>::StringHasher::operator()(const String &key) const {
-  platform_hash<const char*> hasher;
-  return hasher(key.string_chars());
+  // The msvc hasher uses the address to hash char pointers. The linux one on
+  // the other hand doesn't appear to know how to hash a std::string.
+  platform_hash<IF_MSVC(std::string, const char*)> hasher;
+  // Do we need to worry about embedded nulls? In theory strings with embedded
+  // nulls should get the same hash which is within the contract of a hash
+  // function so it should be okay.
+  return hasher(key.chars());
+}
+
+template <typename T>
+bool VariantMap<T>::StringHasher::operator()(const String &a, const String &b) {
+  size_t a_length = a.length();
+  size_t b_length = b.length();
+  if (a_length != b_length || (a_length == 0))
+    // Different lengths or empty strings can be decided based just on length.
+    return a_length < b_length;
+  return strncmp(a.chars(), b.chars(), a_length) < 0;
 }
 
 } // namespace plankton

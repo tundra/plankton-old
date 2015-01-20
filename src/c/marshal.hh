@@ -108,6 +108,9 @@ private:
   struct StringHasher {
   public:
     size_t operator()(const String &key) const;
+    // MSVC hash map stuff.
+    static const size_t bucket_size = 4;
+    bool operator()(const String &a, const String &b);
   };
 
   // A non special case mapping.
