@@ -160,7 +160,7 @@ MessageSocket::MessageSocket()
   , out_(NULL)
   , next_serial_(1) { }
 
-void MessageSocket::init(PushInputStream *in, OutputSocket *out,
+bool MessageSocket::init(PushInputStream *in, OutputSocket *out,
     RequestCallback handler) {
   in_ = in;
   out_ = out;
@@ -169,6 +169,9 @@ void MessageSocket::init(PushInputStream *in, OutputSocket *out,
   types_.register_type(ResponseMessage::seed_type());
   in_->set_type_registry(&types_);
   in_->add_action(tclib::new_callback(&MessageSocket::on_incoming_message, this));
+  if (!out_guard_.initialize())
+    return false;
+  return true;
 }
 
 void MessageSocket::on_incoming_message(ParsedMessage *message) {
@@ -192,8 +195,9 @@ void MessageSocket::on_incoming_message(ParsedMessage *message) {
 void MessageSocket::on_incoming_request(RequestMessage *message) {
   IncomingRequest request(&message->request());
   uint64_t serial = message->serial();
-  (handler_)(&request, new_callback(&MessageSocket::on_outgoing_response,
-      this, serial));
+  ResponseCallback unsafe = new_callback(&MessageSocket::on_outgoing_response,
+      this, serial)
+  (handler_)(&request, unsafe.thread_safe_clone());
 }
 
 void MessageSocket::on_incoming_response(VariantOwner *owner, ResponseMessage *message) {
@@ -223,7 +227,7 @@ void MessageSocket::on_outgoing_response(uint64_t serial, OutgoingResponse respo
   ResponseMessage message(response, serial);
   Arena arena;
   Native value = arena.new_native(&message);
-  out_->send_value(value);
+  send_value(value);
 }
 
 MessageSocket::PendingMessage::PendingMessage(uint64_t serial)
@@ -238,8 +242,21 @@ IncomingResponse MessageSocket::send_request(OutgoingRequest *request) {
   pending->ref();
   pending_messages_[serial] = pending;
   Native wrapped = arena.new_native(&message);
-  out_->send_value(wrapped);
+  send_value(wrapped);
   return IncomingResponse(pending);
+}
+
+bool MessageSocket::send_value(Variant value) {
+  if (!out_guard_.lock()) {
+    WARN("Failed to acquire output stream");
+    return false;
+  }
+  out_->send_value(value);
+  if (!out_guard_.unlock()) {
+    WARN("Failed to release output stream");
+    return false;
+  }
+  return true;
 }
 
 OutgoingResponse::OutgoingResponse()

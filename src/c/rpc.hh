@@ -158,7 +158,14 @@ private:
 // A socket you can send and receive requests through.
 class MessageSocket {
 public:
+  // A callback that can be used to deliver a response to a request.
   typedef tclib::callback_t<void(OutgoingResponse)> ResponseCallback;
+
+  // The type of callback that will be invoked to handle incoming requests. The
+  // response callback can be used to return a response asynchronously. The
+  // response callback is thread safe, so it is safe both to pass it between
+  // threads and to invoke it from a different thread than the one that
+  // originated it.
   typedef tclib::callback_t<void(IncomingRequest*, ResponseCallback)> RequestCallback;
 
   // Initializes an empty socket. If this constructor is used you must then
@@ -176,7 +183,7 @@ public:
   MessageSocket(PushInputStream *in, OutputSocket *out, RequestCallback handler);
 
   // Initialize an empty socket.
-  void init(PushInputStream *in, OutputSocket *out, RequestCallback handler);
+  bool init(PushInputStream *in, OutputSocket *out, RequestCallback handler);
 
   // Writes a request to the outgoing socket and returns a promise for a
   // response received on the incoming socket.
@@ -189,8 +196,14 @@ private:
   void on_incoming_request(internal::RequestMessage *request);
   void on_incoming_response(VariantOwner *owner, internal::ResponseMessage *response);
   void on_outgoing_response(uint64_t serial, OutgoingResponse message);
+
+  // Write a value on the output stream. This method is thread safe whereas
+  // just writing directly isn't.
+  bool send_value(Variant value);
+
   PushInputStream *in_;
   OutputSocket *out_;
+  tclib::NativeMutex out_guard_;
   RequestCallback handler_;
   TypeRegistry types_;
   uint64_t next_serial_;
