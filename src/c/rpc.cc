@@ -196,7 +196,7 @@ void MessageSocket::on_incoming_request(RequestMessage *message) {
   IncomingRequest request(&message->request());
   uint64_t serial = message->serial();
   ResponseCallback unsafe = new_callback(&MessageSocket::on_outgoing_response,
-      this, serial)
+      this, serial);
   (handler_)(&request, unsafe.thread_safe_clone());
 }
 
