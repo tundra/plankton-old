@@ -7,10 +7,15 @@
 #include "utils-inl.hh"
 #include <new>
 
+BEGIN_C_INCLUDES
+#include "utils/check.h"
+END_C_INCLUDES
+
 namespace plankton {
 
-TextWriter::TextWriter()
-  : chars_(NULL)
+TextWriter::TextWriter(TextSyntax syntax)
+  : syntax_(syntax)
+  , chars_(NULL)
   , length_(0) { }
 
 TextWriter::~TextWriter() {
@@ -21,7 +26,8 @@ TextWriter::~TextWriter() {
 // Utility used to print plankton values as ascii.
 class TextWriterImpl {
 public:
-  TextWriterImpl();
+  TextWriterImpl() { }
+  virtual ~TextWriterImpl() { }
 
   // Writes the given value on the stream at the current indentation level.
   void write(Variant value);
@@ -36,24 +42,36 @@ public:
   // string?
   static bool is_unquoted_string_part(char c);
 
-private:
-  // Writes the given null-terminated string directly to the buffer.
-  void write_raw_string(const char *chars);
+protected:
+  // Writes any pending newlines.
+  virtual void flush_pending_newline() = 0;
+
+  // Schedules a newline to be printed before the next non-newline character.
+  virtual void schedule_newline() = 0;
+
+  // Increases the indentation level.
+  virtual void indent() = 0;
+
+  // Decreases the indentation level.
+  virtual void deindent() = 0;
+
+  // Writes an array value.
+  virtual void write_array(Array array) = 0;
+
+  // Writes a map value.
+  virtual void write_map(Map map) = 0;
+
+  // Writes a seed value.
+  virtual void write_seed(Seed seed) = 0;
 
   // Writes the given character directly to the buffer.
   void write_raw_char(char c);
 
-  // Writes any pending newlines.
-  void flush_pending_newline();
+  Buffer<char> chars_;
 
-  // Schedules a newline to be printed before the next non-newline character.
-  void schedule_newline();
-
-  // Increases the indentation level.
-  void indent();
-
-  // Decreases the indentation level.
-  void deindent();
+private:
+  // Writes the given null-terminated string directly to the buffer.
+  void write_raw_string(const char *chars);
 
   // Writes the given byte as two hex characters.
   void write_hex_byte(uint8_t c);
@@ -78,15 +96,6 @@ private:
   // Base64-encodes and writes the given blob.
   void write_blob(const void *data, size_t size);
 
-  // Writes an array value.
-  void write_array(Array array);
-
-  // Writes a map value.
-  void write_map(Map map);
-
-  // Writes a seed value.
-  void write_seed(Seed seed);
-
   // Writes a native value.
   void write_native(Native obj);
 
@@ -104,6 +113,23 @@ private:
   // The character to use for base-64 padding.
   static const char kBase64Padding;
 
+  Arena scratch_;
+};
+
+class SourceTextWriterImpl : public TextWriterImpl {
+public:
+  SourceTextWriterImpl();
+
+protected:
+  virtual void flush_pending_newline();
+  virtual void schedule_newline();
+  virtual void indent();
+  virtual void deindent();
+  virtual void write_array(Array array);
+  virtual void write_map(Map map);
+  virtual void write_seed(Seed map);
+
+private:
   // Lengths up to (but not including) this will be considered short. Longer
   // lengths are considered, for all practical purposes, infinite.
   static const size_t kShortLengthLimit = 80;
@@ -115,13 +141,26 @@ private:
   // of subtrees for every variant.
   static size_t get_short_length(Variant variant, size_t offset);
 
-  Arena scratch_;
-  Buffer<char> chars_;
+  // Will writing the given value cause the line to get too long so we have to
+  // use the long multiline format?
+  bool write_long(Variant value);
+
   size_t indent_;
   bool has_pending_newline_;
 };
 
-TextWriterImpl::TextWriterImpl()
+class CommandTextWriterImpl : public TextWriterImpl {
+protected:
+  virtual void flush_pending_newline() { }
+  virtual void schedule_newline() { }
+  virtual void indent() { }
+  virtual void deindent() { }
+  virtual void write_array(Array array);
+  virtual void write_map(Map map);
+  virtual void write_seed(Seed map);
+};
+
+SourceTextWriterImpl::SourceTextWriterImpl()
   : indent_(0)
   , has_pending_newline_(false) { }
 
@@ -163,7 +202,7 @@ void TextWriterImpl::write(Variant value) {
   }
 }
 
-size_t TextWriterImpl::get_short_length(Variant value, size_t offset) {
+size_t SourceTextWriterImpl::get_short_length(Variant value, size_t offset) {
   switch (value.type()) {
     case PTON_INTEGER:
       return offset + 5;
@@ -173,19 +212,30 @@ size_t TextWriterImpl::get_short_length(Variant value, size_t offset) {
     case PTON_STRING:
       return offset + value.string_length();
     case PTON_ARRAY: {
-      Array array = Array(value);
+      Array array = value;
       size_t current = offset + 2;
       for (size_t i = 0; i < array.length() && current < kShortLengthLimit; i++)
-        current = get_short_length(array[i], current) + 2;
+        current = get_short_length(array[i], current + 2);
       return current;
     }
     case PTON_MAP: {
-      Map map = Map(value);
+      Map map = value;
       size_t current = offset + 2;
       for (Map::Iterator i = map.begin();
            i != map.end() && current < kShortLengthLimit;
            i++) {
-        current = get_short_length(i->key(), current) + 2;
+        current = get_short_length(i->key(), current + 2);
+        current = get_short_length(i->value(), current);
+      }
+      return current;
+    }
+    case PTON_SEED: {
+      Seed seed = value;
+      size_t current = get_short_length(seed.header(), offset + 2);
+      for (Seed::Iterator i = seed.fields_begin();
+           i != seed.fields_end() && current < kShortLengthLimit;
+           i++) {
+        current = get_short_length(i->key(), current + 3);
         current = get_short_length(i->value(), current);
       }
       return current;
@@ -206,7 +256,7 @@ void TextWriterImpl::write_raw_char(char c) {
   chars_.add(c);
 }
 
-void TextWriterImpl::flush_pending_newline() {
+void SourceTextWriterImpl::flush_pending_newline() {
   if (!has_pending_newline_)
     return;
   chars_.add('\n');
@@ -214,15 +264,15 @@ void TextWriterImpl::flush_pending_newline() {
   has_pending_newline_ = false;
 }
 
-void TextWriterImpl::schedule_newline() {
+void SourceTextWriterImpl::schedule_newline() {
   has_pending_newline_ = true;
 }
 
-void TextWriterImpl::indent() {
+void SourceTextWriterImpl::indent() {
   indent_ += 2;
 }
 
-void TextWriterImpl::deindent() {
+void SourceTextWriterImpl::deindent() {
   indent_ -= 2;
 }
 
@@ -348,8 +398,12 @@ void TextWriterImpl::write_blob(const void *data, size_t size) {
   write_raw_char(']');
 }
 
-void TextWriterImpl::write_array(Array array) {
-  bool is_long = get_short_length(array, indent_) >= kShortLengthLimit;
+bool SourceTextWriterImpl::write_long(Variant value) {
+  return get_short_length(value, indent_) >= kShortLengthLimit;
+}
+
+void SourceTextWriterImpl::write_array(Array array) {
+  bool is_long = write_long(array);
   write_raw_char('[');
   if (is_long) {
     indent();
@@ -371,8 +425,19 @@ void TextWriterImpl::write_array(Array array) {
   write_raw_char(']');
 }
 
-void TextWriterImpl::write_map(Map map) {
-  bool is_long = get_short_length(map, indent_) >= kShortLengthLimit;
+void CommandTextWriterImpl::write_array(Array array) {
+  write_raw_char('[');
+  for (size_t i = 0; i < array.length(); i++) {
+    Variant value = array[i];
+    write(value);
+    if (i + 1 < array.length())
+      write_raw_char(' ');
+  }
+  write_raw_char(']');
+}
+
+void SourceTextWriterImpl::write_map(Map map) {
+  bool is_long = write_long(map);
   write_raw_char('{');
   if (is_long) {
     indent();
@@ -396,11 +461,25 @@ void TextWriterImpl::write_map(Map map) {
   write_raw_char('}');
 }
 
-void TextWriterImpl::write_seed(Seed seed) {
-  bool is_long = get_short_length(seed, indent_) >= kShortLengthLimit;
-  write(seed.header());
-  write_raw_char(' ');
+void CommandTextWriterImpl::write_map(Map map) {
   write_raw_char('{');
+  for (Map::Iterator i = map.begin(); i != map.end(); i++) {
+    write_raw_char('-');
+    write_raw_char('-');
+    write(i->key());
+    write_raw_char(' ');
+    write(i->value());
+    if (i.has_next())
+      write_raw_char(' ');
+  }
+  write_raw_char('}');
+}
+
+void SourceTextWriterImpl::write_seed(Seed seed) {
+  bool is_long = write_long(seed);
+  write_raw_char('@');
+  write(seed.header());
+  write_raw_char(is_long ? '{' : '(');
   if (is_long) {
     indent();
     schedule_newline();
@@ -420,7 +499,23 @@ void TextWriterImpl::write_seed(Seed seed) {
   }
   if (is_long)
     deindent();
-  write_raw_char('}');
+  write_raw_char(is_long ? '}' : ')');
+}
+
+void CommandTextWriterImpl::write_seed(Seed seed) {
+  write_raw_char('@');
+  write(seed.header());
+  write_raw_char('(');
+  for (Seed::Iterator i = seed.fields_begin(); i != seed.fields_end(); i++) {
+    write_raw_char('-');
+    write_raw_char('-');
+    write(i->key());
+    write_raw_char(' ');
+    write(i->value());
+    if (i.has_next())
+      write_raw_char(' ');
+  }
+  write_raw_char(')');
 }
 
 void TextWriterImpl::write_native(Native value) {
@@ -459,9 +554,16 @@ void TextWriterImpl::flush(TextWriter *writer) {
 }
 
 void TextWriter::write(Variant value) {
-  TextWriterImpl impl;
-  impl.write(value);
-  impl.flush(this);
+  if (syntax_ == SOURCE_SYNTAX) {
+    SourceTextWriterImpl impl;
+    impl.write(value);
+    impl.flush(this);
+  } else {
+    CHECK_EQ("unexpected syntax", COMMAND_SYNTAX, syntax_);
+    CommandTextWriterImpl impl;
+    impl.write(value);
+    impl.flush(this);
+  }
 }
 
 // Utility for parsing a particular string.
@@ -473,7 +575,7 @@ public:
   // from others because it must fill the whole string.
   bool decode_toplevel(Variant *out);
 
-private:
+protected:
   // Mapping from ascii characters to the base-64 sextets they represent.
   static const uint8_t kBase64CharToSextet[256];
 
@@ -499,6 +601,10 @@ private:
 
   // Skips of the current and any subsequent whitespace characters.
   void skip_whitespace();
+
+  // Utility used by skip_whitespace to skip block comments. When called it is
+  // assumed that we've just seen a #.
+  void skip_comments();
 
   // Is the given character considered whitespace?
   static bool is_whitespace(char c);
@@ -532,14 +638,18 @@ private:
   bool decode_blob(Variant *out);
 
   // Parses the next array.
-  bool decode_array(Variant *out);
+  virtual bool decode_array(Variant *out) = 0;
 
   // Parses the next map.
-  bool decode_map(Variant *out);
+  virtual bool decode_map(Variant *out) = 0;
+
+  // Parses the next seed.
+  virtual bool decode_seed(Variant *out) = 0;
 
   // Returns the arena to use for allocation.
   Arena *arena() { return parser_->arena_; }
 
+private:
   // Given a character, returns the special character it encodes (for instance
   // a newline for 'n'), or a null character if this one doesn't represent a
   // special character.
@@ -551,6 +661,28 @@ private:
   TextReader *parser_;
 };
 
+class SourceTextReaderImpl : public TextReaderImpl {
+public:
+  SourceTextReaderImpl(const char *chars, size_t length, TextReader *parser)
+    : TextReaderImpl(chars, length, parser) { }
+
+protected:
+  virtual bool decode_array(Variant *out);
+  virtual bool decode_map(Variant *out);
+  virtual bool decode_seed(Variant *out);
+};
+
+class CommandTextReaderImpl : public TextReaderImpl {
+public:
+  CommandTextReaderImpl(const char *chars, size_t length, TextReader *parser)
+    : TextReaderImpl(chars, length, parser) { }
+
+protected:
+  virtual bool decode_array(Variant *out);
+  virtual bool decode_map(Variant *out);
+  virtual bool decode_seed(Variant *out);
+};
+
 TextReaderImpl::TextReaderImpl(const char *chars, size_t length, TextReader *parser)
   : length_(length)
   , cursor_(0)
@@ -560,18 +692,52 @@ TextReaderImpl::TextReaderImpl(const char *chars, size_t length, TextReader *par
 }
 
 void TextReaderImpl::skip_whitespace() {
-  // Loop around skipping any number of comments and the whitespace between
-  // them.
-  top: do {
+  while (true) {
     while (has_more() && is_whitespace(current()))
       advance();
     if (current() == '#') {
-      // If there's a comment skip it and then go around one more time.
-      while (has_more() && !is_newline(current()))
-        advance();
-      goto top;
+      // If we see a comment skip it and go around again to skip any whitespace
+      // following the comment.
+      advance();
+      skip_comments();
+    } else {
+      // Not a comment and not whitespace -- we're done.
+      break;
     }
-  } while (false);
+  }
+}
+
+void TextReaderImpl::skip_comments() {
+  if (current() == '{') {
+    // Block comment; just skip until we see a # which may or may not end this
+    // block.
+    while (true) {
+      while (has_more() && current() != '#')
+        advance();
+      if (current() != '#')
+        // Ran out of input; bail out.
+        break;
+      advance();
+      if (current() == '}') {
+        // Found the comment end marker so we're done.
+        advance();
+        break;
+      } else {
+        // Found some other kind of comment marker. Skip it. Note that this
+        // means that if the block end marker is within a nested EOL comment it
+        // will be counted as commented out and not used to end the block.
+        // Basically, EOL comments are considered to have higher precedence than
+        // block comments.
+        skip_comments();
+        // Since this wasn't the end marker we loop around and keep looking.
+        continue;
+      }
+    }
+  } else {
+    // This is not a block comment so it must be an EOL one. Skip it.
+    while (has_more() && !is_newline(current()))
+      advance();
+  }
 }
 
 bool TextReaderImpl::is_whitespace(char c) {
@@ -624,6 +790,8 @@ bool TextReaderImpl::decode(Variant *out) {
       return decode_array(out);
     case '{':
       return decode_map(out);
+    case '@':
+      return decode_seed(out);
     case '"':
       return decode_quoted_string(out);
     default:
@@ -754,7 +922,7 @@ bool TextReaderImpl::decode_quoted_string(Variant *out) {
   return succeed(arena()->new_string(*buf, buf.length()), out);
 }
 
-bool TextReaderImpl::decode_array(Variant *out) {
+bool SourceTextReaderImpl::decode_array(Variant *out) {
   advance_and_skip();
   Array result = arena()->new_array();
   while (has_more() && current() != ']') {
@@ -775,7 +943,23 @@ bool TextReaderImpl::decode_array(Variant *out) {
   return succeed(result, out);
 }
 
-bool TextReaderImpl::decode_map(Variant *out) {
+bool CommandTextReaderImpl::decode_array(Variant *out) {
+  advance_and_skip();
+  Array result = arena()->new_array();
+  while (has_more() && current() != ']') {
+    Variant next;
+    if (!decode(&next))
+      return fail(out);
+    result.add(next);
+  }
+  if (current() != ']')
+    return fail(out);
+  advance_and_skip();
+  result.ensure_frozen();
+  return succeed(result, out);
+}
+
+bool SourceTextReaderImpl::decode_map(Variant *out) {
   advance_and_skip();
   Map result = arena()->new_map();
   while (has_more() && current() != '}') {
@@ -796,6 +980,109 @@ bool TextReaderImpl::decode_map(Variant *out) {
     }
   }
   if (current() != '}')
+    return fail(out);
+  advance_and_skip();
+  result.ensure_frozen();
+  return succeed(result, out);
+}
+
+bool CommandTextReaderImpl::decode_map(Variant *out) {
+  advance_and_skip();
+  Map result = arena()->new_map();
+  while (has_more() && current() != '}') {
+    if (current() != '-')
+      return fail(out);
+    advance();
+    if (current() != '-')
+      return fail(out);
+    advance_and_skip();
+    Variant key;
+    if (!decode(&key))
+      return fail(out);
+    Variant value;
+    if (!decode(&value))
+      return fail(out);
+    result.set(key, value);
+  }
+  if (current() != '}')
+    return fail(out);
+  advance_and_skip();
+  result.ensure_frozen();
+  return succeed(result, out);
+}
+
+bool SourceTextReaderImpl::decode_seed(Variant *out) {
+  advance_and_skip();
+  Variant header;
+  if (!decode(&header))
+    return fail(out);
+  char end;
+  if (current() == '(') {
+    end = ')';
+  } else if (current() == '{') {
+    end = '}';
+  } else {
+    return fail(out);
+  }
+  advance_and_skip();
+  Seed result = arena()->new_seed();
+  result.set_header(header);
+  while (has_more() && current() != end) {
+    Variant key;
+    if (!decode(&key))
+      return fail(out);
+    if (current() != ':')
+      return fail(out);
+    advance_and_skip();
+    Variant value;
+    if (!decode(&value))
+      return fail(out);
+    result.set_field(key, value);
+    if (current() == ',') {
+      advance_and_skip();
+    } else {
+      break;
+    }
+  }
+  if (current() != end)
+    return fail(out);
+  advance_and_skip();
+  result.ensure_frozen();
+  return succeed(result, out);
+}
+
+bool CommandTextReaderImpl::decode_seed(Variant *out) {
+  advance_and_skip();
+  Variant header;
+  if (!decode(&header))
+    return fail(out);
+  char end;
+  if (current() == '(') {
+    end = ')';
+  } else if (current() == '{') {
+    end = '}';
+  } else {
+    return fail(out);
+  }
+  advance_and_skip();
+  Seed result = arena()->new_seed();
+  result.set_header(header);
+  while (has_more() && current() != end) {
+    if (current() != '-')
+      return fail(out);
+    advance();
+    if (current() != '-')
+      return fail(out);
+    advance_and_skip();
+    Variant key;
+    if (!decode(&key))
+      return fail(out);
+    Variant value;
+    if (!decode(&value))
+      return fail(out);
+    result.set_field(key, value);
+  }
+  if (current() != end)
     return fail(out);
   advance_and_skip();
   result.ensure_frozen();
@@ -882,17 +1169,24 @@ bool TextReaderImpl::succeed(Variant value, Variant *out) {
   return true;
 }
 
-TextReader::TextReader(Arena *arena)
+TextReader::TextReader(Arena *arena, TextSyntax syntax)
   : arena_(arena)
+  , syntax_(syntax)
   , has_failed_(false)
   , offender_('\0') { }
 
 Variant TextReader::parse(const char *chars, size_t length) {
   has_failed_ = false;
   offender_ = '\0';
-  TextReaderImpl decoder(chars, length, this);
   Variant result;
-  decoder.decode_toplevel(&result);
+  if (syntax_ == SOURCE_SYNTAX) {
+    SourceTextReaderImpl decoder(chars, length, this);
+    decoder.decode_toplevel(&result);
+  } else {
+    CHECK_EQ("unexpected syntax", COMMAND_SYNTAX, syntax_);
+    CommandTextReaderImpl decoder(chars, length, this);
+    decoder.decode_toplevel(&result);
+  }
   return result;
 }
 

@@ -88,10 +88,16 @@ private:
   size_t size_;
 };
 
+// The syntaxes text can be formatted as.
+enum TextSyntax {
+  SOURCE_SYNTAX,
+  COMMAND_SYNTAX
+};
+
 // An object that holds the representation of a variant as a 7-bit ascii string.
 class TextWriter {
 public:
-  TextWriter();
+  TextWriter(TextSyntax syntax = SOURCE_SYNTAX);
   ~TextWriter();
 
   // Write the given variant to this asciigram.
@@ -106,6 +112,7 @@ public:
 
 private:
   friend class TextWriterImpl;
+  TextSyntax syntax_;
   char *chars_;
   size_t length_;
 };
@@ -134,7 +141,7 @@ private:
 class TextReader {
 public:
   // Creates a new parser which uses the given arena for allocation.
-  TextReader(Arena *arena);
+  TextReader(Arena *arena, TextSyntax syntax = SOURCE_SYNTAX);
 
   // Parse the given input, returning the value. If any errors occur the
   // has_failed() and offender() methods can be used to identify what the
@@ -151,6 +158,7 @@ public:
 private:
   friend class TextReaderImpl;
   Arena *arena_;
+  TextSyntax syntax_;
   bool has_failed_;
   char offender_;
 };

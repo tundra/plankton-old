@@ -7,39 +7,44 @@
 
 using namespace plankton;
 
-#define CHECK_ASCII(EXP, VAR) do {                                             \
-  TextWriter writer;                                                           \
-  writer.write(VAR);                                                           \
-  ASSERT_EQ(0, strcmp(EXP, *writer));                                          \
-  Arena decoder;                                                               \
-  TextReader parser(&decoder);                                                 \
-  Variant decoded = parser.parse(*writer, writer.length());                    \
-  ASSERT_TRUE(decoded.is_frozen());                                            \
-  TextWriter rewriter;                                                         \
-  rewriter.write(decoded);                                                     \
-  ASSERT_EQ(0, strcmp(EXP, *rewriter));                                        \
-} while (false)
+static void check_syntax(TextSyntax syntax, const char *exp_src, Variant var) {
+  TextWriter writer(syntax);
+  writer.write(var);
+  ASSERT_EQ(0, strcmp(exp_src, *writer));
+  Arena decoder;
+  TextReader parser(&decoder, syntax);
+  Variant decoded = parser.parse(*writer, writer.length());
+  ASSERT_TRUE(decoded.is_frozen());
+  TextWriter rewriter(syntax);
+  rewriter.write(decoded);
+  ASSERT_EQ(0, strcmp(exp_src, *rewriter));
+}
+
+static void check_ascii(const char *exp_src, const char *exp_cmd, Variant var) {
+  check_syntax(SOURCE_SYNTAX, exp_src, var);
+  check_syntax(COMMAND_SYNTAX, exp_cmd == NULL ? exp_src : exp_cmd, var);
+}
 
 TEST(text, primitive) {
-  CHECK_ASCII("%f", Variant::no());
-  CHECK_ASCII("%t", Variant::yes());
-  CHECK_ASCII("%n", Variant::null());
-  CHECK_ASCII("0", Variant::integer(0));
-  CHECK_ASCII("10", Variant::integer(10));
-  CHECK_ASCII("-10", Variant::integer(-10));
-  CHECK_ASCII("fooBAR123", Variant::string("fooBAR123"));
-  CHECK_ASCII("\"\"", Variant::string(""));
-  CHECK_ASCII("\"123\"", Variant::string("123"));
-  CHECK_ASCII("\"a b c\"", Variant::string("a b c"));
-  CHECK_ASCII("\"a\\nb\"", Variant::string("a\nb"));
-  CHECK_ASCII("\"a\\\"b\\\"c\"", Variant::string("a\"b\"c"));
-  CHECK_ASCII("\"a\\x01b\\xa2c\"", Variant::string("a\x1" "b" "\xa2" "c"));
-  CHECK_ASCII("%[TWFu]", Variant::blob("Man", 3));
-  CHECK_ASCII("%[cGxlYXN1cmUu]", Variant::blob("pleasure.", 9));
-  CHECK_ASCII("%[bGVhc3VyZS4=]", Variant::blob("leasure.", 8));
-  CHECK_ASCII("%[ZWFzdXJlLg==]", Variant::blob("easure.", 7));
-  CHECK_ASCII("%[YXN1cmUu]", Variant::blob("asure.", 6));
-  CHECK_ASCII("%[c3VyZS4=]", Variant::blob("sure.", 5));
+  check_ascii("%f", NULL, Variant::no());
+  check_ascii("%t", NULL, Variant::yes());
+  check_ascii("%n", NULL, Variant::null());
+  check_ascii("0", NULL, Variant::integer(0));
+  check_ascii("10", NULL, Variant::integer(10));
+  check_ascii("-10", NULL, Variant::integer(-10));
+  check_ascii("fooBAR123", NULL, Variant::string("fooBAR123"));
+  check_ascii("\"\"", NULL, Variant::string(""));
+  check_ascii("\"123\"", NULL, Variant::string("123"));
+  check_ascii("\"a b c\"", NULL, Variant::string("a b c"));
+  check_ascii("\"a\\nb\"", NULL, Variant::string("a\nb"));
+  check_ascii("\"a\\\"b\\\"c\"", NULL, Variant::string("a\"b\"c"));
+  check_ascii("\"a\\x01b\\xa2c\"", NULL, Variant::string("a\x1" "b" "\xa2" "c"));
+  check_ascii("%[TWFu]", NULL, Variant::blob("Man", 3));
+  check_ascii("%[cGxlYXN1cmUu]", NULL, Variant::blob("pleasure.", 9));
+  check_ascii("%[bGVhc3VyZS4=]", NULL, Variant::blob("leasure.", 8));
+  check_ascii("%[ZWFzdXJlLg==]", NULL, Variant::blob("easure.", 7));
+  check_ascii("%[YXN1cmUu]", NULL, Variant::blob("asure.", 6));
+  check_ascii("%[c3VyZS4=]", NULL, Variant::blob("sure.", 5));
   const char *long_blob =
       "Man is distinguished, not only by his reason, but by this singular passion from "
       "other animals, which is a lust of the mind, that by a perseverance of delight "
@@ -51,8 +56,8 @@ TEST(text, primitive) {
       "dGhlIG1pbmQsIHRoYXQgYnkgYSBwZXJzZXZlcmFuY2Ugb2YgZGVsaWdodCBpbiB0aGUgY29udGlu"
       "dWVkIGFuZCBpbmRlZmF0aWdhYmxlIGdlbmVyYXRpb24gb2Yga25vd2xlZGdlLCBleGNlZWRzIHRo"
       "ZSBzaG9ydCB2ZWhlbWVuY2Ugb2YgYW55IGNhcm5hbCBwbGVhc3VyZS4=]";
-  CHECK_ASCII(long_encoded, Variant::blob(long_blob, strlen(long_blob)));
-  CHECK_ASCII("%[]", Variant::blob(NULL, 0));
+  check_ascii(long_encoded, NULL, Variant::blob(long_blob, strlen(long_blob)));
+  check_ascii("%[]", NULL, Variant::blob(NULL, 0));
 }
 
 TEST(text, arrays) {
@@ -60,17 +65,20 @@ TEST(text, arrays) {
   Array a0 = arena.new_array();
   a0.add(8);
   a0.add("foo");
-  CHECK_ASCII("[8, foo]", a0);
+  check_ascii("[8, foo]", "[8 foo]", a0);
   a0.add("blahblahblah");
-  CHECK_ASCII("[8, foo, blahblahblah]", a0);
+  check_ascii("[8, foo, blahblahblah]", "[8 foo blahblahblah]", a0);
   a0.add("blahblahblah");
-  CHECK_ASCII("[8, foo, blahblahblah, blahblahblah]", a0);
+  check_ascii("[8, foo, blahblahblah, blahblahblah]",
+      "[8 foo blahblahblah blahblahblah]", a0);
   a0.add("blahblahblah");
-  CHECK_ASCII("[8, foo, blahblahblah, blahblahblah, blahblahblah]", a0);
+  check_ascii("[8, foo, blahblahblah, blahblahblah, blahblahblah]",
+      "[8 foo blahblahblah blahblahblah blahblahblah]", a0);
   a0.add("blahblahblah");
-  CHECK_ASCII("[8, foo, blahblahblah, blahblahblah, blahblahblah, blahblahblah]", a0);
+  check_ascii("[8, foo, blahblahblah, blahblahblah, blahblahblah, blahblahblah]",
+      "[8 foo blahblahblah blahblahblah blahblahblah blahblahblah]", a0);
   a0.add("blahblahblah");
-  CHECK_ASCII("[\n"
+  check_ascii("[\n"
       "  8,\n"
       "  foo,\n"
       "  blahblahblah,\n"
@@ -78,115 +86,195 @@ TEST(text, arrays) {
       "  blahblahblah,\n"
       "  blahblahblah,\n"
       "  blahblahblah\n"
-      "]", a0);
+      "]",
+      "[8 foo blahblahblah blahblahblah blahblahblah blahblahblah blahblahblah]",
+      a0);
   Array a1 = arena.new_array();
-  CHECK_ASCII("[]", a1);
+  check_ascii("[]", NULL, a1);
   Array a2 = arena.new_array();
   a2.add(a1);
   a2.add(a1);
-  CHECK_ASCII("[[], []]", a2);
+  check_ascii("[[], []]", "[[] []]", a2);
   Array a3 = arena.new_array();
   a3.add(a2);
   a3.add(a2);
-  CHECK_ASCII("[[[], []], [[], []]]", a3);
+  check_ascii("[[[], []], [[], []]]", "[[[] []] [[] []]]", a3);
   Array a4 = arena.new_array();
   a4.add(a3);
   a4.add(a3);
-  CHECK_ASCII("[[[[], []], [[], []]], [[[], []], [[], []]]]", a4);
+  check_ascii("[[[[], []], [[], []]], [[[], []], [[], []]]]",
+      "[[[[] []] [[] []]] [[[] []] [[] []]]]",
+      a4);
   Array a5 = arena.new_array();
   a5.add(a4);
   a5.add(a4);
-  CHECK_ASCII("[\n"
+  check_ascii("[\n"
       "  [[[[], []], [[], []]], [[[], []], [[], []]]],\n"
       "  [[[[], []], [[], []]], [[[], []], [[], []]]]\n"
-      "]", a5);
+      "]",
+      "[[[[[] []] [[] []]] [[[] []] [[] []]]] [[[[] []] [[] []]] [[[] []] [[] []]]]]",
+      a5);
 }
 
 TEST(text, maps) {
   Arena arena;
   Map m0 = arena.new_map();
   m0.set("foo", "bar");
-  CHECK_ASCII("{foo: bar}", m0);
+  check_ascii("{foo: bar}", "{--foo bar}", m0);
   m0.set(8, 16);
-  CHECK_ASCII("{foo: bar, 8: 16}", m0);
+  check_ascii("{foo: bar, 8: 16}", "{--foo bar --8 16}", m0);
   m0.set(arena.new_array(), arena.new_map());
-  CHECK_ASCII("{foo: bar, 8: 16, []: {}}", m0);
+  check_ascii("{foo: bar, 8: 16, []: {}}", "{--foo bar --8 16 --[] {}}", m0);
 }
 
-#define CHECK_REWRITE(IN, OUT) do {                                            \
-  Arena decoder;                                                               \
-  TextReader parser(&decoder);                                                 \
-  Variant decoded = parser.parse(IN, strlen(IN));                              \
-  TextWriter writer;                                                           \
-  writer.write(decoded);                                                       \
-  ASSERT_EQ(0, strcmp(OUT, *writer));                                          \
-} while (false)
+TEST(text, seeds) {
+  Arena arena;
+  Seed s0 = arena.new_seed();
+  s0.set_header("File");
+  check_ascii("@File()", "@File()", s0);
+  s0.set_field("foo", "bar");
+  check_ascii("@File(foo: bar)", "@File(--foo bar)", s0);
+  s0.set_field(3, Variant::yes());
+  check_ascii("@File(foo: bar, 3: %t)", "@File(--foo bar --3 %t)", s0);
+  s0.set_field("long", "asdfkjasaslasdfsaddkjfhkasldjfhlaskdjfhlaskdjfhaasdfl");
+  check_ascii("@File{\n"
+      "  foo: bar,\n"
+      "  3: %t,\n"
+      "  long: asdfkjasaslasdfsaddkjfhkasldjfhlaskdjfhlaskdjfhaasdfl\n"
+      "}",
+      "@File(--foo bar --3 %t --long asdfkjasaslasdfsaddkjfhkasldjfhlaskdjfhlaskdjfhaasdfl)", s0);
+}
 
-#define CHECK_FAILS(CHR, IN) do {                                              \
-  Arena arena;                                                                 \
-  TextReader parser(&arena);                                                   \
-  Variant decoded = parser.parse(IN, strlen(IN));                              \
-  ASSERT_TRUE(parser.has_failed());                                            \
-  ASSERT_FALSE(bool(decoded));                                                 \
-  ASSERT_EQ(CHR, parser.offender());                                           \
-} while (false);
+static void check_syntax_rewrite(TextSyntax syntax, const char *src,
+    const char *expected) {
+  Arena decoder;
+  TextReader parser(&decoder, syntax);
+  Variant decoded = parser.parse(src, strlen(src));
+  TextWriter writer(syntax);
+  writer.write(decoded);
+  if (strcmp(expected, *writer) != 0) {
+    HEST("%s %s", expected, *writer);
+  }
+  ASSERT_EQ(0, strcmp(expected, *writer));
+}
+
+static void check_source_rewrite(const char *src, const char *expected) {
+  check_syntax_rewrite(SOURCE_SYNTAX, src, expected);
+}
+
+static void check_command_rewrite(const char *src, const char *expected) {
+  check_syntax_rewrite(COMMAND_SYNTAX, src, expected);
+}
+
+static void check_both_rewrite(const char *src, const char *expected) {
+  check_source_rewrite(src, expected);
+  check_command_rewrite(src, expected);
+}
+
+static void check_syntax_fails(TextSyntax syntax, char offender, const char *src) {
+  Arena arena;
+  TextReader parser(&arena, syntax);
+  Variant decoded = parser.parse(src, strlen(src));
+  ASSERT_TRUE(parser.has_failed());
+  ASSERT_FALSE(bool(decoded));
+  ASSERT_EQ(offender, parser.offender());
+}
+
+static void check_source_fails(char offender, const char *src) {
+  check_syntax_fails(SOURCE_SYNTAX, offender, src);
+}
+
+static void check_command_fails(char offender, const char *src) {
+  check_syntax_fails(COMMAND_SYNTAX, offender, src);
+}
+
+static void check_both_fail(char offender, const char *src) {
+  check_source_fails(offender, src);
+  check_command_fails(offender, src);
+}
 
 TEST(text, strings) {
-  CHECK_REWRITE("%f", "%f");
-  CHECK_REWRITE(" %f", "%f");
-  CHECK_REWRITE("%f ", "%f");
-  CHECK_REWRITE("[ ]", "[]");
-  CHECK_REWRITE("[ 1]", "[1]");
-  CHECK_REWRITE("[1 ]", "[1]");
-  CHECK_REWRITE(" [1]", "[1]");
-  CHECK_REWRITE("[1] ", "[1]");
-  CHECK_REWRITE("[1,] ", "[1]");
-  CHECK_REWRITE("{ }", "{}");
-  CHECK_REWRITE("{a:b}", "{a: b}");
-  CHECK_REWRITE("{ a: b}", "{a: b}");
-  CHECK_REWRITE("{a: b }", "{a: b}");
-  CHECK_REWRITE("{a :b}", "{a: b}");
-  CHECK_REWRITE("{a: b,}", "{a: b}");
-  CHECK_REWRITE("\"\\xfa\"", "\"\\xfa\"");
-  CHECK_REWRITE("\"\\xFA\"", "\"\\xfa\"");
-  CHECK_REWRITE("%[cGxlYXN1cmUu]", "%[cGxlYXN1cmUu]");
-  CHECK_REWRITE("%[ cGxlYXN1cmUu ]", "%[cGxlYXN1cmUu]");
-  CHECK_REWRITE("%[cGxl YXN1 cmUu]", "%[cGxlYXN1cmUu]");
-  CHECK_REWRITE("%[ c G x l Y X N 1 c m U u ]", "%[cGxlYXN1cmUu]");
-  CHECK_FAILS('%', "%f %f");
-  CHECK_FAILS(',', "[,]");
-  CHECK_FAILS(',', "{,}");
-  CHECK_FAILS('}', "{a:}");
-  CHECK_FAILS(':', "{:b}");
-  CHECK_FAILS('c', "{a:b c:d}");
-  CHECK_FAILS('2', "[1 2]");
-  CHECK_FAILS('\0', "[1, ");
-  CHECK_FAILS('\0', "[1");
-  CHECK_FAILS('\0', "[");
-  CHECK_FAILS('\0', "{");
-  CHECK_FAILS('\0', "{a");
-  CHECK_FAILS('\0', "{a:");
-  CHECK_FAILS('\0', "{a:b");
-  CHECK_FAILS('\0', "\"");
-  CHECK_FAILS('\0', "\"\\");
-  CHECK_FAILS('\0', "\"\\x");
-  CHECK_FAILS('\0', "\"\\xa");
-  CHECK_FAILS('g', "\"\\xag\"");
-  CHECK_FAILS('g', "\"\\xga\"");
-  CHECK_FAILS('%', "\"\\%\"");
-  CHECK_FAILS('\0', "%");
-  CHECK_FAILS('g', "%g");
-  CHECK_FAILS('.', "%[cGxl.XN1cmUu]");
-  CHECK_FAILS(']', "%[cGxlYXN1cmU]");
-  CHECK_FAILS(']', "%[cGxlYXN1cm]");
-  CHECK_FAILS(']', "%[cGxlYXN1c]");
-  CHECK_FAILS('=', "%[cGxlYXN1=mUu]");
-  CHECK_FAILS('=', "%[cGxlYXN1c=Uu]");
+  check_both_rewrite("%f", "%f");
+  check_both_rewrite(" %f", "%f");
+  check_both_rewrite("[ ]", "[]");
+  check_both_rewrite("[ 1]", "[1]");
+  check_both_rewrite("[1 ]", "[1]");
+  check_both_rewrite(" [1]", "[1]");
+  check_both_rewrite("[1] ", "[1]");
+  check_both_rewrite("{ }", "{}");
+  check_both_rewrite("\"\\xfa\"", "\"\\xfa\"");
+  check_both_rewrite("\"\\xFA\"", "\"\\xfa\"");
+  check_both_rewrite("%[cGxlYXN1cmUu]", "%[cGxlYXN1cmUu]");
+  check_both_rewrite("%[ cGxlYXN1cmUu ]", "%[cGxlYXN1cmUu]");
+  check_both_rewrite("%[cGxl YXN1 cmUu]", "%[cGxlYXN1cmUu]");
+  check_both_rewrite("%[ c G x l Y X N 1 c m U u ]", "%[cGxlYXN1cmUu]");
+  check_source_rewrite("[1,] ", "[1]");
+  check_source_rewrite("{a:b}", "{a: b}");
+  check_source_rewrite("{ a: b}", "{a: b}");
+  check_source_rewrite("{a: b }", "{a: b}");
+  check_source_rewrite("{a :b}", "{a: b}");
+  check_source_rewrite("{a: b,}", "{a: b}");
+  check_command_rewrite("{ --a b}", "{--a b}");
+  check_command_rewrite("{--a b }", "{--a b}");
+  check_command_rewrite("{ -- a b}", "{--a b}");
+  check_both_fail('%', "%f %f");
+  check_source_fails(',', "[,]");
+  check_source_fails(',', "{,}");
+  check_source_fails('}', "{a:}");
+  check_source_fails(':', "{:b}");
+  check_source_fails('c', "{a:b c:d}");
+  check_source_fails('2', "[1 2]");
+  check_source_fails('\0', "[1, ");
+  check_source_fails('\0', "[1");
+  check_source_fails('\0', "[");
+  check_source_fails('\0', "{");
+  check_source_fails('\0', "{a");
+  check_source_fails('\0', "{a:");
+  check_source_fails('\0', "{a:b");
+  check_both_fail('\0', "\"");
+  check_both_fail('\0', "\"\\");
+  check_both_fail('\0', "\"\\x");
+  check_both_fail('\0', "\"\\xa");
+  check_both_fail('g', "\"\\xag\"");
+  check_both_fail('g', "\"\\xga\"");
+  check_both_fail('%', "\"\\%\"");
+  check_both_fail('\0', "%");
+  check_both_fail('g', "%g");
+  check_both_fail('.', "%[cGxl.XN1cmUu]");
+  check_both_fail(']', "%[cGxlYXN1cmU]");
+  check_both_fail(']', "%[cGxlYXN1cm]");
+  check_both_fail(']', "%[cGxlYXN1c]");
+  check_both_fail('=', "%[cGxlYXN1=mUu]");
+  check_both_fail('=', "%[cGxlYXN1c=Uu]");
+  check_command_fails('}', "{--a}");
+  check_command_fails('b', "{b}");
+  check_command_fails('\0', "[1 ");
+  check_command_fails('\0', "[1");
+  check_command_fails('\0', "[");
+  check_command_fails('\0', "{");
+  check_command_fails('\0', "{--");
+  check_command_fails('\0', "{--b");
+  check_command_fails('\0', "{--b c");
 }
 
 TEST(text, comments) {
-  CHECK_REWRITE("# here comes false\n %f", "%f");
-  CHECK_REWRITE("# here comes false then true %f\n %t", "%t");
-  CHECK_REWRITE("# here comes false\f %f", "%f");
-  CHECK_REWRITE("%f # here came false", "%f");
+  check_both_rewrite("# here comes false\n %f", "%f");
+  check_both_rewrite("# here comes false then true %f\n %t", "%t");
+  check_both_rewrite("# here comes false\f %f", "%f");
+  check_both_rewrite("%f # here came false", "%f");
+  check_both_rewrite("#{ asdfas #} %f", "%f");
+  check_both_rewrite("#{ \n a \n b \n c \n #} %f", "%f");
+  check_both_rewrite("#{\n"
+      "  # nested eol comment\n"
+      "#}\n"
+      "%f", "%f");
+  check_both_rewrite("#{\n"
+      "  # nested eol comment with ignored end marker #}\n"
+      "#}\n"
+      "%f", "%f");
+  check_both_rewrite("#{ #{ #{ #{ deeply nested #} #} #} #} %f", "%f");
+  check_both_rewrite("[ #{ asdfas #} 1 #{asdfasd #} ]", "[1]");
+  check_both_fail('\0', "#{  #");
+  check_both_fail('\0', "#{");
+  check_both_fail('\0', "#");
 }
