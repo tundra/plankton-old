@@ -168,12 +168,13 @@ private:
 // Utility for converting a plankton variant to a 7-bit ascii string.
 class TextReader {
 public:
-  // Creates a new parser which uses the given arena for allocation.
-  TextReader(Factory *factory, TextSyntax syntax = SOURCE_SYNTAX);
+  // Creates a new reader which uses the given arena for allocation.
+  TextReader(TextSyntax syntax = SOURCE_SYNTAX, Factory *factory = NULL);
+  ~TextReader();
 
-  // Parse the given input, returning the value. If any errors occur the
-  // has_failed() and offender() methods can be used to identify what the
-  // problem was.
+  // Parse the given input, returning the value. If any errors occur a syntax
+  // error will be returned; alternatively has_failed() and error() can be used
+  // to inspect what went wrong.
   Variant parse(const char *chars, size_t length);
 
   // Returns true iff the last parse failed.  If parse hasn't been called at all
@@ -185,11 +186,70 @@ public:
   // does.
   SyntaxError *error() { return error_; }
 
-private:
+protected:
   friend class TextReaderImpl;
   Factory *factory_;
+  Arena *scratch_arena_;
   TextSyntax syntax_;
   SyntaxError *error_;
+};
+
+
+class CommandLine {
+public:
+  CommandLine(Array args, Map options)
+    : args_(args)
+    , options_(options) { }
+
+  // Returns the number of toplevel arguments.
+  size_t argument_count() { return args_.length(); }
+
+  // Returns the i'th argument. If the index is out of bounds returns null.
+  Variant argument(size_t i) { return args_[i]; }
+
+  // Returns the option with the given name. Returns the default value of there
+  // is no such option, the default default (what?) being null.
+  Variant option(Variant field, Variant defawlt = Variant::null());
+
+  // The number of options passed.
+  size_t option_count() { return options_.size(); }
+
+  // The seed type for syntax errors.
+  static SeedType<CommandLine> *seed_type() { return &kSeedType; }
+
+private:
+  static SeedType<CommandLine> kSeedType;
+  Array args_;
+  Map options_;
+};
+
+// A text reader specialized for reading command-line arguments. The plain text
+// reader can also read the command-line value syntax, but this one has some
+// more convenience methods and, particularly, reads the top-level command-line
+// syntax which is slightly different from the value command-line syntax. So
+// for instance, this
+//
+//   git checkout foo
+//
+// is not a valid single command-line value -- it is three strings -- but it is
+// fine as a top-level command-line.
+class CommandLineReader : public TextReader {
+public:
+  // Creates a new reader which uses the given factory for allocation. If no
+  // factory is specified one will be created and disposed when the reader is
+  // destroyed.
+  CommandLineReader(Factory *factory = NULL)
+    : TextReader(COMMAND_SYNTAX, factory) { }
+
+  // Parse the given input as a top-level command-line.
+  CommandLine *parse(const char *chars, size_t length);
+
+  // Parse the given program arguments as top-level command-line.
+  CommandLine *parse(int argc, const char **argv);
+
+  // Joins an argument array into a single string by inserting spaces between
+  // the parts. Visible for testing only, don't use this.
+  static char *join_argv(int argc, const char **argv, int *len_out);
 };
 
 } // namespace plankton

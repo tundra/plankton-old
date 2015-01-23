@@ -578,9 +578,11 @@ public:
   TextReaderImpl(const char *chars, size_t length, TextReader *parser);
   virtual ~TextReaderImpl() { }
 
-  // Decode a toplevel variant expression. A toplevel expression is different
-  // from others because it must fill the whole string.
-  bool decode_toplevel(Variant *out);
+  // Decode a full variant expression. A full expression is different from
+  // others because it must fill the whole string.
+  bool decode_full(Variant *out);
+
+  bool decode_command_line_full(Variant *out);
 
 protected:
   // Mapping from ascii characters to the base-64 sextets they represent.
@@ -656,6 +658,8 @@ protected:
   // Parses the next seed.
   virtual bool decode_seed(Variant *out) = 0;
 
+  virtual bool decode_command_line(Variant *out) = 0;
+
   // Returns the factory to use for allocation.
   Factory *factory() { return parser_->factory_; }
 
@@ -680,6 +684,7 @@ protected:
   virtual bool decode_array(Variant *out);
   virtual bool decode_map(Variant *out);
   virtual bool decode_seed(Variant *out);
+  virtual bool decode_command_line(Variant *out) { return fail(out); }
 };
 
 class CommandTextReaderImpl : public TextReaderImpl {
@@ -691,6 +696,7 @@ protected:
   virtual bool decode_array(Variant *out);
   virtual bool decode_map(Variant *out);
   virtual bool decode_seed(Variant *out);
+  virtual bool decode_command_line(Variant *out);
 };
 
 TextReaderImpl::TextReaderImpl(const char *chars, size_t length, TextReader *parser)
@@ -772,8 +778,12 @@ bool TextReaderImpl::is_digit(char c) {
   return '0' <= c && c <= '9';
 }
 
-bool TextReaderImpl::decode_toplevel(Variant *out) {
+bool TextReaderImpl::decode_full(Variant *out) {
   return decode(out) && (!has_more() || fail(out));
+}
+
+bool TextReaderImpl::decode_command_line_full(Variant *out) {
+  return decode_command_line(out);
 }
 
 bool TextReaderImpl::decode(Variant *out) {
@@ -1080,11 +1090,9 @@ bool CommandTextReaderImpl::decode_seed(Variant *out) {
   Seed result = factory()->new_seed();
   result.set_header(header);
   while (has_more() && current() != end) {
-    if (current() != '-')
+    if (current() != '-' || current() != '-')
       return fail(out);
     advance();
-    if (current() != '-')
-      return fail(out);
     advance_and_skip();
     Variant key;
     if (!decode(&key))
@@ -1097,6 +1105,33 @@ bool CommandTextReaderImpl::decode_seed(Variant *out) {
   if (current() != end)
     return fail(out);
   advance_and_skip();
+  result.ensure_frozen();
+  return succeed(result, out);
+}
+
+bool CommandTextReaderImpl::decode_command_line(Variant *out) {
+  Array args = factory()->new_array();
+  Map options = factory()->new_map();
+  while (has_more()) {
+    if (current() == '-' && next() == '-') {
+      advance();
+      advance_and_skip();
+      Variant key;
+      if (!decode(&key))
+        return fail(out);
+      Variant value;
+      if (!decode(&value))
+        return fail(out);
+      options.set(key, value);
+    } else {
+      Variant arg;
+      if (!decode(&arg))
+        return fail(out);
+      args.add(arg);
+    }
+  }
+  CommandLine *cmdline = new (factory()) CommandLine(args, options);
+  Native result = factory()->new_native(cmdline);
   result.ensure_frozen();
   return succeed(result, out);
 }
@@ -1183,23 +1218,79 @@ bool TextReaderImpl::succeed(Variant value, Variant *out) {
   return true;
 }
 
-TextReader::TextReader(Factory *factory, TextSyntax syntax)
+TextReader::TextReader(TextSyntax syntax, Factory *factory)
   : factory_(factory)
+  , scratch_arena_(NULL)
   , syntax_(syntax)
-  , error_(NULL) { }
+  , error_(NULL) {
+  if (factory_ == NULL) {
+    scratch_arena_ = new Arena();
+    factory_ = scratch_arena_;
+  }
+}
+
+TextReader::~TextReader() {
+  delete scratch_arena_;
+}
 
 Variant TextReader::parse(const char *chars, size_t length) {
   error_ = NULL;
   Variant result;
   if (syntax_ == SOURCE_SYNTAX) {
     SourceTextReaderImpl decoder(chars, length, this);
-    decoder.decode_toplevel(&result);
+    decoder.decode_full(&result);
   } else {
     CHECK_EQ("unexpected syntax", COMMAND_SYNTAX, syntax_);
     CommandTextReaderImpl decoder(chars, length, this);
-    decoder.decode_toplevel(&result);
+    decoder.decode_full(&result);
   }
   return result;
+}
+
+SeedType<CommandLine> CommandLine::kSeedType("CommandLine");
+
+CommandLine *CommandLineReader::parse(const char *chars, size_t length) {
+  error_ = NULL;
+  Variant result;
+  CommandTextReaderImpl decoder(chars, length, this);
+  decoder.decode_command_line_full(&result);
+  return native_cast<CommandLine>(result);
+}
+
+CommandLine *CommandLineReader::parse(int argc, const char **argv) {
+  int length = 0;
+  char *joined = join_argv(argc, argv, &length);
+  CommandLine *result = parse(joined, length);
+  delete[] joined;
+  return result;
+}
+
+char *CommandLineReader::join_argv(int argc, const char **argv, int *len_out) {
+  size_t length;
+  if (argc == 0) {
+    length = 0;
+  } else {
+    length = (argc - 1);
+    for (int i = 0; i < argc; i++)
+      length += strlen(argv[i]);
+  }
+  char *result = new char[length + 1];
+  result[length] = '\0';
+  char *ptr = result;
+  for (int i = 0; i < argc; i++) {
+    if (i > 0)
+      *(ptr++) = ' ';
+    size_t arglen = strlen(argv[i]);
+    memcpy(ptr, argv[i], arglen * sizeof(char));
+    ptr += arglen;
+  }
+  *len_out = length;
+  return result;
+}
+
+
+Variant CommandLine::option(Variant field, Variant defawlt) {
+  return options_.has(field) ? options_[field] : defawlt;
 }
 
 } // namespace plankton

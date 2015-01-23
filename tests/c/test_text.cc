@@ -1,10 +1,11 @@
 //- Copyright 2014 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#include "marshal-inl.hh"
+#include "plankton-inl.hh"
 #include "test/asserts.hh"
 #include "test/unittest.hh"
-#include "plankton-inl.hh"
-#include "marshal-inl.hh"
+#include "utils/string-inl.h"
 
 using namespace plankton;
 
@@ -12,8 +13,7 @@ static void check_syntax(TextSyntax syntax, const char *exp_src, Variant var) {
   TextWriter writer(syntax);
   writer.write(var);
   ASSERT_EQ(0, strcmp(exp_src, *writer));
-  Arena decoder;
-  TextReader parser(&decoder, syntax);
+  TextReader parser(syntax);
   Variant decoded = parser.parse(*writer, writer.length());
   ASSERT_TRUE(decoded.is_frozen());
   TextWriter rewriter(syntax);
@@ -149,8 +149,7 @@ TEST(text, seeds) {
 
 static void check_syntax_rewrite(TextSyntax syntax, const char *src,
     const char *expected) {
-  Arena decoder;
-  TextReader parser(&decoder, syntax);
+  TextReader parser(syntax);
   Variant decoded = parser.parse(src, strlen(src));
   TextWriter writer(syntax);
   writer.write(decoded);
@@ -172,8 +171,7 @@ static void check_both_rewrite(const char *src, const char *expected) {
 
 static void check_syntax_fails(TextSyntax syntax, char offender,
     int offset, const char *src) {
-  Arena arena;
-  TextReader parser(&arena, syntax);
+  TextReader parser(syntax);
   Variant decoded = parser.parse(src, strlen(src));
   ASSERT_TRUE(parser.has_failed());
   SyntaxError *error = native_cast<SyntaxError>(decoded);
@@ -277,8 +275,61 @@ TEST(text, comments) {
       "#}\n"
       "%f", "%f");
   check_both_rewrite("#{ #{ #{ #{ deeply nested #} #} #} #} %f", "%f");
-  check_both_rewrite("[ #{ asdfas #} 1 #{asdfasd #} ]", "[1]");
+  check_both_rewrite("[ #{ asdfas #} 1 #{ asdfasd #} ]", "[1]");
   check_both_fail('\0', 5, "#{  #");
   check_both_fail('\0', 2, "#{");
   check_both_fail('\0', 1, "#");
+}
+
+#define o ,
+
+void check_cmdline(const char *str, size_t argc, Variant *argv, size_t optc,
+    Variant *optv) {
+  CommandLineReader reader;
+  CommandLine *cmdline = reader.parse(str, strlen(str));
+  ASSERT_FALSE(cmdline == NULL);
+  ASSERT_EQ(argc, cmdline->argument_count());
+  for (size_t i = 0; i < argc; i++)
+    ASSERT_TRUE(argv[i] == cmdline->argument(i));
+  ASSERT_EQ(optc, cmdline->option_count());
+  for (size_t i = 0; i < optc; i++) {
+    Variant key = optv[2 * i];
+    Variant value = optv[2 * i + 1];
+    ASSERT_TRUE(value == cmdline->option(key));
+  }
+}
+
+#define CHECK_CMDLINE(STR, ARGC, ARGV, OPTC, OPTV) do {                        \
+  Variant argv[(ARGC)] = {ARGV};                                               \
+  Variant optv[2 * (OPTC)] = {OPTV};                                           \
+  check_cmdline((STR), (ARGC), argv, (OPTC), optv);                            \
+} while (false)
+
+TEST(text, flat_command_line) {
+  CHECK_CMDLINE("", 0, , 0, );
+  CHECK_CMDLINE("foo", 1, "foo", 0, );
+  CHECK_CMDLINE("foo bar", 2, "foo" o "bar", 0, );
+  CHECK_CMDLINE("foo bar baz", 3, "foo" o "bar" o "baz", 0, );
+  CHECK_CMDLINE("foo --bar baz", 1, "foo", 1, "bar" o "baz");
+  CHECK_CMDLINE("foo --bar baz --1 2", 1, "foo", 2,
+      "bar" o "baz" o
+      1 o 2);
+}
+
+#define CHECK_JOIN(STR, ARGC, ARGV) do {                                       \
+  const char *argv[(ARGC)] = {ARGV};                                           \
+  int length = 0;                                                              \
+  char *joined = CommandLineReader::join_argv((ARGC), argv, &length);          \
+  ASSERT_C_STREQ((STR), joined);                                                 \
+  ASSERT_EQ(length, strlen(STR));                                              \
+  delete[] joined;                                                             \
+} while (false)
+
+TEST(text, join) {
+  CHECK_JOIN("", 0, );
+  CHECK_JOIN("a", 1, "a");
+  CHECK_JOIN("a b", 2, "a" o "b");
+  CHECK_JOIN("a b c", 3, "a" o "b" o "c");
+  CHECK_JOIN("a  c", 3, "a" o "" o "c");
+  CHECK_JOIN("a     c", 3, "a" o "   " o "c");
 }

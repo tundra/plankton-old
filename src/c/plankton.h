@@ -221,6 +221,10 @@ bool pton_map_set_sinks(pton_variant_t variant, pton_sink_t **key_out,
 // key, otherwise null.
 pton_variant_t pton_map_get(pton_variant_t variant, pton_variant_t key);
 
+// Returns true if the given value is a map that contains a mapping for the
+// given key, otherwise false.
+bool pton_map_has(pton_variant_t variant, pton_variant_t key);
+
 // Returns a 64-bit identity token with the given value.
 pton_variant_t pton_id64(uint64_t value);
 

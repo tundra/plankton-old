@@ -85,6 +85,8 @@ public:
 
   Variant get(Variant key) const;
 
+  bool has(Variant key) const;
+
   uint32_t size() const { return size_; }
 
 private:
@@ -660,6 +662,12 @@ pton_variant_t pton_map_get(pton_variant_t variant, pton_variant_t key) {
       : pton_null();
 }
 
+bool pton_map_has(pton_variant_t variant, pton_variant_t key) {
+  pton_check_binary_version(variant);
+  pton_check_binary_version(key);
+  return pton_is_map(variant) && variant.payload_.as_arena_map_->has(key);
+}
+
 bool pton_map_set_sinks(pton_variant_t map, pton_sink_t **key_out,
     pton_sink_t **value_out) {
   pton_check_binary_version(map);
@@ -680,6 +688,10 @@ bool Variant::map_set(Sink *key_out, Sink *value_out) {
 
 Variant Variant::map_get(Variant key) const {
   return pton_map_get(value_, key.value_);
+}
+
+Variant Variant::map_has(Variant key) const {
+  return pton_map_has(value_, key.value_);
 }
 
 uint64_t pton_id64_value(pton_variant_t variant) {
@@ -877,6 +889,15 @@ Variant pton_arena_map_t::get(Variant key) const {
       return entry->value;
   }
   return Variant::null();
+}
+
+bool pton_arena_map_t::has(Variant key) const {
+  for (size_t i = 0; i < size_; i++) {
+    entry_t *entry = &elms_[i];
+    if (entry->key == key)
+      return true;
+  }
+  return false;
 }
 
 pton_arena_seed_t::pton_arena_seed_t(Arena *origin)

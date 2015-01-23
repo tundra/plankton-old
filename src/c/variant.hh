@@ -211,6 +211,10 @@ public:
   // key, otherwise null.
   Variant map_get(Variant key) const;
 
+  // Returns true if this is a map that contains a mapping for the given key,
+  // otherwise false.
+  Variant map_has(Variant key) const;
+
   // Returns an iterator for iterating this map, if this is a map, otherwise an
   // empty iterator. The first call to advance will yield the first mapping, if
   // there is one.
@@ -460,6 +464,9 @@ public:
 
   // Returns the mapping for the given key.
   Variant operator[](Variant key) { return map_get(key); }
+
+  // Returns true iff this map contains the given key.
+  bool has(Variant key) { return map_has(key); }
 
   // Because of the way string indexing works the normal [] operator can give
   // overloading ambiguities when passed strings. This method disambiguates.
