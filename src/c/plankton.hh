@@ -7,6 +7,7 @@
 #define _PLANKTON_HH
 
 #include "variant.hh"
+#include "marshal.hh"
 
 namespace plankton {
 
@@ -137,6 +138,28 @@ private:
   AbstractTypeRegistry *type_registry_;
 };
 
+class SyntaxError {
+public:
+  SyntaxError(const char *source, size_t offset)
+    : source_(source)
+    , offset_(offset) { }
+
+  // Returns the offending character.
+  char offender() { return source_[offset_]; }
+
+  // Returns the 0-based character offset within the source string where the
+  // error occurred.
+  size_t offset() { return offset_; }
+
+  // The seed type for syntax errors.
+  static SeedType<SyntaxError> *seed_type() { return &kSeedType; }
+
+private:
+  static SeedType<SyntaxError> kSeedType;
+  const char *source_;
+  size_t offset_;
+};
+
 // Utility for converting a plankton variant to a 7-bit ascii string.
 class TextReader {
 public:
@@ -150,17 +173,16 @@ public:
 
   // Returns true iff the last parse failed.  If parse hasn't been called at all
   // returns false.
-  bool has_failed() { return has_failed_; }
+  bool has_failed() { return error_ != NULL; }
 
   // If has_failed() returns true this will return the offending character.
-  char offender() { return offender_; }
+  char offender() { return error_ == NULL ? '\0' : error_->offender(); }
 
 private:
   friend class TextReaderImpl;
   Arena *arena_;
   TextSyntax syntax_;
-  bool has_failed_;
-  char offender_;
+  SyntaxError *error_;
 };
 
 } // namespace plankton

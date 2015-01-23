@@ -4,6 +4,7 @@
 #include "test/asserts.hh"
 #include "test/unittest.hh"
 #include "plankton-inl.hh"
+#include "marshal-inl.hh"
 
 using namespace plankton;
 
@@ -33,6 +34,7 @@ TEST(text, primitive) {
   check_ascii("10", NULL, Variant::integer(10));
   check_ascii("-10", NULL, Variant::integer(-10));
   check_ascii("fooBAR123", NULL, Variant::string("fooBAR123"));
+  check_ascii("foo-BAR-123", NULL, Variant::string("foo-BAR-123"));
   check_ascii("\"\"", NULL, Variant::string(""));
   check_ascii("\"123\"", NULL, Variant::string("123"));
   check_ascii("\"a b c\"", NULL, Variant::string("a b c"));
@@ -152,9 +154,6 @@ static void check_syntax_rewrite(TextSyntax syntax, const char *src,
   Variant decoded = parser.parse(src, strlen(src));
   TextWriter writer(syntax);
   writer.write(decoded);
-  if (strcmp(expected, *writer) != 0) {
-    HEST("%s %s", expected, *writer);
-  }
   ASSERT_EQ(0, strcmp(expected, *writer));
 }
 
@@ -171,26 +170,29 @@ static void check_both_rewrite(const char *src, const char *expected) {
   check_command_rewrite(src, expected);
 }
 
-static void check_syntax_fails(TextSyntax syntax, char offender, const char *src) {
+static void check_syntax_fails(TextSyntax syntax, char offender,
+    int offset, const char *src) {
   Arena arena;
   TextReader parser(&arena, syntax);
   Variant decoded = parser.parse(src, strlen(src));
   ASSERT_TRUE(parser.has_failed());
-  ASSERT_FALSE(bool(decoded));
-  ASSERT_EQ(offender, parser.offender());
+  SyntaxError *error = native_cast<SyntaxError>(decoded);
+  ASSERT_FALSE(error == NULL);
+  ASSERT_EQ(offender, error->offender());
+  ASSERT_EQ(offset, error->offset());
 }
 
-static void check_source_fails(char offender, const char *src) {
-  check_syntax_fails(SOURCE_SYNTAX, offender, src);
+static void check_source_fails(char offender, int offset, const char *src) {
+  check_syntax_fails(SOURCE_SYNTAX, offender, offset, src);
 }
 
-static void check_command_fails(char offender, const char *src) {
-  check_syntax_fails(COMMAND_SYNTAX, offender, src);
+static void check_command_fails(char offender, int offset, const char *src) {
+  check_syntax_fails(COMMAND_SYNTAX, offender, offset, src);
 }
 
-static void check_both_fail(char offender, const char *src) {
-  check_source_fails(offender, src);
-  check_command_fails(offender, src);
+static void check_both_fail(char offender, int offset, const char *src) {
+  check_source_fails(offender, offset, src);
+  check_command_fails(offender, offset, src);
 }
 
 TEST(text, strings) {
@@ -217,44 +219,46 @@ TEST(text, strings) {
   check_command_rewrite("{ --a b}", "{--a b}");
   check_command_rewrite("{--a b }", "{--a b}");
   check_command_rewrite("{ -- a b}", "{--a b}");
-  check_both_fail('%', "%f %f");
-  check_source_fails(',', "[,]");
-  check_source_fails(',', "{,}");
-  check_source_fails('}', "{a:}");
-  check_source_fails(':', "{:b}");
-  check_source_fails('c', "{a:b c:d}");
-  check_source_fails('2', "[1 2]");
-  check_source_fails('\0', "[1, ");
-  check_source_fails('\0', "[1");
-  check_source_fails('\0', "[");
-  check_source_fails('\0', "{");
-  check_source_fails('\0', "{a");
-  check_source_fails('\0', "{a:");
-  check_source_fails('\0', "{a:b");
-  check_both_fail('\0', "\"");
-  check_both_fail('\0', "\"\\");
-  check_both_fail('\0', "\"\\x");
-  check_both_fail('\0', "\"\\xa");
-  check_both_fail('g', "\"\\xag\"");
-  check_both_fail('g', "\"\\xga\"");
-  check_both_fail('%', "\"\\%\"");
-  check_both_fail('\0', "%");
-  check_both_fail('g', "%g");
-  check_both_fail('.', "%[cGxl.XN1cmUu]");
-  check_both_fail(']', "%[cGxlYXN1cmU]");
-  check_both_fail(']', "%[cGxlYXN1cm]");
-  check_both_fail(']', "%[cGxlYXN1c]");
-  check_both_fail('=', "%[cGxlYXN1=mUu]");
-  check_both_fail('=', "%[cGxlYXN1c=Uu]");
-  check_command_fails('}', "{--a}");
-  check_command_fails('b', "{b}");
-  check_command_fails('\0', "[1 ");
-  check_command_fails('\0', "[1");
-  check_command_fails('\0', "[");
-  check_command_fails('\0', "{");
-  check_command_fails('\0', "{--");
-  check_command_fails('\0', "{--b");
-  check_command_fails('\0', "{--b c");
+  check_both_fail('%', 3, "%f %f");
+  check_source_fails(',', 1, "[,]");
+  check_source_fails(',', 1, "{,}");
+  check_source_fails('}', 3, "{a:}");
+  check_source_fails(':', 1, "{:b}");
+  check_source_fails('c', 5, "{a:b c:d}");
+  check_source_fails('2', 3, "[1 2]");
+  check_source_fails('\0', 4, "[1, ");
+  check_source_fails('\0', 2, "[1");
+  check_source_fails('\0', 1, "[");
+  check_source_fails('\0', 1, "{");
+  check_source_fails('\0', 2, "{a");
+  check_source_fails('\0', 3, "{a:");
+  check_source_fails('\0', 4, "{a:b");
+  check_both_fail('\0', 1, "\"");
+  check_both_fail('\0', 2, "\"\\");
+  check_both_fail('\0', 3, "\"\\x");
+  check_both_fail('\0', 4, "\"\\xa");
+  check_both_fail('g', 4, "\"\\xag\"");
+  check_both_fail('g', 3, "\"\\xga\"");
+  check_both_fail('%', 2, "\"\\%\"");
+  check_both_fail('\0', 1, "%");
+  check_both_fail('g', 1, "%g");
+  check_both_fail('.', 6, "%[cGxl.XN1cmUu]");
+  check_both_fail(']', 13, "%[cGxlYXN1cmU]");
+  check_both_fail(']', 12, "%[cGxlYXN1cm]");
+  check_both_fail(']', 11, "%[cGxlYXN1c]");
+  check_both_fail('=', 10, "%[cGxlYXN1=mUu]");
+  check_both_fail('=', 11, "%[cGxlYXN1c=Uu]");
+  check_command_fails('}', 4, "{--a}");
+  check_command_fails('-', 5, "{--a --}");
+  check_command_fails('-', 0, "--");
+  check_command_fails('b', 1, "{b}");
+  check_command_fails('\0', 3, "[1 ");
+  check_command_fails('\0', 2, "[1");
+  check_command_fails('\0', 1, "[");
+  check_command_fails('\0', 1, "{");
+  check_command_fails('\0', 3, "{--");
+  check_command_fails('\0', 4, "{--b");
+  check_command_fails('\0', 6, "{--b c");
 }
 
 TEST(text, comments) {
@@ -274,7 +278,7 @@ TEST(text, comments) {
       "%f", "%f");
   check_both_rewrite("#{ #{ #{ #{ deeply nested #} #} #} #} %f", "%f");
   check_both_rewrite("[ #{ asdfas #} 1 #{asdfasd #} ]", "[1]");
-  check_both_fail('\0', "#{  #");
-  check_both_fail('\0', "#{");
-  check_both_fail('\0', "#");
+  check_both_fail('\0', 5, "#{  #");
+  check_both_fail('\0', 2, "#{");
+  check_both_fail('\0', 1, "#");
 }

@@ -8,6 +8,15 @@
 
 namespace plankton {
 
+// Shorthand for getting wrapped data out of a native variant. If the variant
+// is a native of the given type returns the wrapped value, otherwise returns
+// NULL.
+template <typename T>
+static inline T *native_cast(Variant variant,
+    ConcreteSeedType<T> *type = default_seed_type<T>::get()) {
+  return variant.native_as(type);
+}
+
 template <typename T>
 inline T *Variant::native_as(ConcreteSeedType<T> *type) {
   return type->cast(native_type(), native_object());

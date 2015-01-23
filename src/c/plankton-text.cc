@@ -294,10 +294,12 @@ bool TextWriterImpl::is_unquoted_string_start(char c) {
       || ('A' <= c && c <= 'Z');
 }
 
+static const char *kUnquotedStringSpecials = "_-";
+
 bool TextWriterImpl::is_unquoted_string_part(char c) {
   return is_unquoted_string_start(c)
       || ('0' <= c && c <= '9')
-      || (c == '_');
+      || ((c != '\0') && (strchr(kUnquotedStringSpecials, c) != NULL));
 }
 
 bool TextWriterImpl::is_unescaped_char(char c) {
@@ -570,6 +572,7 @@ void TextWriter::write(Variant value) {
 class TextReaderImpl {
 public:
   TextReaderImpl(const char *chars, size_t length, TextReader *parser);
+  virtual ~TextReaderImpl() { }
 
   // Decode a toplevel variant expression. A toplevel expression is different
   // from others because it must fill the whole string.
@@ -584,6 +587,9 @@ protected:
 
   // Returns the current character or \0 if we've read past the end.
   char current() { return has_more() ? chars_[cursor_] : '\0'; }
+
+  // Returns the next character or \0 if it's past the end.
+  char next() { return cursor_ + 1 < length_ ? chars_[cursor_ + 1] : '\0'; }
 
   // Skips to the next character, returning true iff there is input left.
   bool advance() {
@@ -794,9 +800,11 @@ bool TextReaderImpl::decode(Variant *out) {
       return decode_seed(out);
     case '"':
       return decode_quoted_string(out);
+    case '-':
+      return (next() == '-' ? fail(out) : decode_integer(out));
     default:
       char c = current();
-      if (c == '-' || is_digit(c)) {
+      if (is_digit(c)) {
         return decode_integer(out);
       } else if (TextWriterImpl::is_unquoted_string_start(c)) {
         return decode_unquoted_string(out);
@@ -1157,10 +1165,12 @@ bool TextReaderImpl::decode_blob(Variant *out) {
   }
 }
 
+SeedType<SyntaxError> SyntaxError::kSeedType("plankton.SyntaxError");
+
 bool TextReaderImpl::fail(Variant *out) {
-  parser_->has_failed_ = true;
-  parser_->offender_ = current();
-  *out = Variant::null();
+  SyntaxError *error = new (arena()) SyntaxError(chars_, cursor_);
+  parser_->error_ = error;
+  *out = arena()->new_native(error);
   return false;
 }
 
@@ -1172,12 +1182,10 @@ bool TextReaderImpl::succeed(Variant value, Variant *out) {
 TextReader::TextReader(Arena *arena, TextSyntax syntax)
   : arena_(arena)
   , syntax_(syntax)
-  , has_failed_(false)
-  , offender_('\0') { }
+  , error_(NULL) { }
 
 Variant TextReader::parse(const char *chars, size_t length) {
-  has_failed_ = false;
-  offender_ = '\0';
+  error_ = NULL;
   Variant result;
   if (syntax_ == SOURCE_SYNTAX) {
     SourceTextReaderImpl decoder(chars, length, this);
