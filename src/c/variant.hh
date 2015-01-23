@@ -586,6 +586,10 @@ public:
   // Creates and returns a new mutable blob value of the given size.
   virtual Blob new_blob(uint32_t size) = 0;
 
+  // Creates and returns a new variant blob. The contents it copied into this
+  // arena so the data array can be disposed after this call returns.
+  virtual Blob new_blob(const void *data, uint32_t size) = 0;
+
   // Creates and returns a new sink value that will store the value set into the
   // given output parameter..
   virtual Sink new_sink(Variant *out) = 0;

@@ -138,6 +138,11 @@ private:
   AbstractTypeRegistry *type_registry_;
 };
 
+// Represents a syntax error while parsing text input. If parsing fails an
+// instance of this will be returned. You can then distinguish success/failure
+// by checking whether you got a syntax error back or, more reliably in case
+// you might have to deal with parsing correctly encoded syntax error objects,
+// using TextReader::has_failed().
 class SyntaxError {
 public:
   SyntaxError(const char *source, size_t offset)
@@ -164,7 +169,7 @@ private:
 class TextReader {
 public:
   // Creates a new parser which uses the given arena for allocation.
-  TextReader(Arena *arena, TextSyntax syntax = SOURCE_SYNTAX);
+  TextReader(Factory *factory, TextSyntax syntax = SOURCE_SYNTAX);
 
   // Parse the given input, returning the value. If any errors occur the
   // has_failed() and offender() methods can be used to identify what the
@@ -175,12 +180,14 @@ public:
   // returns false.
   bool has_failed() { return error_ != NULL; }
 
-  // If has_failed() returns true this will return the offending character.
-  char offender() { return error_ == NULL ? '\0' : error_->offender(); }
+  // If has_failed() returns true this will return the syntax error. The error
+  // will have been allocated in the factory so will live as long as the factory
+  // does.
+  SyntaxError *error() { return error_; }
 
 private:
   friend class TextReaderImpl;
-  Arena *arena_;
+  Factory *factory_;
   TextSyntax syntax_;
   SyntaxError *error_;
 };

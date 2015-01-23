@@ -294,6 +294,10 @@ bool TextWriterImpl::is_unquoted_string_start(char c) {
       || ('A' <= c && c <= 'Z');
 }
 
+// Characters that are allowed in unquoted strings, beyond the ascii alnum ones.
+//
+// TODO: How to generalize this to non-latin characters without requiring the
+//   massive full weight of ICU or something similar?
 static const char *kUnquotedStringSpecials = "_-";
 
 bool TextWriterImpl::is_unquoted_string_part(char c) {
@@ -652,8 +656,8 @@ protected:
   // Parses the next seed.
   virtual bool decode_seed(Variant *out) = 0;
 
-  // Returns the arena to use for allocation.
-  Arena *arena() { return parser_->arena_; }
+  // Returns the factory to use for allocation.
+  Factory *factory() { return parser_->factory_; }
 
 private:
   // Given a character, returns the special character it encodes (for instance
@@ -837,7 +841,7 @@ bool TextReaderImpl::decode_unquoted_string(Variant *out) {
     advance();
   const char *end = chars_ + cursor_;
   skip_whitespace();
-  return succeed(arena()->new_string(start, end - start), out);
+  return succeed(factory()->new_string(start, end - start), out);
 }
 
 bool TextWriterImpl::encode_short_escape(char c, char *out) {
@@ -927,12 +931,12 @@ bool TextReaderImpl::decode_quoted_string(Variant *out) {
   } else {
     advance_and_skip();
   }
-  return succeed(arena()->new_string(*buf, buf.length()), out);
+  return succeed(factory()->new_string(*buf, buf.length()), out);
 }
 
 bool SourceTextReaderImpl::decode_array(Variant *out) {
   advance_and_skip();
-  Array result = arena()->new_array();
+  Array result = factory()->new_array();
   while (has_more() && current() != ']') {
     Variant next;
     if (!decode(&next))
@@ -953,7 +957,7 @@ bool SourceTextReaderImpl::decode_array(Variant *out) {
 
 bool CommandTextReaderImpl::decode_array(Variant *out) {
   advance_and_skip();
-  Array result = arena()->new_array();
+  Array result = factory()->new_array();
   while (has_more() && current() != ']') {
     Variant next;
     if (!decode(&next))
@@ -969,7 +973,7 @@ bool CommandTextReaderImpl::decode_array(Variant *out) {
 
 bool SourceTextReaderImpl::decode_map(Variant *out) {
   advance_and_skip();
-  Map result = arena()->new_map();
+  Map result = factory()->new_map();
   while (has_more() && current() != '}') {
     Variant key;
     if (!decode(&key))
@@ -996,7 +1000,7 @@ bool SourceTextReaderImpl::decode_map(Variant *out) {
 
 bool CommandTextReaderImpl::decode_map(Variant *out) {
   advance_and_skip();
-  Map result = arena()->new_map();
+  Map result = factory()->new_map();
   while (has_more() && current() != '}') {
     if (current() != '-')
       return fail(out);
@@ -1033,7 +1037,7 @@ bool SourceTextReaderImpl::decode_seed(Variant *out) {
     return fail(out);
   }
   advance_and_skip();
-  Seed result = arena()->new_seed();
+  Seed result = factory()->new_seed();
   result.set_header(header);
   while (has_more() && current() != end) {
     Variant key;
@@ -1073,7 +1077,7 @@ bool CommandTextReaderImpl::decode_seed(Variant *out) {
     return fail(out);
   }
   advance_and_skip();
-  Seed result = arena()->new_seed();
+  Seed result = factory()->new_seed();
   result.set_header(header);
   while (has_more() && current() != end) {
     if (current() != '-')
@@ -1158,7 +1162,7 @@ bool TextReaderImpl::decode_blob(Variant *out) {
   }
   if (current() == ']') {
     advance_and_skip();
-    Variant result = arena()->new_blob(*data, data.length());
+    Variant result = factory()->new_blob(*data, data.length());
     return succeed(result, out);
   } else {
     return fail(out);
@@ -1168,9 +1172,9 @@ bool TextReaderImpl::decode_blob(Variant *out) {
 SeedType<SyntaxError> SyntaxError::kSeedType("plankton.SyntaxError");
 
 bool TextReaderImpl::fail(Variant *out) {
-  SyntaxError *error = new (arena()) SyntaxError(chars_, cursor_);
+  SyntaxError *error = new (factory()) SyntaxError(chars_, cursor_);
   parser_->error_ = error;
-  *out = arena()->new_native(error);
+  *out = factory()->new_native(error);
   return false;
 }
 
@@ -1179,8 +1183,8 @@ bool TextReaderImpl::succeed(Variant value, Variant *out) {
   return true;
 }
 
-TextReader::TextReader(Arena *arena, TextSyntax syntax)
-  : arena_(arena)
+TextReader::TextReader(Factory *factory, TextSyntax syntax)
+  : factory_(factory)
   , syntax_(syntax)
   , error_(NULL) { }
 
