@@ -1294,3 +1294,33 @@ Variant CommandLine::option(Variant field, Variant defawlt) {
 }
 
 } // namespace plankton
+
+pton_command_line_reader_t *pton_new_command_line_reader() {
+  return new plankton::CommandLineReader();
+}
+
+void pton_dispose_command_line_reader(pton_command_line_reader_t *that) {
+  delete static_cast<plankton::CommandLineReader*>(that);
+}
+
+pton_command_line_t *pton_command_line_reader_parse(
+    pton_command_line_reader_t *reader, int argc, const char **argv) {
+  return static_cast<plankton::CommandLineReader*>(reader)->parse(argc, argv);
+}
+
+size_t pton_command_line_argument_count(pton_command_line_t *that) {
+  return static_cast<plankton::CommandLine*>(that)->argument_count();
+}
+
+pton_variant_t pton_command_line_argument(pton_command_line_t *that, size_t i) {
+  return static_cast<plankton::CommandLine*>(that)->argument(i).to_c();
+}
+
+size_t pton_command_line_option_count(pton_command_line_t *that) {
+  return static_cast<plankton::CommandLine*>(that)->option_count();
+}
+
+pton_variant_t pton_command_line_option(pton_command_line_t *that,
+    pton_variant_t key, pton_variant_t defawlt) {
+  return static_cast<plankton::CommandLine*>(that)->option(key, defawlt).to_c();
+}

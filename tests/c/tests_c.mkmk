@@ -11,7 +11,8 @@ filenames = [
   "test_marshal.cc",
   "test_rpc.cc",
   "test_socket.cc",
-  "test_text.cc",
+  "test_text_c.cc",
+  "test_text_cpp.cc",
   "test_variant_c.cc",
   "test_variant_cpp.cc",
 ]

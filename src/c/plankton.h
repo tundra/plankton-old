@@ -19,6 +19,8 @@ typedef struct pton_arena_t pton_arena_t;
 typedef struct pton_arena_value_t pton_arena_value_t;
 typedef struct pton_assembler_t pton_assembler_t;
 typedef struct pton_sink_t pton_sink_t;
+typedef struct pton_command_line_t pton_command_line_t;
+typedef struct pton_command_line_reader_t pton_command_line_reader_t;
 
 // The different types of variants. The values are the corresponding
 // representation tags downshifted by 4.
@@ -406,5 +408,33 @@ typedef struct {
 // parameter. Returns true if disassembling succeeded, false if not.
 bool pton_decode_next_instruction(const uint8_t *code, size_t size,
     pton_instr_t *instr_out);
+
+// Creates and returns a new command-line reader. Dispose after use with
+// pton_dispose_command_line_reader();
+pton_command_line_reader_t *pton_new_command_line_reader();
+
+// Frees up the resources allocated for the given reader.
+void pton_dispose_command_line_reader(pton_command_line_reader_t *that);
+
+// Parses the given command-line and returns a command line object representing
+// the result. The result will be valid as long as the reader that returned it
+// exists.
+pton_command_line_t *pton_command_line_reader_parse(
+    pton_command_line_reader_t *reader, int argc, const char **argv);
+
+// Returns the number of positional arguments in the given command line.
+size_t pton_command_line_argument_count(pton_command_line_t *that);
+
+// Returns the value of the i'th positional argument in the given command line.
+// If i is past the end of the command line returns null.
+pton_variant_t pton_command_line_argument(pton_command_line_t *that, size_t i);
+
+// Returns the number of options in the given command line.
+size_t pton_command_line_option_count(pton_command_line_t *that);
+
+// Returns the value of the option with the given key in the given command line.
+// If the key doesn't exist returns the given default value.
+pton_variant_t pton_command_line_option(pton_command_line_t *that,
+    pton_variant_t key, pton_variant_t defawlt);
 
 #endif // _PLANKTON_H

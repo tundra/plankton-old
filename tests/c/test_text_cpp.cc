@@ -26,7 +26,7 @@ static void check_ascii(const char *exp_src, const char *exp_cmd, Variant var) {
   check_syntax(COMMAND_SYNTAX, exp_cmd == NULL ? exp_src : exp_cmd, var);
 }
 
-TEST(text, primitive) {
+TEST(text_cpp, primitive) {
   check_ascii("%f", NULL, Variant::no());
   check_ascii("%t", NULL, Variant::yes());
   check_ascii("%n", NULL, Variant::null());
@@ -62,7 +62,7 @@ TEST(text, primitive) {
   check_ascii("%[]", NULL, Variant::blob(NULL, 0));
 }
 
-TEST(text, arrays) {
+TEST(text_cpp, arrays) {
   Arena arena;
   Array a0 = arena.new_array();
   a0.add(8);
@@ -118,7 +118,7 @@ TEST(text, arrays) {
       a5);
 }
 
-TEST(text, maps) {
+TEST(text_cpp, maps) {
   Arena arena;
   Map m0 = arena.new_map();
   m0.set("foo", "bar");
@@ -129,7 +129,7 @@ TEST(text, maps) {
   check_ascii("{foo: bar, 8: 16, []: {}}", "{--foo bar --8 16 --[] {}}", m0);
 }
 
-TEST(text, seeds) {
+TEST(text_cpp, seeds) {
   Arena arena;
   Seed s0 = arena.new_seed();
   s0.set_header("File");
@@ -193,7 +193,7 @@ static void check_both_fail(char offender, int offset, const char *src) {
   check_command_fails(offender, offset, src);
 }
 
-TEST(text, strings) {
+TEST(text_cpp, strings) {
   check_both_rewrite("%f", "%f");
   check_both_rewrite(" %f", "%f");
   check_both_rewrite("[ ]", "[]");
@@ -259,7 +259,7 @@ TEST(text, strings) {
   check_command_fails('\0', 6, "{--b c");
 }
 
-TEST(text, comments) {
+TEST(text_cpp, comments) {
   check_both_rewrite("# here comes false\n %f", "%f");
   check_both_rewrite("# here comes false then true %f\n %t", "%t");
   check_both_rewrite("# here comes false\f %f", "%f");
@@ -305,7 +305,7 @@ void check_cmdline(const char *str, size_t argc, Variant *argv, size_t optc,
   check_cmdline((STR), (ARGC), argv, (OPTC), optv);                            \
 } while (false)
 
-TEST(text, flat_command_line) {
+TEST(text_cpp, flat_command_line) {
   CHECK_CMDLINE("", 0, , 0, );
   CHECK_CMDLINE("foo", 1, "foo", 0, );
   CHECK_CMDLINE("foo bar", 2, "foo" o "bar", 0, );
@@ -325,7 +325,7 @@ TEST(text, flat_command_line) {
   delete[] joined;                                                             \
 } while (false)
 
-TEST(text, join) {
+TEST(text_cpp, join) {
   CHECK_JOIN("", 0, );
   CHECK_JOIN("a", 1, "a");
   CHECK_JOIN("a b", 2, "a" o "b");

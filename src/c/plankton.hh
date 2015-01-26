@@ -9,6 +9,10 @@
 #include "variant.hh"
 #include "marshal.hh"
 
+// Opaque C binding types.
+struct pton_command_line_t { };
+struct pton_command_line_reader_t { };
+
 namespace plankton {
 
 // Utility for encoding plankton data. For most uses you can use a BinaryWriter
@@ -196,7 +200,7 @@ protected:
 
 
 // The result of parsing a set of command-line arguments.
-class CommandLine {
+class CommandLine : public pton_command_line_t {
 public:
   CommandLine(Array args, Map options)
     : args_(args)
@@ -234,7 +238,7 @@ private:
 //
 // is not a valid single command-line value -- it is three strings -- but it is
 // fine as a top-level command-line.
-class CommandLineReader : public TextReader {
+class CommandLineReader : public TextReader, public pton_command_line_reader_t {
 public:
   // Creates a new reader which uses the given factory for allocation. If no
   // factory is specified one will be created and disposed when the reader is
