@@ -1090,7 +1090,7 @@ bool CommandTextReaderImpl::decode_seed(Variant *out) {
   Seed result = factory()->new_seed();
   result.set_header(header);
   while (has_more() && current() != end) {
-    if (current() != '-' || current() != '-')
+    if (current() != '-' || next() != '-')
       return fail(out);
     advance();
     advance_and_skip();

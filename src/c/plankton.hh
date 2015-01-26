@@ -195,6 +195,7 @@ protected:
 };
 
 
+// The result of parsing a set of command-line arguments.
 class CommandLine {
 public:
   CommandLine(Array args, Map options)
