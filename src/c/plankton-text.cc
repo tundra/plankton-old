@@ -298,7 +298,7 @@ bool TextWriterImpl::is_unquoted_string_start(char c) {
 //
 // TODO: How to generalize this to non-latin characters without requiring the
 //   massive full weight of ICU or something similar?
-static const char *kUnquotedStringSpecials = "_-";
+static const char *kUnquotedStringSpecials = "_-/.";
 
 bool TextWriterImpl::is_unquoted_string_part(char c) {
   return is_unquoted_string_start(c)
@@ -1253,8 +1253,12 @@ CommandLine *CommandLineReader::parse(const char *chars, size_t length) {
   error_ = NULL;
   Variant result;
   CommandTextReaderImpl decoder(chars, length, this);
-  decoder.decode_command_line_full(&result);
-  return native_cast<CommandLine>(result);
+  if (!decoder.decode_command_line_full(&result)) {
+    CHECK_TRUE("no error object", error_ != NULL);
+    return new (factory_) CommandLine(error_);
+  } else {
+    return native_cast<CommandLine>(result);
+  }
 }
 
 CommandLine *CommandLineReader::parse(int argc, const char **argv) {
@@ -1323,4 +1327,16 @@ size_t pton_command_line_option_count(pton_command_line_t *that) {
 pton_variant_t pton_command_line_option(pton_command_line_t *that,
     pton_variant_t key, pton_variant_t defawlt) {
   return static_cast<plankton::CommandLine*>(that)->option(key, defawlt).to_c();
+}
+
+bool pton_command_line_is_valid(pton_command_line_t *that) {
+  return static_cast<plankton::CommandLine*>(that)->is_valid();
+}
+
+pton_syntax_error_t *pton_command_line_error(pton_command_line_t *that) {
+  return static_cast<plankton::CommandLine*>(that)->error();
+}
+
+char pton_syntax_error_offender(pton_syntax_error_t *that) {
+  return static_cast<plankton::SyntaxError*>(that)->offender();
 }

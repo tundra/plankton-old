@@ -12,6 +12,7 @@
 // Opaque C binding types.
 struct pton_command_line_t { };
 struct pton_command_line_reader_t { };
+struct pton_syntax_error_t { };
 
 namespace plankton {
 
@@ -147,7 +148,7 @@ private:
 // by checking whether you got a syntax error back or, more reliably in case
 // you might have to deal with parsing correctly encoded syntax error objects,
 // using TextReader::has_failed().
-class SyntaxError {
+class SyntaxError : public pton_syntax_error_t {
 public:
   SyntaxError(const char *source, size_t offset)
     : source_(source)
@@ -202,8 +203,14 @@ protected:
 // The result of parsing a set of command-line arguments.
 class CommandLine : public pton_command_line_t {
 public:
+  // Constructor for failed results.
+  explicit CommandLine(SyntaxError *error)
+    : error_(error) { }
+
+  // Constructor for successful results.
   CommandLine(Array args, Map options)
-    : args_(args)
+    : error_(NULL)
+    , args_(args)
     , options_(options) { }
 
   // Returns the number of toplevel arguments.
@@ -219,11 +226,19 @@ public:
   // The number of options passed.
   size_t option_count() { return options_.size(); }
 
+  // Does this command line represent a successful parse?
+  bool is_valid() { return error_ == NULL; }
+
+  // If this command line is the result of a failed parse, returns the syntax
+  // error that describes the problem. Otherwise NULL.
+  SyntaxError *error() { return error_; }
+
   // The seed type for syntax errors.
   static SeedType<CommandLine> *seed_type() { return &kSeedType; }
 
 private:
   static SeedType<CommandLine> kSeedType;
+  SyntaxError *error_;
   Array args_;
   Map options_;
 };

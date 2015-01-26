@@ -15,6 +15,7 @@ static void check_syntax(TextSyntax syntax, const char *exp_src, Variant var) {
   ASSERT_EQ(0, strcmp(exp_src, *writer));
   TextReader parser(syntax);
   Variant decoded = parser.parse(*writer, writer.length());
+  ASSERT_FALSE(parser.has_failed());
   ASSERT_TRUE(decoded.is_frozen());
   TextWriter rewriter(syntax);
   rewriter.write(decoded);
@@ -35,6 +36,8 @@ TEST(text_cpp, primitive) {
   check_ascii("-10", NULL, Variant::integer(-10));
   check_ascii("fooBAR123", NULL, Variant::string("fooBAR123"));
   check_ascii("foo-BAR-123", NULL, Variant::string("foo-BAR-123"));
+  check_ascii("foo/BAR/123", NULL, Variant::string("foo/BAR/123"));
+  check_ascii("foo.BAR.123", NULL, Variant::string("foo.BAR.123"));
   check_ascii("\"\"", NULL, Variant::string(""));
   check_ascii("\"123\"", NULL, Variant::string("123"));
   check_ascii("\"a b c\"", NULL, Variant::string("a b c"));
@@ -288,6 +291,7 @@ void check_cmdline(const char *str, size_t argc, Variant *argv, size_t optc,
   CommandLineReader reader;
   CommandLine *cmdline = reader.parse(str, strlen(str));
   ASSERT_FALSE(cmdline == NULL);
+  ASSERT_TRUE(cmdline->is_valid());
   ASSERT_EQ(argc, cmdline->argument_count());
   for (size_t i = 0; i < argc; i++)
     ASSERT_TRUE(argv[i] == cmdline->argument(i));

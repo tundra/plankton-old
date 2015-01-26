@@ -21,6 +21,7 @@ typedef struct pton_assembler_t pton_assembler_t;
 typedef struct pton_sink_t pton_sink_t;
 typedef struct pton_command_line_t pton_command_line_t;
 typedef struct pton_command_line_reader_t pton_command_line_reader_t;
+typedef struct pton_syntax_error_t pton_syntax_error_t;
 
 // The different types of variants. The values are the corresponding
 // representation tags downshifted by 4.
@@ -149,6 +150,9 @@ pton_variant_t pton_blob(const void *data, uint32_t size);
 
 // Is the given value an integer?
 bool pton_is_integer(pton_variant_t variant);
+
+// Is the given value null?
+bool pton_is_null(pton_variant_t variant);
 
 // Is this value an array?
 bool pton_is_array(pton_variant_t variant);
@@ -432,9 +436,21 @@ pton_variant_t pton_command_line_argument(pton_command_line_t *that, size_t i);
 // Returns the number of options in the given command line.
 size_t pton_command_line_option_count(pton_command_line_t *that);
 
+// Returns true if the given command line is the result of a successful parse.
+bool pton_command_line_is_valid(pton_command_line_t *that);
+
+// If the given command line is the result of a failed parse, returns a syntax
+// error value that describes the problem. Otherwise returns NULL. The returned
+// value is valid as long as the reader that produced the command line.
+pton_syntax_error_t *pton_command_line_error(pton_command_line_t *that);
+
 // Returns the value of the option with the given key in the given command line.
 // If the key doesn't exist returns the given default value.
 pton_variant_t pton_command_line_option(pton_command_line_t *that,
     pton_variant_t key, pton_variant_t defawlt);
+
+// Given a syntax error, returns character where the error occurred. If it was
+// the end of the input \0 will be returned.
+char pton_syntax_error_offender(pton_syntax_error_t *that);
 
 #endif // _PLANKTON_H

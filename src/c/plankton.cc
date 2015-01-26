@@ -1104,6 +1104,11 @@ bool pton_is_integer(pton_variant_t variant) {
   return variant.header_.repr_tag_ == header_t::PTON_REPR_INT64;
 }
 
+bool pton_is_null(pton_variant_t variant) {
+  pton_check_binary_version(variant);
+  return variant.header_.repr_tag_ == header_t::PTON_REPR_NULL;
+}
+
 bool pton_is_array(pton_variant_t variant) {
   pton_check_binary_version(variant);
   return variant.header_.repr_tag_ == header_t::PTON_REPR_ARNA_ARRAY;
