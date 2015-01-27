@@ -292,6 +292,7 @@ class Options(object):
       element.apply(self)
 
   def get_flag_value(self, name, default):
+    self.ensure_processed()
     if name in self.flags:
       return self.flags[name]
     elif ('_' in name):
