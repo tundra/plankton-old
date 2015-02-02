@@ -7,6 +7,7 @@
 
 BEGIN_C_INCLUDES
 #include "io/file.h"
+#include "utils/string-inl.h"
 END_C_INCLUDES
 
 #include <vector>
@@ -239,7 +240,7 @@ bool YamlParser::parse(io_stream_t *in, Sink sink) {
 
 bool YamlParser::get_test_case(Variant test_type, Arena *arena, TestCase *test_case_out) {
   // Read the test case file into a variant.
-  const char *yaml_path = getenv("YAML_PATH");
+  utf8_t yaml_path = new_c_string(getenv("YAML_PATH"));
   io_stream_t *yaml_file = file_system_open(file_system_native(), yaml_path,
       OPEN_FILE_MODE_READ);
   YamlParser parser;

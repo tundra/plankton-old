@@ -60,9 +60,9 @@ int main(int argc, char *argv[]) {
   FileSystem *fs = FileSystem::native();
   IoStream *out = fs->std_out();
   for (int i = 1; i < argc; i++) {
-    const char *name = argv[i];
+    utf8_t name = new_c_string(argv[i]);
     IoStream *in = NULL;
-    if (strcmp("-", name) == 0)
+    if (string_equals_cstr(name, "-"))
       in = fs->std_in();
     else
       in = fs->open(name, OPEN_FILE_MODE_READ);
