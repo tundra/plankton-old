@@ -58,14 +58,14 @@ void disass_instr(pton_instr_t *instr, string_buffer_t *buf) {
 int main(int argc, char *argv[]) {
   install_crash_handler();
   FileSystem *fs = FileSystem::native();
-  IoStream *out = fs->std_out();
+  OutStream *out = fs->std_out();
   for (int i = 1; i < argc; i++) {
     utf8_t name = new_c_string(argv[i]);
-    IoStream *in = NULL;
+    InStream *in = NULL;
     if (string_equals_cstr(name, "-"))
       in = fs->std_in();
     else
-      in = fs->open(name, OPEN_FILE_MODE_READ);
+      in = fs->open(name, OPEN_FILE_MODE_READ).in();
     string_buffer_t buf;
     string_buffer_init(&buf);
     do {

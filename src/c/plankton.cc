@@ -1198,7 +1198,7 @@ pton_variant_t pton_id(uint32_t size, uint64_t value) {
   return result;
 }
 
-OutputSocket::OutputSocket(tclib::IoStream *dest)
+OutputSocket::OutputSocket(tclib::OutStream *dest)
   : dest_(dest)
   , cursor_(0)
   , default_encoding_(PTON_CHARSET_UTF_8)
@@ -1296,7 +1296,7 @@ void StreamId::dispose() {
   raw_key_ = NULL;
 }
 
-InputSocket::InputSocket(tclib::IoStream *src)
+InputSocket::InputSocket(tclib::InStream *src)
   : src_(src)
   , has_been_inited_(false)
   , cursor_(0)

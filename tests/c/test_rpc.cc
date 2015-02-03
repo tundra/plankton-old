@@ -18,7 +18,7 @@ using namespace tclib;
 // A bounded concurrent io stream that allows any number of concurrent readers
 // and writers. It doesn't necessarily scale super well but it is simple and
 // the concurrency control is (famous last words) solid.
-class ByteBufferStream : public tclib::IoStream {
+class ByteBufferStream : public tclib::InStream, public tclib::OutStream {
 public:
   ByteBufferStream(size_t capacity);
   ~ByteBufferStream();

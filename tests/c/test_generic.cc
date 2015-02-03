@@ -58,7 +58,7 @@ public:
 
   // Parses the contents of the given file as yaml, building the result using
   // the given sink.
-  bool parse(io_stream_t *in, Sink sink);
+  bool parse(in_stream_t *in, Sink sink);
 
   static bool get_test_case(Variant name, Arena *arena, TestCase *test_case);
 
@@ -96,8 +96,8 @@ YamlParser::~YamlParser() {
 
 int YamlParser::handle_framework_read(void *yaml_file_ptr, unsigned char *buffer,
     size_t size, size_t *length) {
-  io_stream_t *yaml_file = (io_stream_t*) yaml_file_ptr;
-  int read = io_stream_read_bytes(yaml_file, buffer, size);
+  in_stream_t *yaml_file = (in_stream_t*) yaml_file_ptr;
+  int read = in_stream_read_bytes(yaml_file, buffer, size);
   if (read < 0)
     return false;
   *length = read;
@@ -226,7 +226,7 @@ bool YamlParser::at(yaml_event_type_t type) {
   return current_.type == type;
 }
 
-bool YamlParser::parse(io_stream_t *in, Sink sink) {
+bool YamlParser::parse(in_stream_t *in, Sink sink) {
   yaml_parser_set_input(&parser_, handle_framework_read, in);
   yaml_parser_parse(&parser_, &current_);
   expect(YAML_STREAM_START_EVENT);
@@ -241,12 +241,12 @@ bool YamlParser::parse(io_stream_t *in, Sink sink) {
 bool YamlParser::get_test_case(Variant test_type, Arena *arena, TestCase *test_case_out) {
   // Read the test case file into a variant.
   utf8_t yaml_path = new_c_string(getenv("YAML_PATH"));
-  io_stream_t *yaml_file = file_system_open(file_system_native(), yaml_path,
+  file_streams_t streams = file_system_open(file_system_native(), yaml_path,
       OPEN_FILE_MODE_READ);
   YamlParser parser;
   Variant everything;
-  ASSERT_TRUE(parser.parse(yaml_file, arena->new_sink(&everything)));
-  io_stream_close(yaml_file);
+  ASSERT_TRUE(parser.parse(streams.in, arena->new_sink(&everything)));
+  file_streams_close(&streams);
   // Scan through the test case to find the one we're looking for.
   for (size_t i = 0; i < everything.array_length(); i++) {
     Variant test_case = everything.array_get(i).map_get("test_case");

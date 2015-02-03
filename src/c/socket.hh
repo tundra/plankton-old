@@ -21,7 +21,7 @@ static const byte_t kSendValue = 2;
 class OutputSocket {
 public:
   // Create a new output socket that writes to the given stream.
-  OutputSocket(tclib::IoStream *dest);
+  OutputSocket(tclib::OutStream *dest);
 
   // Write the stream header.
   void init();
@@ -49,7 +49,7 @@ private:
   // Writes 0s until the total number of bytes written is a multiple of 8.
   void write_padding();
 
-  tclib::IoStream *dest_;
+  tclib::OutStream *dest_;
   size_t cursor_;
   pton_charset_t default_encoding_;
   bool has_been_inited_;
@@ -224,7 +224,7 @@ public:
   typedef tclib::callback_t<InputStream*(InputStreamConfig*)> InputStreamFactory;
 
   // Create a new input socket that fetches data from the given source.
-  InputSocket(tclib::IoStream *src);
+  InputSocket(tclib::InStream *src);
 
   // Sets the factory used to create input streams. If you want to set the
   // stream factory you have to do it before calling init(). Returns true if
@@ -280,7 +280,7 @@ private:
 
   typedef platform_hash_map<StreamId, InputStream*, StreamId::Hasher> StreamMap;
 
-  tclib::IoStream *src_;
+  tclib::InStream *src_;
   bool has_been_inited_;
   size_t cursor_;
   InputStreamFactory stream_factory_;
