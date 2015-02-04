@@ -304,8 +304,8 @@ void check_cmdline(const char *str, size_t argc, Variant *argv, size_t optc,
 }
 
 #define CHECK_CMDLINE(STR, ARGC, ARGV, OPTC, OPTV) do {                        \
-  Variant argv[(ARGC)] = {ARGV};                                               \
-  Variant optv[2 * (OPTC)] = {OPTV};                                           \
+  Variant argv[(ARGC) + 1] = {ARGV};                                           \
+  Variant optv[2 * (OPTC) + 1] = {OPTV};                                       \
   check_cmdline((STR), (ARGC), argv, (OPTC), optv);                            \
 } while (false)
 
@@ -321,7 +321,7 @@ TEST(text_cpp, flat_command_line) {
 }
 
 #define CHECK_JOIN(STR, ARGC, ARGV) do {                                       \
-  const char *argv[(ARGC)] = {ARGV};                                           \
+  const char *argv[(ARGC) + 1] = {ARGV};                                       \
   int length = 0;                                                              \
   char *joined = CommandLineReader::join_argv((ARGC), argv, &length);          \
   ASSERT_C_STREQ((STR), joined);                                                 \
