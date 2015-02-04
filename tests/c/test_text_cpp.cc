@@ -27,6 +27,20 @@ static void check_ascii(const char *exp_src, const char *exp_cmd, Variant var) {
   check_syntax(COMMAND_SYNTAX, exp_cmd == NULL ? exp_src : exp_cmd, var);
 }
 
+// Test that reading the given string yields the given expected variant.
+static void check_syntax_read(TextSyntax syntax, const char *src, Variant exp) {
+  TextReader parser(syntax);
+  Variant decoded = parser.parse(src, strlen(src));
+  ASSERT_FALSE(parser.has_failed());
+  ASSERT_TRUE(decoded.is_frozen());
+  ASSERT_TRUE(decoded == exp);
+}
+
+static void check_ascii_read(const char *exp_src, const char *exp_cmd, Variant var) {
+  check_syntax_read(SOURCE_SYNTAX, exp_src, var);
+  check_syntax_read(COMMAND_SYNTAX, exp_cmd == NULL ? exp_src : exp_cmd, var);
+}
+
 TEST(text_cpp, primitive) {
   check_ascii("%f", NULL, Variant::no());
   check_ascii("%t", NULL, Variant::yes());
@@ -38,6 +52,9 @@ TEST(text_cpp, primitive) {
   check_ascii("foo-BAR-123", NULL, Variant::string("foo-BAR-123"));
   check_ascii("foo/BAR/123", NULL, Variant::string("foo/BAR/123"));
   check_ascii("foo.BAR.123", NULL, Variant::string("foo.BAR.123"));
+  check_ascii_read("foo\\\\BAR123", NULL, Variant::string("foo\\BAR123"));
+  check_ascii_read("foo\\nBAR123", NULL, Variant::string("foo\nBAR123"));
+  check_ascii_read("foo\\\"BAR123", NULL, Variant::string("foo\"BAR123"));
   check_ascii("\"\"", NULL, Variant::string(""));
   check_ascii("\"123\"", NULL, Variant::string("123"));
   check_ascii("\"a b c\"", NULL, Variant::string("a b c"));
@@ -207,6 +224,7 @@ TEST(text_cpp, strings) {
   check_both_rewrite("{ }", "{}");
   check_both_rewrite("\"\\xfa\"", "\"\\xfa\"");
   check_both_rewrite("\"\\xFA\"", "\"\\xfa\"");
+  check_both_rewrite("foo\\\\bar", "\"foo\\\\bar\"");
   check_both_rewrite("%[cGxlYXN1cmUu]", "%[cGxlYXN1cmUu]");
   check_both_rewrite("%[ cGxlYXN1cmUu ]", "%[cGxlYXN1cmUu]");
   check_both_rewrite("%[cGxl YXN1 cmUu]", "%[cGxlYXN1cmUu]");

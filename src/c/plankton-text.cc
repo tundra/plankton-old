@@ -35,11 +35,12 @@ public:
   // Null-terminates and stores the result in the destination.
   void flush(TextWriter *writer);
 
-  // Is the given character allowed as the first character of an unquoted string?
+  // Is the given character allowed as the first character of a string to be
+  // written?
   static bool is_unquoted_string_start(char c);
 
   // Is the given character allowed as a subsequent character of an unquoted
-  // string?
+  // string to be written?
   static bool is_unquoted_string_part(char c);
 
 protected:
@@ -584,6 +585,14 @@ public:
 
   bool decode_command_line_full(Variant *out);
 
+  // Is the given character allowed as the first character of a string to be
+  // read?
+  static bool is_unquoted_string_start(char c);
+
+  // Is the given character allowed as a subsequent character of an unquoted
+  // string to be read?
+  static bool is_unquoted_string_part(char c);
+
 protected:
   // Mapping from ascii characters to the base-64 sextets they represent.
   static const uint8_t kBase64CharToSextet[256];
@@ -642,6 +651,9 @@ protected:
 
   // Parses the next unquoted string.
   bool decode_unquoted_string(Variant *out);
+
+  // Decodes a single, possibly escaped, character in a string, quoted or not.
+  bool decode_character(char *out);
 
   // Parses the next quoted string.
   bool decode_quoted_string(Variant *out);
@@ -774,6 +786,14 @@ bool TextReaderImpl::is_newline(char c) {
   }
 }
 
+bool TextReaderImpl::is_unquoted_string_start(char c) {
+  return TextWriterImpl::is_unquoted_string_start(c) || (c == '\\');
+}
+
+bool TextReaderImpl::is_unquoted_string_part(char c) {
+  return TextWriterImpl::is_unquoted_string_part(c) || (c == '\\');
+}
+
 bool TextReaderImpl::is_digit(char c) {
   return '0' <= c && c <= '9';
 }
@@ -820,7 +840,7 @@ bool TextReaderImpl::decode(Variant *out) {
       char c = current();
       if (is_digit(c)) {
         return decode_integer(out);
-      } else if (TextWriterImpl::is_unquoted_string_start(c)) {
+      } else if (is_unquoted_string_start(c)) {
         return decode_unquoted_string(out);
       } else {
         return fail(out);
@@ -843,15 +863,6 @@ bool TextReaderImpl::decode_integer(Variant *out) {
   if (is_negative)
     result = -result;
   return succeed(Variant::integer(result), out);
-}
-
-bool TextReaderImpl::decode_unquoted_string(Variant *out) {
-  const char *start = chars_ + cursor_;
-  while (TextWriterImpl::is_unquoted_string_part(current()))
-    advance();
-  const char *end = chars_ + cursor_;
-  skip_whitespace();
-  return succeed(factory()->new_string(start, end - start), out);
 }
 
 bool TextWriterImpl::encode_short_escape(char c, char *out) {
@@ -907,34 +918,52 @@ static bool parse_hex_digit(char c, uint8_t *out) {
   return true;
 }
 
+bool TextReaderImpl::decode_unquoted_string(Variant *out) {
+  Buffer<char> buf;
+  while (has_more() && is_unquoted_string_part(current())) {
+    char next = '\0';
+    if (!decode_character(&next))
+      return fail(out);
+    buf.add(next);
+  }
+  skip_whitespace();
+  return succeed(factory()->new_string(*buf, buf.length()), out);
+}
+
+bool TextReaderImpl::decode_character(char *out) {
+  if (current() == '\\') {
+    if (!advance()) {
+      return false;
+    } else if (current() == 'x') {
+      uint8_t high = 0;
+      uint8_t low = 0;
+      if (!advance()
+       || !parse_hex_digit(current(), &high)
+       || !advance()
+       || !parse_hex_digit(current(), &low))
+        return false;
+      *out = (high << 4) | low;
+      advance();
+    } else {
+      if (!decode_short_escape(current(), out))
+        return false;
+      advance();
+    }
+  } else {
+    *out = current();
+    advance();
+  }
+  return true;
+}
+
 bool TextReaderImpl::decode_quoted_string(Variant *out) {
   advance();
   Buffer<char> buf;
   while (has_more() && current() != '"') {
-    if (current() == '\\') {
-      if (!advance()) {
-        return fail(out);
-      } else if (current() == 'x') {
-        uint8_t high = 0;
-        uint8_t low = 0;
-        if (!advance()
-         || !parse_hex_digit(current(), &high)
-         || !advance()
-         || !parse_hex_digit(current(), &low))
-          return fail(out);
-        buf.add((high << 4) | low);
-        advance();
-      } else {
-        char special = '\0';
-        if (!decode_short_escape(current(), &special))
-          return fail(out);
-        buf.add(special);
-        advance();
-      }
-    } else {
-      buf.add(current());
-      advance();
-    }
+    char next = '\0';
+    if (!decode_character(&next))
+      return fail(out);
+    buf.add(next);
   }
   if (current() != '"') {
     return fail(out);
