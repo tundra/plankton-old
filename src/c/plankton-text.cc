@@ -1236,7 +1236,11 @@ bool TextReaderImpl::decode_blob(Variant *out) {
 SeedType<SyntaxError> SyntaxError::kSeedType("plankton.SyntaxError");
 
 bool TextReaderImpl::fail(Variant *out) {
-  SyntaxError *error = new (factory()) SyntaxError(chars_, cursor_);
+  // The ownership of the input isn't tied to the factory the syntax error comes
+  // from so we need to copy it there so it'll stay alive while the syntax error
+  // is alive.
+  String source_copy = factory()->new_string(chars_, strlen(chars_));
+  SyntaxError *error = new (factory()) SyntaxError(source_copy, cursor_);
   parser_->error_ = error;
   *out = factory()->new_native(error);
   return false;

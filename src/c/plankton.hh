@@ -150,12 +150,12 @@ private:
 // using TextReader::has_failed().
 class SyntaxError : public pton_syntax_error_t {
 public:
-  SyntaxError(const char *source, size_t offset)
+  SyntaxError(String source, size_t offset)
     : source_(source)
     , offset_(offset) { }
 
   // Returns the offending character.
-  char offender() { return source_[offset_]; }
+  char offender() { return source_.chars()[offset_]; }
 
   // Returns the 0-based character offset within the source string where the
   // error occurred.
@@ -166,7 +166,7 @@ public:
 
 private:
   static SeedType<SyntaxError> kSeedType;
-  const char *source_;
+  String source_;
   size_t offset_;
 };
 
