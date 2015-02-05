@@ -355,3 +355,12 @@ TEST(text_cpp, join) {
   CHECK_JOIN("a  c", 3, "a" o "" o "c");
   CHECK_JOIN("a     c", 3, "a" o "   " o "c");
 }
+
+TEST(text_cpp, error_owner) {
+  CommandLineReader reader;
+  const char *argv[2] = {"--foo", "}"};
+  CommandLine *cmdline = reader.parse(2, argv);
+  SyntaxError *error = cmdline->error();
+  ASSERT_TRUE(error != NULL);
+  ASSERT_EQ('}', error->offender());
+}
