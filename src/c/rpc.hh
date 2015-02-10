@@ -10,8 +10,8 @@
 #include "io/file.hh"
 #include "marshal.hh"
 #include "plankton-inl.hh"
-#include "refcount.hh"
 #include "socket.hh"
+#include "utils/refcount.hh"
 
 // Basic rpc mechanism. This lies above the raw socket support but below the
 // high-level service abstraction.

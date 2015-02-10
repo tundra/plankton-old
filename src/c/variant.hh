@@ -6,16 +6,16 @@
 #ifndef _VARIANT_HH
 #define _VARIANT_HH
 
-#include "stdc.h"
+#include "c/stdc.h"
 
 BEGIN_C_INCLUDES
 #include "plankton.h"
 #include "utils/alloc.h"
 END_C_INCLUDES
 
-#include "callback.hh"
-#include "refcount.hh"
-#include "std/stdvector.hh"
+#include "c/stdvector.hh"
+#include "utils/callback.hh"
+#include "utils/refcount.hh"
 
 // This is really just an opaque name for c api arenas but it does need a tiny
 // bit of functionality just to be on the safe side wrt. destruction.

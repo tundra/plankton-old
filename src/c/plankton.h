@@ -6,8 +6,8 @@
 #ifndef _PLANKTON_H
 #define _PLANKTON_H
 
+#include "c/stdc.h"
 #include "utils/alloc.h"
-#include "stdc.h"
 
 typedef struct pton_arena_array_t pton_arena_array_t;
 typedef struct pton_arena_blob_t pton_arena_blob_t;

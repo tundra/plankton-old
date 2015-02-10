@@ -6,11 +6,11 @@
 #ifndef _SOCKET_HH
 #define _SOCKET_HH
 
-#include "callback.hh"
+#include "c/stdhashmap.hh"
 #include "io/file.hh"
 #include "marshal.hh"
 #include "plankton.hh"
-#include "std/stdhashmap.hh"
+#include "utils/callback.hh"
 #include "variant.hh"
 
 namespace plankton {

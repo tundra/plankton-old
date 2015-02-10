@@ -6,12 +6,11 @@
 #ifndef _MARSHAL_HH
 #define _MARSHAL_HH
 
-#include "stdc.h"
+#include "c/stdc.h"
 
-#include "callback.hh"
+#include "c/stdhashmap.hh"
+#include "utils/callback.hh"
 #include "variant.hh"
-
-#include "std/stdhashmap.hh"
 
 namespace plankton {
 
