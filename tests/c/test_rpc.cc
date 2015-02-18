@@ -23,9 +23,8 @@ public:
   ByteBufferStream(size_t capacity);
   ~ByteBufferStream();
   virtual size_t read_bytes(void *dest, size_t size);
-  virtual size_t write_bytes(void *src, size_t size);
+  virtual size_t write_bytes(const void *src, size_t size);
   virtual bool at_eof();
-  virtual size_t vprintf(const char *fmt, va_list argp);
   virtual bool flush();
 
 private:
@@ -67,8 +66,8 @@ size_t ByteBufferStream::read_bytes(void *raw_dest, size_t size) {
   return size;
 }
 
-size_t ByteBufferStream::write_bytes(void *raw_src, size_t size) {
-  byte_t *src = static_cast<byte_t*>(raw_src);
+size_t ByteBufferStream::write_bytes(const void *raw_src, size_t size) {
+  const byte_t *src = static_cast<const byte_t*>(raw_src);
   for (size_t i = 0; i < size; i++) {
     writable_.acquire();
     buffer_mutex_.lock();
@@ -82,10 +81,6 @@ size_t ByteBufferStream::write_bytes(void *raw_src, size_t size) {
 
 bool ByteBufferStream::at_eof() {
   return false;
-}
-
-size_t ByteBufferStream::vprintf(const char *fmt, va_list argp) {
-  return 0;
 }
 
 bool ByteBufferStream::flush() {
