@@ -60,12 +60,11 @@ private:
 // An arena-allocated native object handle.
 struct pton_arena_native_t : public pton_arena_value_t {
 public:
-  pton_arena_native_t(Arena *origin, AbstractSeedType *type, void *object);
+  pton_arena_native_t(AbstractSeedType *type, void *object);
 
 private:
   friend class plankton::Variant;
   friend class plankton::Arena;
-  Arena *origin_;
   AbstractSeedType *type_;
   void *object_;
 };
@@ -108,7 +107,6 @@ public:
 
 private:
   friend class plankton::Variant;
-  Arena *origin_;
   Variant header_;
   Map fields_;
 };
@@ -254,7 +252,7 @@ ArenaData *Arena::data() {
 Native Arena::new_raw_native(void *object, AbstractSeedType *type) {
   pton_arena_native_t *data = alloc_value<pton_arena_native_t>();
   Variant result(header_t::PTON_REPR_ARNA_NATIVE,
-      new (data) pton_arena_native_t(this, type, object));
+      new (data) pton_arena_native_t(type, object));
   return result;
 }
 
@@ -611,15 +609,14 @@ bool ArraySink::set_destination(Variant value) {
 pton_sink_t *pton_arena_array_t::add_sink() {
   size_t index = length_;
   if (!add(Variant::null()))
-      return false;
+    return NULL;
   ArraySink *result = origin_->alloc_sink<ArraySink>();
   result->init(this, index);
   return result;
 }
 
-pton_arena_native_t::pton_arena_native_t(Arena *origin, AbstractSeedType *type, void *object)
-  : origin_(origin)
-  , type_(type)
+pton_arena_native_t::pton_arena_native_t(AbstractSeedType *type, void *object)
+  : type_(type)
   , object_(object) { }
 
 uint32_t pton_map_size(pton_variant_t variant) {
@@ -900,8 +897,7 @@ bool pton_arena_map_t::has(Variant key) const {
   return false;
 }
 
-pton_arena_seed_t::pton_arena_seed_t(Arena *origin)
-  : origin_(origin) {
+pton_arena_seed_t::pton_arena_seed_t(Arena *origin) {
   fields_ = origin->new_map();
 }
 

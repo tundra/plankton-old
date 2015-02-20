@@ -286,7 +286,7 @@ void TextWriterImpl::write_hex_byte(uint8_t c) {
 
 void TextWriterImpl::write_integer(int64_t value) {
   char chars[64];
-  sprintf(chars, "%li", value);
+  sprintf(chars, "%" PRIi64, value);
   write_raw_string(chars);
 }
 
@@ -535,19 +535,19 @@ void TextWriterImpl::write_id(uint32_t size, uint64_t value) {
   char chars[64];
   switch (size) {
     case 64:
-      sprintf(chars, "~%016lx", value);
+      sprintf(chars, "~%016" PRIx64, value);
       break;
     case 32:
-      sprintf(chars, "~%08lx", value);
+      sprintf(chars, "~%08" PRIx64, value);
       break;
     case 16:
-      sprintf(chars, "~%04lx", value);
+      sprintf(chars, "~%04" PRIx64, value);
       break;
     case 8:
-      sprintf(chars, "~%02lx", value);
+      sprintf(chars, "~%02" PRIx64, value);
       break;
     default:
-      sprintf(chars, "~%i:%lx", size, value);
+      sprintf(chars, "~%i:%" PRIx64, size, value);
       break;
   }
   write_raw_string(chars);

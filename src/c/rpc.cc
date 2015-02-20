@@ -137,13 +137,13 @@ Variant ResponseMessage::to_seed(Factory *factory) {
 
 class MessageSocket::PendingMessage : public internal::IncomingResponseData {
 public:
-  PendingMessage(uint64_t serial);
+  PendingMessage();
   virtual ~PendingMessage() { }
   virtual sync_promise_t<Variant, Variant> *result() { return &promise_; }
+
 private:
   friend class MessageSocket;
   Arena arena_;
-  uint64_t serial_;
   sync_promise_t<Variant, Variant> promise_;
 };
 
@@ -230,15 +230,14 @@ void MessageSocket::on_outgoing_response(uint64_t serial, OutgoingResponse respo
   send_value(value);
 }
 
-MessageSocket::PendingMessage::PendingMessage(uint64_t serial)
-  : serial_(serial)
-  , promise_(sync_promise_t<Variant, Variant>::empty()) { }
+MessageSocket::PendingMessage::PendingMessage()
+  : promise_(sync_promise_t<Variant, Variant>::empty()) { }
 
 IncomingResponse MessageSocket::send_request(OutgoingRequest *request) {
   Arena arena;
   uint64_t serial = next_serial_++;
   RequestMessage message(request, serial);
-  PendingMessage *pending = new PendingMessage(serial);
+  PendingMessage *pending = new PendingMessage();
   pending->ref();
   pending_messages_[serial] = pending;
   Native wrapped = arena.new_native(&message);
