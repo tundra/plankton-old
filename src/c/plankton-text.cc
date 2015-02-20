@@ -535,19 +535,19 @@ void TextWriterImpl::write_id(uint32_t size, uint64_t value) {
   char chars[64];
   switch (size) {
     case 64:
-      sprintf(chars, "~%016" PRIx64, value);
+      sprintf(chars, "~%016"PRIx64, value);
       break;
     case 32:
-      sprintf(chars, "~%08" PRIx64, value);
+      sprintf(chars, "~%08"PRIx64, value);
       break;
     case 16:
-      sprintf(chars, "~%04" PRIx64, value);
+      sprintf(chars, "~%04"PRIx64, value);
       break;
     case 8:
-      sprintf(chars, "~%02" PRIx64, value);
+      sprintf(chars, "~%02"PRIx64, value);
       break;
     default:
-      sprintf(chars, "~%i:%" PRIx64, size, value);
+      sprintf(chars, "~%i:%"PRIx64, size, value);
       break;
   }
   write_raw_string(chars);
