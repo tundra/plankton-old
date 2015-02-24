@@ -141,6 +141,9 @@ public:
   virtual ~PendingMessage() { }
   virtual sync_promise_t<Variant, Variant> *result() { return &promise_; }
 
+protected:
+  virtual size_t instance_size() { return sizeof(*this); }
+
 private:
   friend class MessageSocket;
   Arena arena_;
@@ -237,7 +240,7 @@ IncomingResponse MessageSocket::send_request(OutgoingRequest *request) {
   Arena arena;
   uint64_t serial = next_serial_++;
   RequestMessage message(request, serial);
-  PendingMessage *pending = new PendingMessage();
+  PendingMessage *pending = new (tclib::kDefaultAlloc) PendingMessage();
   pending->ref();
   pending_messages_[serial] = pending;
   Native wrapped = arena.new_native(&message);
@@ -259,10 +262,10 @@ bool MessageSocket::send_value(Variant value) {
 }
 
 OutgoingResponse::OutgoingResponse()
-  : super_t(new internal::OutgoingResponseData(true, Variant::null())) { }
+  : super_t(new (tclib::kDefaultAlloc) internal::OutgoingResponseData(true, Variant::null())) { }
 
 OutgoingResponse::OutgoingResponse(Status status, Variant payload)
-  : super_t(new internal::OutgoingResponseData(
+  : super_t(new (tclib::kDefaultAlloc) internal::OutgoingResponseData(
       status == SUCCESS,
       payload)) { }
 

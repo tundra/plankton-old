@@ -242,7 +242,7 @@ VariantOwner *Arena::resolve_adopted() {
 ArenaData *Arena::data() {
   ArenaData *shared = refcount_shared();
   if (shared == NULL) {
-    shared = new ArenaData();
+    shared = new (tclib::kDefaultAlloc) ArenaData();
     shared->ref();
     tclib::refcount_reference_t<ArenaData>::set_refcount_shared(shared);
   }

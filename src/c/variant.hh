@@ -726,6 +726,7 @@ protected:
   void mark_adopted();
   void unmark_adopted();
   VariantOwner *resolve_adopted();
+  virtual size_t instance_size() { return sizeof(*this); }
 
 private:
   friend class Arena;

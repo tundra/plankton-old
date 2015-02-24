@@ -44,6 +44,10 @@ public:
   bool is_success() { return is_success_; }
   Variant payload() { return payload_; }
   Factory *factory() { return &arena_; }
+
+protected:
+  virtual size_t instance_size() { return sizeof(*this); }
+
 private:
   Arena arena_;
   bool is_success_;
