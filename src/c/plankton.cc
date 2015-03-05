@@ -88,6 +88,8 @@ public:
 
   uint32_t size() const { return size_; }
 
+  entry_t *elms() { return elms_; }
+
 private:
   friend class ::Map_Iterator;
   friend class MapKeySink;
@@ -288,6 +290,10 @@ Map Arena::new_map() {
 
 pton_variant_t pton_new_map(pton_arena_t *arena) {
   return Arena::from_c(arena)->new_map().to_c();
+}
+
+pton_variant_t pton_new_seed(pton_arena_t *arena) {
+  return Arena::from_c(arena)->new_seed().to_c();
 }
 
 Seed Arena::new_seed(AbstractSeedType *type) {
@@ -714,6 +720,10 @@ Variant Variant::seed_header() const {
   return is_seed() ? value_.payload_.as_arena_seed_->header_ : null();
 }
 
+pton_variant_t pton_seed_get_header(pton_variant_t value) {
+  return Variant(value).seed_header().to_c();
+}
+
 bool Variant::seed_set_header(Variant value) {
   pton_check_binary_version(value_);
   pton_check_binary_version(value.value_);
@@ -723,6 +733,10 @@ bool Variant::seed_set_header(Variant value) {
   } else {
     return false;
   }
+}
+
+void pton_seed_set_header(pton_variant_t value, pton_variant_t header) {
+  Variant(value).seed_set_header(Variant(header));
 }
 
 bool Variant::seed_set_field(Variant key, Variant value) {
@@ -768,7 +782,13 @@ uint32_t Variant::id_size() const {
 }
 
 Map_Iterator Variant::map_begin() const {
-  return is_map() ? Map_Iterator(payload()->as_arena_map_, 0) : Map_Iterator(NULL, 0);
+  return Map_Iterator(value_);
+}
+
+void pton_map_iter_init(pton_map_iter_t *iter, pton_variant_t variant) {
+  pton_check_binary_version(variant);
+  iter->cursor = 0;
+  iter->data = pton_is_map(variant) ? variant.payload_.as_arena_map_ : NULL;
 }
 
 Map_Iterator Variant::map_end() const {
@@ -780,26 +800,47 @@ Map_Iterator Variant::map_end() const {
 Map_Iterator::Map_Iterator(pton_arena_map_t *data, uint32_t cursor)
   : entry_(data, cursor) { }
 
+Map_Iterator::Map_Iterator(pton_variant_t variant) {
+  pton_map_iter_init(&entry_, variant);
+}
+
 Variant Map_Iterator::Entry::key() const {
-  return data_->elms_[cursor_].key;
+  return Variant(pton_map_iter_current_key(this));
+}
+
+pton_variant_t pton_map_iter_current_key(const pton_map_iter_t *iter) {
+  return iter->data->elms()[iter->cursor].key.to_c();
 }
 
 Variant Map_Iterator::Entry::value() const {
-  return data_->elms_[cursor_].value;
+  return Variant(pton_map_iter_current_value(this));
+}
+
+pton_variant_t pton_map_iter_current_value(const pton_map_iter_t *iter) {
+  return iter->data->elms()[iter->cursor].value.to_c();
 }
 
 Map_Iterator &Map_Iterator::operator++() {
-  entry_.cursor_++;
+  pton_map_iter_advance(&entry_);
   return *this;
 }
 
 Map_Iterator &Map_Iterator::operator++(int) {
-  entry_.cursor_++;
+  pton_map_iter_advance(&entry_);
   return *this;
 }
 
+void pton_map_iter_advance(pton_map_iter_t *iter) {
+  iter->cursor++;
+}
+
 bool Map_Iterator::has_next() {
-  return (entry_.cursor_ + 1) < entry_.data_->size_;
+  return pton_map_iter_has_next(&entry_);
+}
+
+bool pton_map_iter_has_next(pton_map_iter_t *iter) {
+  return (iter->data != NULL) &&
+      ((iter->cursor + 1) < iter->data->size());
 }
 
 pton_arena_map_t::pton_arena_map_t(Arena *origin)

@@ -367,17 +367,17 @@ public:
 // An iterator that allows you to scan through all the mappings in a map.
 class Map_Iterator {
 public:
-  class Entry {
+  class Entry : public pton_map_iter_t {
   public:
-    Entry(pton_arena_map_t *data, uint32_t cursor)
-      : data_(data)
-      , cursor_(cursor) { }
+    Entry(pton_arena_map_t *data, uint32_t cursor) {
+      this->data = data;
+      this->cursor = cursor;
+    }
+    Entry() { this->data = NULL; this->cursor = 0; }
     Variant key() const;
     Variant value() const;
   private:
     friend class Map_Iterator;
-    pton_arena_map_t *data_;
-    uint32_t cursor_;
   };
 
   // Advances this iterator to the next entry in this map.
@@ -387,10 +387,10 @@ public:
   Map_Iterator &operator++(int);
 
   // Returns true iff this and the given iterator point to the same entry.
-  bool operator==(const Map_Iterator &that) { return entry_.cursor_ == that.entry_.cursor_; }
+  bool operator==(const Map_Iterator &that) { return entry_.cursor == that.entry_.cursor; }
 
   // Returns true iff this and the given iterator point to different entries.
-  bool operator!=(const Map_Iterator &that) { return entry_.cursor_ != that.entry_.cursor_; }
+  bool operator!=(const Map_Iterator &that) { return entry_.cursor != that.entry_.cursor; }
 
   // Returns true iff the next call to advance will return true.
   bool has_next();
@@ -401,7 +401,8 @@ public:
 private:
   friend class Variant;
   Map_Iterator(pton_arena_map_t *data, uint32_t cursor);
-  Map_Iterator() : entry_(NULL, 0) { }
+  Map_Iterator(pton_variant_t variant);
+  Map_Iterator() { }
 
   Entry entry_;
 };

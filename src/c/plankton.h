@@ -107,6 +107,12 @@ typedef struct {
 
 } pton_variant_t;
 
+// Iterator for scanning through the entries of a plankton map.
+typedef struct {
+  pton_arena_map_t *data;
+  uint32_t cursor;
+} pton_map_iter_t;
+
 // Returns a variant representing null.
 pton_variant_t pton_null();
 
@@ -231,6 +237,29 @@ pton_variant_t pton_map_get(pton_variant_t variant, pton_variant_t key);
 // given key, otherwise false.
 bool pton_map_has(pton_variant_t variant, pton_variant_t key);
 
+// Initialize the given iterator such that it can be used to iterate through
+// the entries of the given map.
+void pton_map_iter_init(pton_map_iter_t *iter, pton_variant_t map);
+
+// Does the given iter have more entries?
+bool pton_map_iter_has_next(pton_map_iter_t *iter);
+
+// Advances the given iter to the next entry.
+void pton_map_iter_advance(pton_map_iter_t *iter);
+
+// Returns the current entry's key.
+pton_variant_t pton_map_iter_current_key(const pton_map_iter_t *iter);
+
+// Returns the current entry's value.
+pton_variant_t pton_map_iter_current_value(const pton_map_iter_t *iter);
+
+// Sets the given seed's header value. If the seed is frozen or the value is not
+// a seed, nothing happens.
+void pton_seed_set_header(pton_variant_t value, pton_variant_t header);
+
+// Returns the given seed's header or, if the value isn't a seed, null.
+pton_variant_t pton_seed_get_header(pton_variant_t value);
+
 // Returns a 64-bit identity token with the given value.
 pton_variant_t pton_id64(uint64_t value);
 
@@ -294,6 +323,9 @@ pton_variant_t pton_new_array_with_capacity(pton_arena_t *arena, uint32_t init_c
 
 // Creates and returns a new mutable map value.
 pton_variant_t pton_new_map(pton_arena_t *arena);
+
+// Creates and returns a new mutable seed value.
+pton_variant_t pton_new_seed(pton_arena_t *arena);
 
 // Creates and returns a new sink value.
 pton_sink_t *pton_new_sink(pton_arena_t *arena, pton_variant_t *out);
