@@ -30,7 +30,8 @@ test_library = get_group("library")
 tests_yaml = get_external("tests", "generic", "tests.yaml")
 tests_yaml_path = tests_yaml.get_input_file().get_path()
 
-DISABLE_YAML_TEST = False
+# Sigh, the yaml stuff needs to go.
+DISABLE_YAML_TEST = True
 
 # Compile the test source files.
 for filename in filenames:
