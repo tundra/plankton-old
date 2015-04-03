@@ -3,7 +3,7 @@
 
 file_names = [
   "test_container.py",
-  "test_generic.py",
+#  "test_generic.py",
   "test_strenc.py",
 ]
 
