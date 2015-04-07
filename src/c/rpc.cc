@@ -135,6 +135,14 @@ Variant ResponseMessage::to_seed(Factory *factory) {
   return result;
 }
 
+size_t MessageSocket::SerialHasher::operator()(const Serial &key) const {
+  return static_cast<size_t>(key.value_);
+}
+
+bool MessageSocket::SerialHasher::operator()(const Serial &a, const Serial &b) {
+  return a.value_ < b.value_;
+}
+
 class MessageSocket::PendingMessage : public internal::IncomingResponseData {
 public:
   PendingMessage();
@@ -204,7 +212,7 @@ void MessageSocket::on_incoming_request(RequestMessage *message) {
 }
 
 void MessageSocket::on_incoming_response(VariantOwner *owner, ResponseMessage *message) {
-  uint64_t serial = message->serial();
+  Serial serial = message->serial();
   PendingMessageMap::iterator pendings = pending_messages_.find(serial);
   if (pendings == pending_messages_.end()) {
     // This response is out of band; ignore.

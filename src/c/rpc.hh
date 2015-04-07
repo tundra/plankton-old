@@ -165,6 +165,31 @@ public:
   // A callback that can be used to deliver a response to a request.
   typedef tclib::callback_t<void(OutgoingResponse)> ResponseCallback;
 
+  class SerialHasher;
+
+  // Wrapper around a message serial number. This is to make it explicit how the
+  // hash map should deal with serials rather than rely on built-in handling of
+  // raw uint64_ts which is inconsistent between platforms.
+  class Serial {
+  public:
+    Serial(uint64_t value) : value_(value) { }
+    bool operator==(const Serial &other) const { return value_ == other.value_; }
+
+  private:
+    friend class SerialHasher;
+    uint64_t value_;
+  };
+
+  // Controls how serials are hashed, again to avoid platform-dependent
+  // confusion about the default way to handle uint64_ts.
+  class SerialHasher {
+  public:
+    size_t operator()(const Serial &key) const;
+    // MSVC hash map stuff.
+    static const size_t bucket_size = 4;
+    bool operator()(const Serial &a, const Serial &b);
+  };
+
   // The type of callback that will be invoked to handle incoming requests. The
   // response callback can be used to return a response asynchronously. The
   // response callback is thread safe, so it is safe both to pass it between
@@ -195,7 +220,7 @@ public:
 
 private:
   class PendingMessage;
-  typedef platform_hash_map<uint64_t, PendingMessage*> PendingMessageMap;
+  typedef platform_hash_map<Serial, PendingMessage*, SerialHasher> PendingMessageMap;
   void on_incoming_message(ParsedMessage *message);
   void on_incoming_request(internal::RequestMessage *request);
   void on_incoming_response(VariantOwner *owner, internal::ResponseMessage *response);
