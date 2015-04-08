@@ -78,7 +78,7 @@ TEST(text_cpp, primitive) {
       "dGhlIG1pbmQsIHRoYXQgYnkgYSBwZXJzZXZlcmFuY2Ugb2YgZGVsaWdodCBpbiB0aGUgY29udGlu"
       "dWVkIGFuZCBpbmRlZmF0aWdhYmxlIGdlbmVyYXRpb24gb2Yga25vd2xlZGdlLCBleGNlZWRzIHRo"
       "ZSBzaG9ydCB2ZWhlbWVuY2Ugb2YgYW55IGNhcm5hbCBwbGVhc3VyZS4=]";
-  check_ascii(long_encoded, NULL, Variant::blob(long_blob, strlen(long_blob)));
+  check_ascii(long_encoded, NULL, Variant::blob(long_blob, static_cast<uint32_t>(strlen(long_blob))));
   check_ascii("%[]", NULL, Variant::blob(NULL, 0));
 }
 
@@ -311,13 +311,13 @@ void check_cmdline(const char *str, size_t argc, Variant *argv, size_t optc,
   ASSERT_FALSE(cmdline == NULL);
   ASSERT_TRUE(cmdline->is_valid());
   ASSERT_EQ(argc, cmdline->argument_count());
-  for (size_t i = 0; i < argc; i++)
-    ASSERT_TRUE(argv[i] == cmdline->argument(i));
+  for (uint32_t i = 0; i < argc; i++)
+    ASSERT_EQ(argv[i], cmdline->argument(i));
   ASSERT_EQ(optc, cmdline->option_count());
   for (size_t i = 0; i < optc; i++) {
     Variant key = optv[2 * i];
     Variant value = optv[2 * i + 1];
-    ASSERT_TRUE(value == cmdline->option(key));
+    ASSERT_EQ(value, cmdline->option(key));
   }
 }
 

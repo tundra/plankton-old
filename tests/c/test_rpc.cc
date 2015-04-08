@@ -20,7 +20,7 @@ using namespace tclib;
 // the concurrency control is (famous last words) solid.
 class ByteBufferStream : public tclib::InStream, public tclib::OutStream {
 public:
-  ByteBufferStream(size_t capacity);
+  ByteBufferStream(uint32_t capacity);
   ~ByteBufferStream();
   virtual size_t read_bytes(void *dest, size_t size);
   virtual size_t write_bytes(const void *src, size_t size);
@@ -37,7 +37,7 @@ private:
   byte_t *buffer_;
 };
 
-ByteBufferStream::ByteBufferStream(size_t capacity)
+ByteBufferStream::ByteBufferStream(uint32_t capacity)
   : capacity_(capacity)
   , next_read_cursor_(0)
   , next_write_cursor_(0)
@@ -105,29 +105,29 @@ TEST(rpc, byte_buffer_simple) {
 
 class Slice {
 public:
-  Slice(ByteBufferStream *nexus, NativeSemaphore *lets_go, Slice **slices, size_t index);
+  Slice(ByteBufferStream *nexus, NativeSemaphore *lets_go, Slice **slices, uint32_t index);
   void start();
   void join();
-  static const size_t kSliceCount = 16;
-  static const size_t kStepCount = 1600;
+  static const uint32_t kSliceCount = 16;
+  static const uint32_t kStepCount = 1600;
 private:
   void *run_producer();
   void *run_distributer();
   void *run_validator();
-  byte_t get_value(size_t step) { return (index_ << 4) + (step & 0xF); }
+  byte_t get_value(size_t step) { return static_cast<byte_t>((index_ << 4) + (step & 0xF)); }
   size_t get_origin(byte_t value) { return value >> 4; }
   size_t get_step(byte_t value) { return value & 0xF; }
   ByteBufferStream *nexus_;
   NativeSemaphore *lets_go_;
   ByteBufferStream stream_;
   Slice **slices_;
-  size_t index_;
+  uint32_t index_;
   NativeThread producer_;
   NativeThread distributer_;
   NativeThread validator_;
 };
 
-Slice::Slice(ByteBufferStream *nexus, NativeSemaphore *lets_go, Slice **slices, size_t index)
+Slice::Slice(ByteBufferStream *nexus, NativeSemaphore *lets_go, Slice **slices, uint32_t index)
   : nexus_(nexus)
   , lets_go_(lets_go)
   , stream_(57 + index)
@@ -198,15 +198,15 @@ TEST(rpc, byte_buffer_concurrent) {
   Slice *slices[Slice::kSliceCount];
   NativeSemaphore lets_go(0);
   ASSERT_TRUE(lets_go.initialize());
-  for (size_t i = 0; i < Slice::kSliceCount; i++)
+  for (uint32_t i = 0; i < Slice::kSliceCount; i++)
     slices[i] = new Slice(&nexus, &lets_go, slices, i);
-  for (size_t i = 0; i < Slice::kSliceCount; i++)
+  for (uint32_t i = 0; i < Slice::kSliceCount; i++)
     slices[i]->start();
-  for (size_t i = 0; i < Slice::kSliceCount; i++)
+  for (uint32_t i = 0; i < Slice::kSliceCount; i++)
     lets_go.release();
-  for (size_t i = 0; i < Slice::kSliceCount; i++)
+  for (uint32_t i = 0; i < Slice::kSliceCount; i++)
     slices[i]->join();
-  for (size_t i = 0; i < Slice::kSliceCount; i++)
+  for (uint32_t i = 0; i < Slice::kSliceCount; i++)
     delete slices[i];
 }
 

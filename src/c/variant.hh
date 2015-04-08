@@ -434,7 +434,7 @@ public:
   Variant get_field(Variant key) { return seed_get_field(key); }
 
   // Returns the number of fields this seed contains.
-  size_t field_count() { return seed_field_count(); }
+  uint32_t field_count() { return seed_field_count(); }
 
   Iterator fields_begin() { return seed_fields_begin(); }
 

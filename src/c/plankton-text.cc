@@ -215,7 +215,7 @@ size_t SourceTextWriterImpl::get_short_length(Variant value, size_t offset) {
     case PTON_ARRAY: {
       Array array = value;
       size_t current = offset + 2;
-      for (size_t i = 0; i < array.length() && current < kShortLengthLimit; i++)
+      for (uint32_t i = 0; i < array.length() && current < kShortLengthLimit; i++)
         current = get_short_length(array[i], current + 2);
       return current;
     }
@@ -279,9 +279,9 @@ void SourceTextWriterImpl::deindent() {
 
 void TextWriterImpl::write_hex_byte(uint8_t c) {
   uint8_t high = (c >> 4) & 0xF;
-  write_raw_char(high < 10 ? ('0' + high) : ('a' + high - 10));
+  write_raw_char(static_cast<char>(high < 10 ? ('0' + high) : ('a' + high - 10)));
   uint8_t low = c & 0xF;
-  write_raw_char(low < 10 ? ('0' + low) : ('a' + low - 10));
+  write_raw_char(static_cast<char>(low < 10 ? ('0' + low) : ('a' + low - 10)));
 }
 
 void TextWriterImpl::write_integer(int64_t value) {
@@ -416,7 +416,7 @@ void SourceTextWriterImpl::write_array(Array array) {
     indent();
     schedule_newline();
   }
-  for (size_t i = 0; i < array.length(); i++) {
+  for (uint32_t i = 0; i < array.length(); i++) {
     Variant value = array[i];
     write(value);
     if (i + 1 < array.length()) {
@@ -434,7 +434,7 @@ void SourceTextWriterImpl::write_array(Array array) {
 
 void CommandTextWriterImpl::write_array(Array array) {
   write_raw_char('[');
-  for (size_t i = 0; i < array.length(); i++) {
+  for (uint32_t i = 0; i < array.length(); i++) {
     Variant value = array[i];
     write(value);
     if (i + 1 < array.length())
@@ -907,11 +907,11 @@ bool TextReaderImpl::decode_short_escape(char c, char *out) {
 
 static bool parse_hex_digit(char c, uint8_t *out) {
   if ('0' <= c && c <= '9') {
-    *out = c - '0';
+    *out = static_cast<uint8_t>(c - '0');
   } else if ('a' <= c && c <= 'f') {
-    *out = c - 'a' + 10;
+    *out = static_cast<uint8_t>(c - 'a' + 10);
   } else if ('A' <= c && c <= 'F') {
-    *out = c - 'A' + 10;
+    *out = static_cast<uint8_t>(c - 'A' + 10);
   } else {
     return false;
   }
@@ -927,7 +927,8 @@ bool TextReaderImpl::decode_unquoted_string(Variant *out) {
     buf.add(next);
   }
   skip_whitespace();
-  return succeed(factory()->new_string(*buf, buf.length()), out);
+  return succeed(factory()->new_string(*buf, static_cast<uint32_t>(buf.length())),
+      out);
 }
 
 bool TextReaderImpl::decode_character(char *out) {
@@ -942,7 +943,7 @@ bool TextReaderImpl::decode_character(char *out) {
        || !advance()
        || !parse_hex_digit(current(), &low))
         return false;
-      *out = (high << 4) | low;
+      *out = static_cast<char>((high << 4) | low);
       advance();
     } else {
       if (!decode_short_escape(current(), out))
@@ -970,7 +971,8 @@ bool TextReaderImpl::decode_quoted_string(Variant *out) {
   } else {
     advance_and_skip();
   }
-  return succeed(factory()->new_string(*buf, buf.length()), out);
+  return succeed(factory()->new_string(*buf, static_cast<uint32_t>(buf.length())),
+      out);
 }
 
 bool SourceTextReaderImpl::decode_array(Variant *out) {
@@ -1217,16 +1219,16 @@ bool TextReaderImpl::decode_blob(Variant *out) {
     if (d == INV || !advance_and_skip())
       return fail(out);
     // Then decode the values.
-    data.add((a << 2) | (b >> 4));
+    data.add(static_cast<uint8_t>((a << 2) | (b >> 4)));
     if (c != PAD) {
-      data.add(((b << 4) | (c >> 2)) & 0xFF);
+      data.add(static_cast<uint8_t>(((b << 4) | (c >> 2)) & 0xFF));
       if (d != PAD)
-        data.add(((c << 6) | d) & 0xFF);
+        data.add(static_cast<uint8_t>(((c << 6) | d) & 0xFF));
     }
   }
   if (current() == ']') {
     advance_and_skip();
-    Variant result = factory()->new_blob(*data, data.length());
+    Variant result = factory()->new_blob(*data, static_cast<uint32_t>(data.length()));
     return succeed(result, out);
   } else {
     return fail(out);
@@ -1239,7 +1241,7 @@ bool TextReaderImpl::fail(Variant *out) {
   // The ownership of the input isn't tied to the factory the syntax error comes
   // from so we need to copy it there so it'll stay alive while the syntax error
   // is alive.
-  String source_copy = factory()->new_string(chars_, strlen(chars_));
+  String source_copy = factory()->new_string(chars_, static_cast<uint32_t>(strlen(chars_)));
   SyntaxError *error = new (factory()) SyntaxError(source_copy, cursor_);
   parser_->error_ = error;
   *out = factory()->new_native(error);
@@ -1303,13 +1305,13 @@ CommandLine *CommandLineReader::parse(int argc, const char **argv) {
 }
 
 char *CommandLineReader::join_argv(int argc, const char **argv, int *len_out) {
-  size_t length;
+  uint32_t length;
   if (argc == 0) {
     length = 0;
   } else {
     length = (argc - 1);
     for (int i = 0; i < argc; i++)
-      length += strlen(argv[i]);
+      length += static_cast<uint32_t>(strlen(argv[i]));
   }
   char *result = new char[length + 1];
   result[length] = '\0';
@@ -1349,7 +1351,7 @@ size_t pton_command_line_argument_count(pton_command_line_t *that) {
   return static_cast<plankton::CommandLine*>(that)->argument_count();
 }
 
-pton_variant_t pton_command_line_argument(pton_command_line_t *that, size_t i) {
+pton_variant_t pton_command_line_argument(pton_command_line_t *that, uint32_t i) {
   return static_cast<plankton::CommandLine*>(that)->argument(i).to_c();
 }
 

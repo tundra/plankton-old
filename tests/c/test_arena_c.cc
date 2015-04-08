@@ -21,7 +21,7 @@ TEST(arena_c, array) {
   ASSERT_TRUE(pton_is_frozen(array));
   ASSERT_FALSE(pton_array_add(array, pton_integer(100)));
   ASSERT_EQ(100, pton_array_length(array));
-  for (size_t i = 0; i < 100; i++) {
+  for (uint32_t i = 0; i < 100; i++) {
     pton_variant_t elm = pton_array_get(array, i);
     ASSERT_EQ(i, pton_int64_value(elm));
   }
@@ -32,7 +32,7 @@ TEST(arena_c, map) {
   pton_arena_t *arena = pton_new_arena();
   pton_variant_t map = pton_new_map(arena);
   ASSERT_FALSE(pton_is_frozen(map));
-  for (size_t i = 0; i < 100; i++) {
+  for (uint32_t i = 0; i < 100; i++) {
     ASSERT_EQ(i, pton_map_size(map));
     ASSERT_TRUE(pton_map_set(map, pton_integer(i), pton_integer(i + 3)));
     ASSERT_EQ(i + 1, pton_map_size(map));

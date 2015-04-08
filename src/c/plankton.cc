@@ -309,7 +309,7 @@ pton_variant_t pton_new_c_str(pton_arena_t *arena, const char *str) {
 }
 
 String Arena::new_string(const char *str) {
-  return new_string(str, strlen(str));
+  return new_string(str, static_cast<uint32_t>(strlen(str)));
 }
 
 String Arena::new_string(const char *str, uint32_t length) {
@@ -613,7 +613,7 @@ bool ArraySink::set_destination(Variant value) {
 }
 
 pton_sink_t *pton_arena_array_t::add_sink() {
-  size_t index = length_;
+  uint32_t index = length_;
   if (!add(Variant::null()))
     return NULL;
   ArraySink *result = origin_->alloc_sink<ArraySink>();
@@ -1207,7 +1207,7 @@ pton_variant_t pton_string(const char *chars, uint32_t length) {
 }
 
 pton_variant_t pton_c_str(const char *chars) {
-  return pton_string(chars, strlen(chars));
+  return pton_string(chars, static_cast<uint32_t>(strlen(chars)));
 }
 
 pton_variant_t pton_blob(const void *data, uint32_t size) {
@@ -1287,10 +1287,10 @@ void OutputSocket::write_uint64(uint64_t value) {
   // it out and share the code would probably be more trouble than it's worth.
   uint64_t current = value;
   while (current >= 0x80) {
-    write_byte((current & 0x7F) | 0x80);
+    write_byte(static_cast<byte_t>((current & 0x7F) | 0x80));
     current = (current >> 7) - 1;
   }
-  write_byte(current);
+  write_byte(static_cast<byte_t>(current));
 }
 
 void OutputSocket::write_padding() {

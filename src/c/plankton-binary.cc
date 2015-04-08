@@ -151,7 +151,7 @@ bool pton_assembler_t::emit_id64(uint32_t size, uint64_t value) {
   write_byte(boId);
   switch (size) {
     case 64: case 32: case 16: case 8:
-      write_byte(size >> 3);
+      write_byte(static_cast<byte_t>(size >> 3));
       break;
     default:
       return false;
@@ -162,17 +162,17 @@ bool pton_assembler_t::emit_id64(uint32_t size, uint64_t value) {
       break;
     }
     case 32: {
-      uint32_t smaller_value = value;
+      uint32_t smaller_value = static_cast<uint32_t>(value);
       bytes_.write(reinterpret_cast<uint8_t*>(&smaller_value), 4);
       break;
     }
     case 16: {
-      uint16_t smaller_value = value;
+      uint16_t smaller_value = static_cast<uint16_t>(value);
       bytes_.write(reinterpret_cast<uint8_t*>(&smaller_value), 2);
       break;
     }
     case 8: {
-      uint8_t smaller_value = value;
+      uint8_t smaller_value = static_cast<uint8_t>(value);
       bytes_.write(reinterpret_cast<uint8_t*>(&smaller_value), 1);
       break;
     }
@@ -218,10 +218,10 @@ bool pton_assembler_t::write_int64(int64_t value) {
 bool pton_assembler_t::write_uint64(uint64_t value) {
   uint64_t current = value;
   while (current >= 0x80) {
-    write_byte((current & 0x7F) | 0x80);
+    write_byte(static_cast<byte_t>((current & 0x7F) | 0x80));
     current = (current >> 7) - 1;
   }
-  write_byte(current);
+  write_byte(static_cast<byte_t>(current));
   return true;
 }
 
@@ -313,7 +313,7 @@ void VariantWriter::encode(Variant value) {
 }
 
 void VariantWriter::encode_string(String value) {
-  size_t length = value.length();
+  uint32_t length = value.length();
   pton_charset_t encoding = value.encoding();
   if (encoding == Variant::default_string_encoding()) {
     assm()->emit_default_string(value.chars(), length);
@@ -327,14 +327,14 @@ void VariantWriter::encode_blob(Blob value) {
 }
 
 void VariantWriter::encode_array(Array value) {
-  size_t length = value.length();
+  uint32_t length = value.length();
   assm()->begin_array(length);
-  for (size_t i = 0; i < length; i++)
+  for (uint32_t i = 0; i < length; i++)
     encode(value[i]);
 }
 
 void VariantWriter::encode_map(Map value) {
-  size_t size = value.size();
+  uint32_t size = value.size();
   assm()->begin_map(size);
   for (Map::Iterator i = value.begin(); i != value.end(); i++) {
     encode(i->key());
@@ -375,13 +375,13 @@ private:
   bool has_more() { return cursor_ < size_; }
 
   // Read an array's payload.
-  bool decode_array(uint64_t length, Variant *result_out);
+  bool decode_array(uint32_t length, Variant *result_out);
 
   // Read a map's payload.
-  bool decode_map(uint64_t size, Variant *result_out);
+  bool decode_map(uint32_t size, Variant *result_out);
 
   // Read an seed's payload.
-  bool decode_seed(uint64_t headerc, uint64_t fieldc, Variant *result_out);
+  bool decode_seed(uint32_t headerc, uint32_t fieldc, Variant *result_out);
 
   // Convert default-encoding string data into a string variant.
   bool decode_default_string(pton_instr_t *instr, Variant *result_out);
@@ -436,6 +436,8 @@ public:
 
   bool decode_uint64(uint64_t *result_out);
 
+  bool decode_uint32(uint32_t *result_out);
+
 private:
   const uint8_t *data_;
   size_t size_;
@@ -453,8 +455,8 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
       instr_out->opcode = PTON_OPCODE_INT64;
       break;
     case BinaryImplUtils::boDefaultString: {
-      uint64_t length = 0;
-      if (!decode_uint64(&length))
+      uint32_t length = 0;
+      if (!decode_uint32(&length))
         return false;
       if (!has_data(length))
         return false;
@@ -469,8 +471,8 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
       if (!decode_uint64(&raw_encoding))
         return false;
       pton_charset_t encoding = static_cast<pton_charset_t>(raw_encoding);
-      uint64_t length = 0;
-      if (!decode_uint64(&length))
+      uint32_t length = 0;
+      if (!decode_uint32(&length))
         return false;
       if (!has_data(length))
         return false;
@@ -482,12 +484,12 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
       break;
     }
     case BinaryImplUtils::boArray:
-      if (!decode_uint64(&instr_out->payload.array_length))
+      if (!decode_uint32(&instr_out->payload.array_length))
         return false;
       instr_out->opcode = PTON_OPCODE_BEGIN_ARRAY;
       break;
     case BinaryImplUtils::boMap:
-      if (!decode_uint64(&instr_out->payload.map_size))
+      if (!decode_uint32(&instr_out->payload.map_size))
         return false;
       instr_out->opcode = PTON_OPCODE_BEGIN_MAP;
       break;
@@ -501,9 +503,9 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
       instr_out->payload.bool_value = (opcode == BinaryImplUtils::boTrue);
       break;
     case BinaryImplUtils::boSeed:
-      if (!decode_uint64(&instr_out->payload.seed_data.headerc))
+      if (!decode_uint32(&instr_out->payload.seed_data.headerc))
         return false;
-      if (!decode_uint64(&instr_out->payload.seed_data.fieldc))
+      if (!decode_uint32(&instr_out->payload.seed_data.fieldc))
         return false;
       instr_out->opcode = PTON_OPCODE_BEGIN_SEED;
       break;
@@ -515,7 +517,7 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
     case BinaryImplUtils::boId: {
       if (!has_more())
         return false;
-      uint8_t size = read_byte() << 3;
+      uint32_t size = read_byte() << 3;
       uint64_t value = 0;
       switch (size) {
         case 64: {
@@ -614,6 +616,16 @@ bool InstrDecoder::decode_uint64(uint64_t *result_out) {
   return true;
 }
 
+bool InstrDecoder::decode_uint32(uint32_t *result_out) {
+  uint64_t next = 0;
+  if (!decode_uint64(&next))
+    return false;
+  if (next > 0xFFFFFFFF)
+    return false;
+  *result_out = static_cast<uint32_t>(next);
+  return true;
+}
+
 
 bool BinaryReaderImpl::decode(Variant *result_out) {
   if (!has_more())
@@ -652,7 +664,7 @@ bool BinaryReaderImpl::decode(Variant *result_out) {
 
 bool BinaryReaderImpl::decode_default_string(pton_instr_t *instr, Variant *result_out) {
   const uint8_t *chars = instr->payload.default_string_data.contents;
-  uint64_t size = instr->payload.default_string_data.length;
+  uint32_t size = instr->payload.default_string_data.length;
   String result = reader_->factory_->new_string(size);
   memcpy(result.mutable_chars(), chars, size);
   result.ensure_frozen();
@@ -662,14 +674,14 @@ bool BinaryReaderImpl::decode_default_string(pton_instr_t *instr, Variant *resul
 bool BinaryReaderImpl::decode_string_with_encoding(pton_instr_t *instr, Variant *result_out) {
   pton_charset_t encoding = instr->payload.string_with_encoding_data.encoding;
   const uint8_t *chars = instr->payload.string_with_encoding_data.contents;
-  uint64_t size = instr->payload.string_with_encoding_data.length;
+  uint32_t size = instr->payload.string_with_encoding_data.length;
   String result = reader_->factory_->new_string(size, encoding);
   memcpy(result.mutable_chars(), chars, size);
   result.ensure_frozen();
   return succeed(result, result_out);
 }
 
-bool BinaryReaderImpl::decode_array(uint64_t length, Variant *result_out) {
+bool BinaryReaderImpl::decode_array(uint32_t length, Variant *result_out) {
   Array result = reader_->factory_->new_array(length);
   for (size_t i = 0; i < length; i++) {
     Variant elm;
@@ -681,7 +693,7 @@ bool BinaryReaderImpl::decode_array(uint64_t length, Variant *result_out) {
   return succeed(result, result_out);
 }
 
-bool BinaryReaderImpl::decode_map(uint64_t size, Variant *result_out) {
+bool BinaryReaderImpl::decode_map(uint32_t size, Variant *result_out) {
   Map result = reader_->factory_->new_map();
   for (size_t i = 0; i < size; i++) {
     Variant key;
@@ -696,7 +708,7 @@ bool BinaryReaderImpl::decode_map(uint64_t size, Variant *result_out) {
   return succeed(result, result_out);
 }
 
-bool BinaryReaderImpl::decode_seed(uint64_t headerc, uint64_t size, Variant *result_out) {
+bool BinaryReaderImpl::decode_seed(uint32_t headerc, uint32_t size, Variant *result_out) {
   Seed seed = reader_->factory_->new_seed();
   AbstractTypeRegistry *registry = reader_->type_registry_;
   AbstractSeedType *type = NULL;

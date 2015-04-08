@@ -10,19 +10,19 @@ using namespace plankton;
 
 class Point {
 public:
-  Point(int x, int y)
+  Point(int64_t x, int64_t y)
     : x_(x)
     , y_(y) { }
-  int x() { return x_; }
-  int y() { return y_; }
+  int64_t x() { return x_; }
+  int64_t y() { return y_; }
   static SeedType<Point> *seed_type() { return &kType; }
 private:
   static Point *new_instance(Variant header, Factory* factory);
   void init(Seed payload, Factory* factory);
   Variant to_seed(Factory *factory);
   static SeedType<Point> kType;
-  int x_;
-  int y_;
+  int64_t x_;
+  int64_t y_;
 };
 
 Point *Point::new_instance(Variant header, Factory* factory) {
@@ -177,7 +177,7 @@ TEST(marshal, invalid_auto_object) {
   Rect *rect = value.as(Rect::seed_type());
   ASSERT_EQ(13, rect->top_left()->x());
   ASSERT_EQ(14, rect->top_left()->y());
-  ASSERT_EQ(NULL, rect->bottom_right());
+  ASSERT_PTREQ(NULL, rect->bottom_right());
 }
 
 TEST(marshal, simple_encode) {
@@ -237,7 +237,7 @@ TEST(marshal, partial_encode) {
   Rect *r2 = value.as(Rect::seed_type());
   ASSERT_EQ(17, r2->top_left()->x());
   ASSERT_EQ(18, r2->top_left()->y());
-  ASSERT_EQ(NULL, r2->bottom_right());
+  ASSERT_PTREQ(NULL, r2->bottom_right());
 }
 
 TEST(marshal, variant_map) {

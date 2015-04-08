@@ -416,19 +416,19 @@ typedef struct {
   union pton_instr_payload_t {
     bool bool_value;
     int64_t int64_value;
-    uint64_t array_length;
-    uint64_t map_size;
+    uint32_t array_length;
+    uint32_t map_size;
     struct {
-      uint64_t headerc;
-      uint64_t fieldc;
+      uint32_t headerc;
+      uint32_t fieldc;
     } seed_data;
     struct {
-      uint64_t length;
+      uint32_t length;
       const uint8_t *contents;
     } default_string_data;
     struct {
       pton_charset_t encoding;
-      uint64_t length;
+      uint32_t length;
       const uint8_t *contents;
     } string_with_encoding_data;
     struct {
@@ -463,7 +463,7 @@ size_t pton_command_line_argument_count(pton_command_line_t *that);
 
 // Returns the value of the i'th positional argument in the given command line.
 // If i is past the end of the command line returns null.
-pton_variant_t pton_command_line_argument(pton_command_line_t *that, size_t i);
+pton_variant_t pton_command_line_argument(pton_command_line_t *that, uint32_t i);
 
 // Returns the number of options in the given command line.
 size_t pton_command_line_option_count(pton_command_line_t *that);

@@ -10,7 +10,7 @@ using namespace plankton;
 TEST(arena_cpp, alloc_values) {
   Arena arena;
   int32_t *blocks[100];
-  for (size_t i = 1; i < 100; i++) {
+  for (uint32_t i = 1; i < 100; i++) {
     int32_t *memory = arena.alloc_values<int32_t>(i);
     blocks[i] = memory;
     for (size_t j = 0; j < i; j++)
@@ -36,7 +36,7 @@ TEST(arena_cpp, array) {
   ASSERT_TRUE(array.is_frozen());
   ASSERT_FALSE(array.add(100));
   ASSERT_EQ(100, array.length());
-  for (size_t i = 0; i < 100; i++) {
+  for (uint32_t i = 0; i < 100; i++) {
     Variant elm = array[i];
     ASSERT_EQ(i, elm.integer_value());
   }

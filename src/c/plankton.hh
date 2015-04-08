@@ -217,7 +217,7 @@ public:
   size_t argument_count() { return args_.length(); }
 
   // Returns the i'th argument. If the index is out of bounds returns null.
-  Variant argument(size_t i) { return args_[i]; }
+  Variant argument(uint32_t i) { return args_[i]; }
 
   // Returns the option with the given name. Returns the default value of there
   // is no such option, the default default (what?) being null.
