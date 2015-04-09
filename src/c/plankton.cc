@@ -1461,7 +1461,7 @@ bool InputSocket::process_next_instruction() {
 }
 
 byte_t *InputSocket::read_value(size_t *size_out) {
-  uint64_t size = read_uint64();
+  uint32_t size = read_uint32();
   byte_t *data = new byte_t[size];
   read_blob(data, size);
   *size_out = size;
@@ -1503,6 +1503,12 @@ uint64_t InputSocket::read_uint64() {
     offset += 7;
   }
   return result;
+}
+
+uint32_t InputSocket::read_uint32() {
+  uint64_t full = read_uint64();
+  CHECK_TRUE("uint32 too wide", full <= 0xFFFFFFFF);
+  return static_cast<uint32_t>(full);
 }
 
 void InputSocket::read_padding() {

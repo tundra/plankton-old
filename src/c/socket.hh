@@ -262,6 +262,9 @@ private:
   // Reads a varint encoded unsigned 64-bit value.
   uint64_t read_uint64();
 
+  // Reads a varint encoded unsigned 32-bit value.
+  uint32_t read_uint32();
+
   // Reads data until the number of bytes read in total is a multiple of 8.
   void read_padding();
 
