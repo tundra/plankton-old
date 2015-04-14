@@ -45,6 +45,8 @@ public:
 
   memory_block_t peek_code();
 
+  memory_block_t release_code();
+
 private:
   // Write a single byte to the stream.
   bool write_byte(uint8_t value);
@@ -199,6 +201,19 @@ memory_block_t pton_assembler_t::peek_code() {
 
 memory_block_t pton_assembler_peek_code(pton_assembler_t *assm) {
   return assm->peek_code();
+}
+
+memory_block_t pton_assembler_t::release_code() {
+  size_t size = bytes_.length();
+  return new_memory_block(bytes_.release(), size);
+}
+
+memory_block_t pton_assembler_release_code(pton_assembler_t *assm) {
+  return assm->release_code();
+}
+
+void pton_assembler_dispose_code(memory_block_t block) {
+  delete[] static_cast<uint8_t*>(block.memory);
 }
 
 void pton_dispose_assembler(pton_assembler_t *assm) {
