@@ -783,3 +783,9 @@ bool pton_decode_next_instruction(const uint8_t *code, size_t size, pton_instr_t
   InstrDecoder in(code, size);
   return in.decode(instr_out);
 }
+
+void pton_binary_writer_write(pton_assembler_t *assm, pton_variant_t value) {
+  Assembler inner(assm);
+  VariantWriter writer(&inner);
+  writer.encode(value);
+}

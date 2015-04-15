@@ -21,8 +21,9 @@ namespace plankton {
 // in some other way you can use this to build custom encoding.
 class Assembler {
 public:
-  Assembler() : assm_(pton_new_assembler()) { }
-  ~Assembler() { pton_dispose_assembler(assm_); }
+  Assembler(pton_assembler_t *assm) : own_assm_(NULL), assm_(assm) { }
+  Assembler() : own_assm_(pton_new_assembler()), assm_(own_assm_) { }
+  ~Assembler() { pton_dispose_assembler(own_assm_); }
 
   // Writes an array header for an array with the given number of elements. This
   // must be followed immediately by the elements.
@@ -70,6 +71,7 @@ public:
   memory_block_t peek_code() { return pton_assembler_peek_code(assm_); }
 
 private:
+  pton_assembler_t *own_assm_;
   pton_assembler_t *assm_;
 };
 

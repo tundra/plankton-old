@@ -492,4 +492,7 @@ pton_variant_t pton_command_line_option(pton_command_line_t *that,
 // the end of the input \0 will be returned.
 char pton_syntax_error_offender(pton_syntax_error_t *that);
 
+// Serialize the given value onto the given assembler.
+void pton_binary_writer_write(pton_assembler_t *assm, pton_variant_t value);
+
 #endif // _PLANKTON_H
