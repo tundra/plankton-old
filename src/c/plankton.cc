@@ -3,6 +3,7 @@
 
 #include "c/stdc.h"
 #include "c/stdnew.hh"
+#include "io/iop.hh"
 #include "marshal-inl.hh"
 #include "plankton-binary.hh"
 #include "plankton-inl.hh"
@@ -1267,7 +1268,8 @@ void OutputSocket::send_value(Variant value, Variant stream_id) {
 
 void OutputSocket::write_blob(byte_t *data, size_t size) {
   cursor_ += size;
-  dest_->write_bytes(data, size);
+  tclib::WriteIop iop(dest_, data, size);
+  iop.execute();
 }
 
 void OutputSocket::write_value(Variant value) {
@@ -1483,7 +1485,8 @@ InputStream *InputSocket::get_stream(StreamId id) {
 
 void InputSocket::read_blob(byte_t *dest, size_t size) {
   cursor_ += size;
-  src_->read_bytes(dest, size);
+  tclib::ReadIop iop(src_, dest, size);
+  iop.execute();
 }
 
 byte_t InputSocket::read_byte() {

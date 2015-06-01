@@ -22,9 +22,8 @@ class ByteBufferStream : public tclib::InStream, public tclib::OutStream {
 public:
   ByteBufferStream(uint32_t capacity);
   ~ByteBufferStream();
-  virtual size_t read_bytes(void *dest, size_t size);
-  virtual size_t write_bytes(const void *src, size_t size);
-  virtual bool at_eof();
+  virtual bool read_sync(read_iop_t *op);
+  virtual bool write_sync(write_iop_t *op);
   virtual bool flush();
 
 private:
@@ -53,8 +52,9 @@ ByteBufferStream::~ByteBufferStream() {
   delete[] buffer_;
 }
 
-size_t ByteBufferStream::read_bytes(void *raw_dest, size_t size) {
-  byte_t *dest = static_cast<byte_t*>(raw_dest);
+bool ByteBufferStream::read_sync(read_iop_t *op) {
+  byte_t *dest = static_cast<byte_t*>(op->dest_);
+  size_t size = op->dest_size_;
   for (size_t i = 0; i < size; i++) {
     readable_.acquire();
     buffer_mutex_.lock();
@@ -63,12 +63,13 @@ size_t ByteBufferStream::read_bytes(void *raw_dest, size_t size) {
     buffer_mutex_.unlock();
     writable_.release();
   }
-  return size;
+  read_iop_deliver(op, size, false);
+  return true;
 }
 
-size_t ByteBufferStream::write_bytes(const void *raw_src, size_t size) {
-  const byte_t *src = static_cast<const byte_t*>(raw_src);
-  for (size_t i = 0; i < size; i++) {
+bool ByteBufferStream::write_sync(write_iop_t *op) {
+  const byte_t *src = static_cast<const byte_t*>(op->src_);
+  for (size_t i = 0; i < op->src_size_; i++) {
     writable_.acquire();
     buffer_mutex_.lock();
     buffer_[next_write_cursor_] = src[i];
@@ -76,11 +77,8 @@ size_t ByteBufferStream::write_bytes(const void *raw_src, size_t size) {
     buffer_mutex_.unlock();
     readable_.release();
   }
-  return size;
-}
-
-bool ByteBufferStream::at_eof() {
-  return false;
+  write_iop_deliver(op, op->src_size_);
+  return true;
 }
 
 bool ByteBufferStream::flush() {
@@ -93,11 +91,15 @@ TEST(rpc, byte_buffer_simple) {
     size_t offset = io * 7;
     for (size_t ii = 0; ii < 373; ii++) {
       byte_t value = static_cast<byte_t>(offset + (5 * ii));
-      ASSERT_EQ(1, stream.write_bytes(&value, 1));
+      WriteIop iop(&stream, &value, 1);
+      ASSERT_TRUE(iop.execute());
+      ASSERT_EQ(1, iop.bytes_written());
     }
     for (size_t ii = 0; ii < 373; ii++) {
       byte_t value = 0;
-      ASSERT_EQ(1, stream.read_bytes(&value, 1));
+      ReadIop iop(&stream, &value, 1);
+      ASSERT_TRUE(iop.execute());
+      ASSERT_EQ(1, iop.bytes_read());
       ASSERT_EQ(value, static_cast<byte_t>(offset + (5 * ii)));
     }
   }
@@ -154,7 +156,8 @@ void *Slice::run_producer() {
   lets_go_->acquire();
   for (size_t i = 0; i < kStepCount; i++) {
     byte_t value = get_value(i);
-    nexus_->write_bytes(&value, 1);
+    WriteIop iop(nexus_, &value, 1);
+    ASSERT_TRUE(iop.execute());
   }
   return NULL;
 }
@@ -162,9 +165,11 @@ void *Slice::run_producer() {
 void *Slice::run_distributer() {
   for (size_t i = 0; i < kStepCount; i++) {
     byte_t value = 0;
-    nexus_->read_bytes(&value, 1);
+    ReadIop read_iop(nexus_, &value, 1);
+    ASSERT_TRUE(read_iop.execute());
     size_t origin = get_origin(value);
-    slices_[origin]->stream_.write_bytes(&value, 1);
+    WriteIop write_iop(&slices_[origin]->stream_, &value, 1);
+    ASSERT_TRUE(write_iop.execute());
   }
   return NULL;
 }
@@ -175,7 +180,8 @@ void *Slice::run_validator() {
     counts[i] = 0;
   for (size_t i = 0; i < kStepCount; i++) {
     byte_t value = 0;
-    stream_.read_bytes(&value, 1);
+    ReadIop iop(&stream_, &value, 1);
+    iop.execute();
     size_t origin = get_origin(value);
     ASSERT_EQ(index_, origin);
     size_t step = get_step(value);

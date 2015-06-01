@@ -68,11 +68,15 @@ int main(int argc, char *argv[]) {
       in = fs->open(name, OPEN_FILE_MODE_READ).in();
     string_buffer_t buf;
     string_buffer_init(&buf);
+    bool at_eof = false;
     do {
       char block[256];
-      size_t count = in->read_bytes(block, 256);
+      ReadIop iop(in, block, 256);
+      iop.execute();
+      size_t count = iop.bytes_read();
       string_buffer_append(&buf, new_string(block, count));
-    } while (!in->at_eof());
+      at_eof = iop.at_eof();
+    } while (!at_eof);
     utf8_t data = string_buffer_flush(&buf);
     if (false) {
     const uint8_t *code = reinterpret_cast<const uint8_t*>(data.chars);
