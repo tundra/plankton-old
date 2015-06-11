@@ -22,8 +22,8 @@ class ByteBufferStream : public tclib::InStream, public tclib::OutStream {
 public:
   ByteBufferStream(uint32_t capacity);
   ~ByteBufferStream();
-  virtual bool read_sync(read_iop_t *op);
-  virtual bool write_sync(write_iop_t *op);
+  virtual bool read_sync(read_iop_state_t *op);
+  virtual bool write_sync(write_iop_state_t *op);
   virtual bool flush();
 
 private:
@@ -52,7 +52,7 @@ ByteBufferStream::~ByteBufferStream() {
   delete[] buffer_;
 }
 
-bool ByteBufferStream::read_sync(read_iop_t *op) {
+bool ByteBufferStream::read_sync(read_iop_state_t *op) {
   byte_t *dest = static_cast<byte_t*>(op->dest_);
   size_t size = op->dest_size_;
   for (size_t i = 0; i < size; i++) {
@@ -63,11 +63,11 @@ bool ByteBufferStream::read_sync(read_iop_t *op) {
     buffer_mutex_.unlock();
     writable_.release();
   }
-  read_iop_deliver(op, size, false);
+  read_iop_state_deliver(op, size, false);
   return true;
 }
 
-bool ByteBufferStream::write_sync(write_iop_t *op) {
+bool ByteBufferStream::write_sync(write_iop_state_t *op) {
   const byte_t *src = static_cast<const byte_t*>(op->src_);
   for (size_t i = 0; i < op->src_size_; i++) {
     writable_.acquire();
@@ -77,7 +77,7 @@ bool ByteBufferStream::write_sync(write_iop_t *op) {
     buffer_mutex_.unlock();
     readable_.release();
   }
-  write_iop_deliver(op, op->src_size_);
+  write_iop_state_deliver(op, op->src_size_);
   return true;
 }
 

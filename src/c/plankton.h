@@ -73,7 +73,7 @@ typedef struct {
         PTON_REPR_INLN_ID = 0x80,
         PTON_REPR_ARNA_SEED = 0x90,
         PTON_REPR_ARNA_NATIVE = 0xA0
-    } repr_tag_ IF_MSVC(, : 8);
+    } repr_tag_ UNLESS_MSVC(: 8);
     // A tag used to identify the version of plankton that produced this value.
     // All variants returned from a binary plankton implementation will have the
     // same version tag, and the version of all arguments will be checked
@@ -82,11 +82,11 @@ typedef struct {
     // by bumping the version when making incompatible changes to variant
     // representation. It is also useful in trapping invalid or uninitialized
     // data viewed as variants.
-    uint8_t binary_version_ IF_MSVC(, : 8);
+    uint8_t binary_version_ UNLESS_MSVC(: 8);
     // A length or size field. Only used by some variants but it wastes space
     // on 64 bits to put it in the payload. Note that this field can not be
     // used the length of a value whose length can change (arrays for instance).
-    uint32_t length_ IF_MSVC(, : 32);
+    uint32_t length_ UNLESS_MSVC(: 32);
   } header_;
 
   // The contents of a variant. This is the part that changes depending on the
