@@ -14,8 +14,6 @@ for filename in filenames:
   source = c.get_source_file(filename)
   source.add_include(get_dep("tclib").get_child("src", "c"))
   object = source.get_object()
-  # TODO: move to tclib.
-  object.add_library_requirement(posix="rt")
   library.add_member(object)
 
 pton_filenames = [
