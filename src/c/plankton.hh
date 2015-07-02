@@ -68,7 +68,7 @@ public:
   // The caller assumes ownership of the returned array and is responsible for
   // freeing it. This doesn't free the assembler, it must still be disposed with
   // pton_dispose_assembler.
-  memory_block_t peek_code() { return pton_assembler_peek_code(assm_); }
+  blob_t peek_code() { return pton_assembler_peek_code(assm_); }
 
 private:
   pton_assembler_t *own_assm_;

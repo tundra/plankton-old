@@ -394,14 +394,14 @@ bool pton_assembler_emit_reference(pton_assembler_t *assm, uint64_t offset);
 // Returns the code written by the assembler. The result is still owned by the
 // assembler and any further modification invalidates a previously peeked
 // result. Typically you'll want to immediately copy the data away.
-memory_block_t pton_assembler_peek_code(pton_assembler_t *assm);
+blob_t pton_assembler_peek_code(pton_assembler_t *assm);
 
 // Works the same as peek code except also gives up ownership of the data so the
 // assembler can be disposed without affecting the code object.
-memory_block_t pton_assembler_release_code(pton_assembler_t *assm);
+blob_t pton_assembler_release_code(pton_assembler_t *assm);
 
 // Disposes a block of memory returned from this assembler.
-void pton_assembler_dispose_code(memory_block_t memory);
+void pton_assembler_dispose_code(blob_t memory);
 
 typedef enum pton_instr_opcode_t {
   PTON_OPCODE_INT64,

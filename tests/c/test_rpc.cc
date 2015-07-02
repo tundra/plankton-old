@@ -68,8 +68,8 @@ bool ByteBufferStream::read_sync(read_iop_state_t *op) {
 }
 
 bool ByteBufferStream::write_sync(write_iop_state_t *op) {
-  const byte_t *src = static_cast<const byte_t*>(op->src_);
-  for (size_t i = 0; i < op->src_size_; i++) {
+  const byte_t *src = static_cast<const byte_t*>(op->src);
+  for (size_t i = 0; i < op->src_size; i++) {
     writable_.acquire();
     buffer_mutex_.lock();
     buffer_[next_write_cursor_] = src[i];
@@ -77,7 +77,7 @@ bool ByteBufferStream::write_sync(write_iop_state_t *op) {
     buffer_mutex_.unlock();
     readable_.release();
   }
-  write_iop_state_deliver(op, op->src_size_);
+  write_iop_state_deliver(op, op->src_size);
   return true;
 }
 
