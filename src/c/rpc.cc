@@ -228,7 +228,7 @@ void MessageSocket::on_incoming_response(VariantOwner *owner, ResponseMessage *m
   if (response.is_success()) {
     pending->result()->fulfill(response.payload());
   } else {
-    pending->result()->fail(response.payload());
+    pending->result()->reject(response.payload());
   }
   pending_messages_.erase(serial);
   pending->deref();
@@ -242,7 +242,7 @@ void MessageSocket::on_outgoing_response(uint64_t serial, OutgoingResponse respo
 }
 
 MessageSocket::PendingMessage::PendingMessage()
-  : promise_(sync_promise_t<Variant, Variant>::empty()) { }
+  : promise_(sync_promise_t<Variant, Variant>::pending()) { }
 
 IncomingResponse MessageSocket::send_request(OutgoingRequest *request) {
   Arena arena;

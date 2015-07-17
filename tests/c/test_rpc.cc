@@ -257,12 +257,12 @@ TEST(rpc, roundtrip) {
   OutgoingRequest request("test_subject", "test_selector");
   request.set_arguments("test_arguments");
   IncomingResponse incoming = channel->send_request(&request);
-  ASSERT_FALSE(incoming->is_resolved());
+  ASSERT_FALSE(incoming->is_settled());
   while (on_response.is_empty())
     ASSERT_TRUE(channel.process_next_instruction());
-  ASSERT_FALSE(incoming->is_resolved());
+  ASSERT_FALSE(incoming->is_settled());
   on_response(OutgoingResponse::success(Variant::integer(18)));
-  while (!incoming->is_resolved())
+  while (!incoming->is_settled())
     ASSERT_TRUE(channel.process_next_instruction());
   ASSERT_TRUE(Variant::integer(18) == incoming->peek_value(Variant::null()));
 }
@@ -297,7 +297,7 @@ TEST(rpc, service) {
   IncomingResponse inc1 = channel->send_request(&req1);
   OutgoingRequest req2(Variant::null(), "ping");
   IncomingResponse inc2 = channel->send_request(&req2);
-  while (!inc2->is_resolved())
+  while (!inc2->is_settled())
     channel.process_next_instruction();
   ASSERT_EQ(43, inc0->peek_value(Variant::null()).integer_value());
   ASSERT_TRUE(inc1->peek_value(10).is_null());
