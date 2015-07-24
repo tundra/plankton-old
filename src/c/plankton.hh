@@ -139,6 +139,9 @@ public:
   // Sets the type registry to use to resolve types during parsing.
   void set_type_registry(AbstractTypeRegistry *value) { type_registry_ = value; }
 
+  // Returns true iff the given input is valid binary plankton.
+  static bool validate(const void *data, size_t size);
+
 private:
   friend class BinaryReaderImpl;
   Factory *factory_;

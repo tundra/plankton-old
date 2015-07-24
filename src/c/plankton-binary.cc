@@ -777,11 +777,49 @@ Variant BinaryReader::parse(const void *data, size_t size) {
   return result;
 }
 
+bool BinaryReader::validate(const void *raw_data, size_t size) {
+  const uint8_t *data = static_cast<const uint8_t*>(raw_data);
+  size_t cursor = 0;
+  size_t remaining_instrs = 1;
+  pton_instr_t instr;
+  while (cursor < size && remaining_instrs > 0) {
+    if (!pton_decode_next_instruction(data + cursor, size - cursor, &instr))
+      return false;
+    cursor += instr.size;
+    remaining_instrs--;
+    switch (instr.opcode) {
+      case PTON_OPCODE_BOOL:
+      case PTON_OPCODE_DEFAULT_STRING:
+      case PTON_OPCODE_ID64:
+      case PTON_OPCODE_INT64:
+      case PTON_OPCODE_NULL:
+      case PTON_OPCODE_REFERENCE:
+      case PTON_OPCODE_STRING_WITH_ENCODING:
+        break;
+      case PTON_OPCODE_BEGIN_ARRAY:
+        remaining_instrs += instr.payload.array_length;
+        break;
+      case PTON_OPCODE_BEGIN_MAP:
+        remaining_instrs += instr.payload.map_size * 2;
+        break;
+      case PTON_OPCODE_BEGIN_SEED:
+        remaining_instrs += instr.payload.seed_data.headerc
+          + instr.payload.seed_data.fieldc * 2;
+        break;
+    }
+  }
+  return (cursor == size) && (remaining_instrs == 0);
+}
+
 } // namespace plankton
 
 bool pton_decode_next_instruction(const uint8_t *code, size_t size, pton_instr_t *instr_out) {
   InstrDecoder in(code, size);
   return in.decode(instr_out);
+}
+
+bool pton_validate(const void *code, size_t size) {
+  return BinaryReader::validate(code, size);
 }
 
 void pton_binary_writer_write(pton_assembler_t *assm, pton_variant_t value) {

@@ -452,6 +452,9 @@ typedef struct {
 bool pton_decode_next_instruction(const uint8_t *code, size_t size,
     pton_instr_t *instr_out);
 
+// Returns true if the given input is valid plankton.
+bool pton_validate(const void *code, size_t size);
+
 // Creates and returns a new command-line reader. Dispose after use with
 // pton_dispose_command_line_reader();
 pton_command_line_reader_t *pton_new_command_line_reader();
