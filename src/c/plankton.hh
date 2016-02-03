@@ -99,7 +99,8 @@ private:
 // The syntaxes text can be formatted as.
 enum TextSyntax {
   SOURCE_SYNTAX,
-  COMMAND_SYNTAX
+  COMMAND_SYNTAX,
+  FLAT_SYNTAX
 };
 
 // An object that holds the representation of a variant as a 7-bit ascii string.

@@ -22,6 +22,7 @@ class ByteBufferStream : public tclib::InStream, public tclib::OutStream {
 public:
   ByteBufferStream(uint32_t capacity);
   ~ByteBufferStream();
+  virtual void default_destroy() { default_delete_concrete(this); }
   virtual bool read_sync(read_iop_state_t *op);
   virtual bool write_sync(write_iop_state_t *op);
   virtual bool flush();

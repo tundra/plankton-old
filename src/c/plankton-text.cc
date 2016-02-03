@@ -30,7 +30,7 @@ public:
   virtual ~TextWriterImpl() { }
 
   // Writes the given value on the stream at the current indentation level.
-  void write(Variant value);
+  void write(Variant value, size_t depth);
 
   // Null-terminates and stores the result in the destination.
   void flush(TextWriter *writer);
@@ -57,13 +57,13 @@ protected:
   virtual void deindent() = 0;
 
   // Writes an array value.
-  virtual void write_array(Array array) = 0;
+  virtual void write_array(Array array, size_t depth) = 0;
 
   // Writes a map value.
-  virtual void write_map(Map map) = 0;
+  virtual void write_map(Map map, size_t depth) = 0;
 
   // Writes a seed value.
-  virtual void write_seed(Seed seed) = 0;
+  virtual void write_seed(Seed seed, size_t depth) = 0;
 
   // Writes the given character directly to the buffer.
   void write_raw_char(char c);
@@ -98,7 +98,7 @@ private:
   void write_blob(const void *data, size_t size);
 
   // Writes a native value.
-  void write_native(Native obj);
+  void write_native(Native obj, size_t depth);
 
   // Writes the given identity token.
   void write_id(uint32_t size, uint64_t value);
@@ -126,9 +126,9 @@ protected:
   virtual void schedule_newline();
   virtual void indent();
   virtual void deindent();
-  virtual void write_array(Array array);
-  virtual void write_map(Map map);
-  virtual void write_seed(Seed map);
+  virtual void write_array(Array array, size_t depth);
+  virtual void write_map(Map map, size_t depth);
+  virtual void write_seed(Seed map, size_t depth);
 
 private:
   // Lengths up to (but not including) this will be considered short. Longer
@@ -151,21 +151,28 @@ private:
 };
 
 class CommandTextWriterImpl : public TextWriterImpl {
+public:
+  CommandTextWriterImpl(bool is_flat_syntax)
+    : is_flat_syntax_(is_flat_syntax) { }
+
 protected:
   virtual void flush_pending_newline() { }
   virtual void schedule_newline() { }
   virtual void indent() { }
   virtual void deindent() { }
-  virtual void write_array(Array array);
-  virtual void write_map(Map map);
-  virtual void write_seed(Seed map);
+  virtual void write_array(Array array, size_t depth);
+  virtual void write_map(Map map, size_t depth);
+  virtual void write_seed(Seed map, size_t depth);
+
+private:
+  bool is_flat_syntax_;
 };
 
 SourceTextWriterImpl::SourceTextWriterImpl()
   : indent_(0)
   , has_pending_newline_(false) { }
 
-void TextWriterImpl::write(Variant value) {
+void TextWriterImpl::write(Variant value, size_t depth) {
   switch (value.type()) {
     case PTON_BOOL:
       write_raw_string(value.bool_value() ? "%t" : "%f");
@@ -186,16 +193,16 @@ void TextWriterImpl::write(Variant value) {
       write_blob(value.blob_data(), value.blob_size());
       break;
     case PTON_ARRAY:
-      write_array(value);
+      write_array(value, depth);
       break;
     case PTON_MAP:
-      write_map(value);
+      write_map(value, depth);
       break;
     case PTON_SEED:
-      write_seed(value);
+      write_seed(value, depth);
       break;
     case PTON_NATIVE:
-      write_native(value);
+      write_native(value, depth);
       break;
     default:
       write_raw_string("?");
@@ -409,7 +416,7 @@ bool SourceTextWriterImpl::write_long(Variant value) {
   return get_short_length(value, indent_) >= kShortLengthLimit;
 }
 
-void SourceTextWriterImpl::write_array(Array array) {
+void SourceTextWriterImpl::write_array(Array array, size_t depth) {
   bool is_long = write_long(array);
   write_raw_char('[');
   if (is_long) {
@@ -418,7 +425,7 @@ void SourceTextWriterImpl::write_array(Array array) {
   }
   for (uint32_t i = 0; i < array.length(); i++) {
     Variant value = array[i];
-    write(value);
+    write(value, depth + 1);
     if (i + 1 < array.length()) {
       write_raw_char(',');
       if (!is_long)
@@ -432,18 +439,18 @@ void SourceTextWriterImpl::write_array(Array array) {
   write_raw_char(']');
 }
 
-void CommandTextWriterImpl::write_array(Array array) {
+void CommandTextWriterImpl::write_array(Array array, size_t depth) {
   write_raw_char('[');
   for (uint32_t i = 0; i < array.length(); i++) {
     Variant value = array[i];
-    write(value);
+    write(value, depth + 1);
     if (i + 1 < array.length())
       write_raw_char(' ');
   }
   write_raw_char(']');
 }
 
-void SourceTextWriterImpl::write_map(Map map) {
+void SourceTextWriterImpl::write_map(Map map, size_t depth) {
   bool is_long = write_long(map);
   write_raw_char('{');
   if (is_long) {
@@ -451,10 +458,10 @@ void SourceTextWriterImpl::write_map(Map map) {
     schedule_newline();
   }
   for (Map::Iterator i = map.begin(); i != map.end(); i++) {
-    write(i->key());
+    write(i->key(), depth + 1);
     write_raw_char(':');
     write_raw_char(' ');
-    write(i->value());
+    write(i->value(), depth + 1);
     if (i.has_next()) {
       write_raw_char(',');
       if (!is_long)
@@ -468,34 +475,37 @@ void SourceTextWriterImpl::write_map(Map map) {
   write_raw_char('}');
 }
 
-void CommandTextWriterImpl::write_map(Map map) {
-  write_raw_char('{');
+void CommandTextWriterImpl::write_map(Map map, size_t depth) {
+  bool write_braces = !is_flat_syntax_ || (depth > 0);
+  if (write_braces)
+    write_raw_char('{');
   for (Map::Iterator i = map.begin(); i != map.end(); i++) {
     write_raw_char('-');
     write_raw_char('-');
-    write(i->key());
+    write(i->key(), depth + 1);
     write_raw_char(' ');
-    write(i->value());
+    write(i->value(), depth + 1);
     if (i.has_next())
       write_raw_char(' ');
   }
-  write_raw_char('}');
+  if (write_braces)
+    write_raw_char('}');
 }
 
-void SourceTextWriterImpl::write_seed(Seed seed) {
+void SourceTextWriterImpl::write_seed(Seed seed, size_t depth) {
   bool is_long = write_long(seed);
   write_raw_char('@');
-  write(seed.header());
+  write(seed.header(), depth + 1);
   write_raw_char(is_long ? '{' : '(');
   if (is_long) {
     indent();
     schedule_newline();
   }
   for (Seed::Iterator i = seed.fields_begin(); i != seed.fields_end(); i++) {
-    write(i->key());
+    write(i->key(), depth + 1);
     write_raw_char(':');
     write_raw_char(' ');
-    write(i->value());
+    write(i->value(), depth + 1);
     if (i.has_next()) {
       write_raw_char(',');
       if (!is_long)
@@ -509,26 +519,26 @@ void SourceTextWriterImpl::write_seed(Seed seed) {
   write_raw_char(is_long ? '}' : ')');
 }
 
-void CommandTextWriterImpl::write_seed(Seed seed) {
+void CommandTextWriterImpl::write_seed(Seed seed, size_t depth) {
   write_raw_char('@');
-  write(seed.header());
+  write(seed.header(), depth + 1);
   write_raw_char('(');
   for (Seed::Iterator i = seed.fields_begin(); i != seed.fields_end(); i++) {
     write_raw_char('-');
     write_raw_char('-');
-    write(i->key());
+    write(i->key(), depth + 1);
     write_raw_char(' ');
-    write(i->value());
+    write(i->value(), depth + 1);
     if (i.has_next())
       write_raw_char(' ');
   }
   write_raw_char(')');
 }
 
-void TextWriterImpl::write_native(Native value) {
+void TextWriterImpl::write_native(Native value, size_t depth) {
   AbstractSeedType *type = value.type();
   Variant replacement = type->encode_instance(value, &scratch_);
-  write(replacement);
+  write(replacement, depth);
 }
 
 void TextWriterImpl::write_id(uint32_t size, uint64_t value) {
@@ -563,12 +573,11 @@ void TextWriterImpl::flush(TextWriter *writer) {
 void TextWriter::write(Variant value) {
   if (syntax_ == SOURCE_SYNTAX) {
     SourceTextWriterImpl impl;
-    impl.write(value);
+    impl.write(value, 0);
     impl.flush(this);
   } else {
-    CHECK_EQ("unexpected syntax", COMMAND_SYNTAX, syntax_);
-    CommandTextWriterImpl impl;
-    impl.write(value);
+    CommandTextWriterImpl impl(syntax_ == FLAT_SYNTAX);
+    impl.write(value, 0);
     impl.flush(this);
   }
 }
