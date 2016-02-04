@@ -321,3 +321,16 @@ void Service::method_one_trampoline(MethodOne delegate, Variant args,
     ResponseCallback callback) {
   delegate(args.map_get(Variant::integer(0)), callback);
 }
+
+StreamServiceConnector::StreamServiceConnector(InStream *in, OutStream *out)
+  : insock_(in)
+  , outsock_(out) { }
+
+bool StreamServiceConnector::init(MessageSocket::RequestCallback handler) {
+  outsock_.init();
+  insock_.set_stream_factory(PushInputStream::new_instance);
+  if (!insock_.init())
+    return false;
+  PushInputStream *root = static_cast<PushInputStream*>(insock_.root_stream());
+  return socket_.init(root, &outsock_, handler);
+}

@@ -49,6 +49,8 @@ private:
   // Writes 0s until the total number of bytes written is a multiple of 8.
   void write_padding();
 
+  void flush();
+
   tclib::OutStream *dest_;
   size_t cursor_;
   pton_charset_t default_encoding_;

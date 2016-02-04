@@ -282,48 +282,17 @@ static void handle_request(MessageSocket::ResponseCallback *callback_out,
   *callback_out = callback;
 }
 
-// One end of a duplex rpc channel.
-class HalfRpcChannel {
-public:
-  HalfRpcChannel(InStream *in, OutStream *out);
-  InputSocket *input() { return &insock_; }
-  MessageSocket *socket() { return &socket_; }
-  bool init(MessageSocket::RequestCallback handler);
-  bool process_messages();
-private:
-  InputSocket insock_;
-  OutputSocket outsock_;
-  MessageSocket socket_;
-};
-
-HalfRpcChannel::HalfRpcChannel(InStream *in, OutStream *out)
-  : insock_(in)
-  , outsock_(out) { }
-
-bool HalfRpcChannel::init(MessageSocket::RequestCallback handler) {
-  outsock_.init();
-  insock_.set_stream_factory(PushInputStream::new_instance);
-  if (!insock_.init())
-    return false;
-  PushInputStream *root = static_cast<PushInputStream*>(insock_.root_stream());
-  return socket_.init(root, &outsock_, handler);
-}
-
-bool HalfRpcChannel::process_messages() {
-  return insock_.process_all_instructions();
-}
-
 // An rpc channel that uses the same buffer for requests and responses.
 class SharedRpcChannel {
 public:
   SharedRpcChannel(MessageSocket::RequestCallback handler);
   bool process_next_instruction();
   MessageSocket *operator->() { return channel()->socket(); }
-  HalfRpcChannel *channel() { return &channel_; }
+  StreamServiceConnector *channel() { return &channel_; }
   bool close() { return bytes_.close(); }
 private:
   ByteBufferStream bytes_;
-  HalfRpcChannel channel_;
+  StreamServiceConnector channel_;
 };
 
 SharedRpcChannel::SharedRpcChannel(MessageSocket::RequestCallback handler)
@@ -391,7 +360,7 @@ TEST(rpc, service) {
 
 static void *run_client(ByteBufferStream *down, ByteBufferStream *up) {
   EchoService echo;
-  HalfRpcChannel client(down, up);
+  StreamServiceConnector client(down, up);
   ASSERT_TRUE(client.init(echo.handler()));
   ASSERT_TRUE(client.process_messages());
   ASSERT_TRUE(up->close());
@@ -401,7 +370,7 @@ static void *run_client(ByteBufferStream *down, ByteBufferStream *up) {
 TEST(rpc, async_service) {
   ByteBufferStream down(1024);
   ByteBufferStream up(1024);
-  HalfRpcChannel server(&up, &down);
+  StreamServiceConnector server(&up, &down);
   NativeThread client(new_callback(run_client, &down, &up));
   ASSERT_TRUE(client.start());
   ASSERT_TRUE(server.init(empty_callback()));

@@ -1249,6 +1249,7 @@ void OutputSocket::init() {
   write_byte(kSetDefaultStringEncoding);
   write_uint64(default_encoding_);
   write_padding();
+  dest_->flush();
   has_been_inited_ = true;
 }
 
@@ -1264,6 +1265,7 @@ void OutputSocket::send_value(Variant value, Variant stream_id) {
   write_value(stream_id);
   write_value(value);
   write_padding();
+  flush();
 }
 
 void OutputSocket::write_blob(byte_t *data, size_t size) {
@@ -1298,6 +1300,10 @@ void OutputSocket::write_uint64(uint64_t value) {
 void OutputSocket::write_padding() {
   while ((cursor_ % 8) != 0)
     write_byte(0);
+}
+
+void OutputSocket::flush() {
+  dest_->flush();
 }
 
 StreamId::StreamId(byte_t *raw_key, size_t key_size, bool owns_key)

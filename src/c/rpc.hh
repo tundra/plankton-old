@@ -106,6 +106,7 @@ class IncomingResponse
     : public tclib::refcount_reference_t<internal::IncomingResponseData> {
 public:
   typedef tclib::refcount_reference_t<internal::IncomingResponseData> super_t;
+  IncomingResponse() : super_t() { }
 
   // Yields the promise that will resolve to the result of the request.
   tclib::sync_promise_t<Variant, Variant> *operator->() { return data()->result(); }
@@ -270,6 +271,22 @@ private:
   Arena arena_;
   VariantMap<GenericMethod> methods_;
   MessageSocket::RequestCallback handler_;
+};
+
+// Utility that connects an in and an out stream as one end of a plankton rpc
+// connection.
+class StreamServiceConnector : public tclib::DefaultDestructable {
+public:
+  StreamServiceConnector(tclib::InStream *in, tclib::OutStream *out);
+  virtual void default_destroy() { tclib::default_delete_concrete(this); }
+  bool init(MessageSocket::RequestCallback handler);
+  InputSocket *input() { return &insock_; }
+  MessageSocket *socket() { return &socket_; }
+  bool process_messages() { return insock_.process_all_instructions(); }
+private:
+  InputSocket insock_;
+  OutputSocket outsock_;
+  MessageSocket socket_;
 };
 
 } // namespace rpc
