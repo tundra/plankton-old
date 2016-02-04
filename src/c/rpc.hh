@@ -274,15 +274,27 @@ private:
 };
 
 // Utility that connects an in and an out stream as one end of a plankton rpc
-// connection.
+// connection. This doesn't really add much, just wires together other types.
 class StreamServiceConnector : public tclib::DefaultDestructable {
 public:
   StreamServiceConnector(tclib::InStream *in, tclib::OutStream *out);
+  virtual ~StreamServiceConnector() { }
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
+
+  // Initializes the components of this connector, setting the given handler
+  // up as the one to handle incoming requests.
   bool init(MessageSocket::RequestCallback handler);
+
+  // The underlying input socket.
   InputSocket *input() { return &insock_; }
+
+  // The underlying message socket.
   MessageSocket *socket() { return &socket_; }
-  bool process_messages() { return insock_.process_all_instructions(); }
+
+  // Keep running and processing messages as long as they come in on the input
+  // stream.
+  bool process_all_messages() { return insock_.process_all_instructions(); }
+
 private:
   InputSocket insock_;
   OutputSocket outsock_;
