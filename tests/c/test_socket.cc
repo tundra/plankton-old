@@ -32,7 +32,7 @@ TEST(socket, values) {
   ByteInStream in(out.data().data(), out.data().size());
   InputSocket insock(&in);
   ASSERT_TRUE(insock.init());
-  while (insock.process_next_instruction())
+  while (insock.process_next_instruction(NULL))
     ;
   BufferInputStream *root_stream = static_cast<BufferInputStream*>(insock.root_stream());
   ASSERT_FALSE(root_stream == NULL);
@@ -76,7 +76,7 @@ TEST(socket, push_stream) {
   int call_count = 0;
   insock.set_stream_factory(tclib::new_callback(new_push_stream, &call_count));
   ASSERT_TRUE(insock.init());
-  while (insock.process_next_instruction())
+  while (insock.process_next_instruction(NULL))
     ;
   ASSERT_EQ(3, call_count);
 }

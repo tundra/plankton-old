@@ -20,12 +20,21 @@ using namespace tclib;
 // the concurrency control is (famous last words) solid.
 class ByteBufferStream : public tclib::InStream, public tclib::OutStream {
 public:
+  class Entry {
+  public:
+    Entry() : is_eof(false), value(0) { }
+    Entry(bool _is_eof, byte_t _value) : is_eof(_is_eof), value(_value) { }
+    bool is_eof;
+    byte_t value;
+  };
   ByteBufferStream(uint32_t capacity);
   ~ByteBufferStream();
   virtual void default_destroy() { default_delete_concrete(this); }
   virtual bool read_sync(read_iop_state_t *op);
   virtual bool write_sync(write_iop_state_t *op);
   virtual bool flush();
+  virtual bool close();
+  void write_entry(Entry entry);
 
 private:
   size_t capacity_;
@@ -34,7 +43,7 @@ private:
   tclib::NativeSemaphore readable_;
   tclib::NativeSemaphore writable_;
   tclib::NativeMutex buffer_mutex_;
-  byte_t *buffer_;
+  Entry *buffer_;
 };
 
 ByteBufferStream::ByteBufferStream(uint32_t capacity)
@@ -43,7 +52,7 @@ ByteBufferStream::ByteBufferStream(uint32_t capacity)
   , next_write_cursor_(0)
   , readable_(0)
   , writable_(capacity)
-  , buffer_(new byte_t[capacity]) {
+  , buffer_(new Entry[capacity]) {
   ASSERT_TRUE(readable_.initialize());
   ASSERT_TRUE(writable_.initialize());
   ASSERT_TRUE(buffer_mutex_.initialize());
@@ -56,33 +65,51 @@ ByteBufferStream::~ByteBufferStream() {
 bool ByteBufferStream::read_sync(read_iop_state_t *op) {
   byte_t *dest = static_cast<byte_t*>(op->dest_);
   size_t size = op->dest_size_;
-  for (size_t i = 0; i < size; i++) {
+  size_t offset = 0;
+  bool at_eof = false;
+  for (; offset < size; offset++) {
     readable_.acquire();
     buffer_mutex_.lock();
-    dest[i] = buffer_[next_read_cursor_];
-    next_read_cursor_ = (next_read_cursor_ + 1) % capacity_;
-    buffer_mutex_.unlock();
-    writable_.release();
+    Entry entry = buffer_[next_read_cursor_];
+    if (entry.is_eof) {
+      readable_.release();
+      buffer_mutex_.unlock();
+      at_eof = true;
+      break;
+    } else {
+      dest[offset] = entry.value;
+      next_read_cursor_ = (next_read_cursor_ + 1) % capacity_;
+      buffer_mutex_.unlock();
+      writable_.release();
+    }
   }
-  read_iop_state_deliver(op, size, false);
+  read_iop_state_deliver(op, offset, at_eof);
   return true;
 }
 
 bool ByteBufferStream::write_sync(write_iop_state_t *op) {
   const byte_t *src = static_cast<const byte_t*>(op->src);
-  for (size_t i = 0; i < op->src_size; i++) {
-    writable_.acquire();
-    buffer_mutex_.lock();
-    buffer_[next_write_cursor_] = src[i];
-    next_write_cursor_ = (next_write_cursor_ + 1) % capacity_;
-    buffer_mutex_.unlock();
-    readable_.release();
-  }
+  for (size_t i = 0; i < op->src_size; i++)
+    write_entry(Entry(false, src[i]));
   write_iop_state_deliver(op, op->src_size);
   return true;
 }
 
+void ByteBufferStream::write_entry(Entry entry) {
+  writable_.acquire();
+  buffer_mutex_.lock();
+  buffer_[next_write_cursor_] = entry;
+  next_write_cursor_ = (next_write_cursor_ + 1) % capacity_;
+  buffer_mutex_.unlock();
+  readable_.release();
+}
+
 bool ByteBufferStream::flush() {
+  return true;
+}
+
+bool ByteBufferStream::close() {
+  write_entry(Entry(true, 0));
   return true;
 }
 
@@ -104,6 +131,36 @@ TEST(rpc, byte_buffer_simple) {
       ASSERT_EQ(value, static_cast<byte_t>(offset + (5 * ii)));
     }
   }
+  ASSERT_TRUE(stream.close());
+  byte_t value = 0;
+  ReadIop iop(&stream, &value, 1);
+  ASSERT_TRUE(iop.execute());
+  ASSERT_EQ(0, iop.bytes_read());
+  ASSERT_TRUE(iop.at_eof());
+}
+
+TEST(rpc, byte_buffer_delayed_eof) {
+  // Check that if we close the stream before the contents have all been read
+  // those contents are still available to be read before the stream eofs.
+  ByteBufferStream stream(374);
+  byte_t buf[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+  WriteIop write(&stream, buf, 10);
+  ASSERT_TRUE(write.execute());
+  ASSERT_EQ(10, write.bytes_written());
+  ASSERT_TRUE(stream.close());
+  memset(buf, 0, 10);
+  ReadIop read(&stream, buf, 10);
+  ASSERT_TRUE(read.execute());
+  ASSERT_EQ(10, read.bytes_read());
+  ASSERT_FALSE(read.at_eof());
+  read.recycle();
+  ASSERT_TRUE(read.execute());
+  ASSERT_EQ(0, read.bytes_read());
+  ASSERT_TRUE(read.at_eof());
+  read.recycle();
+  ASSERT_TRUE(read.execute());
+  ASSERT_EQ(0, read.bytes_read());
+  ASSERT_TRUE(read.at_eof());
 }
 
 class Slice {
@@ -225,36 +282,63 @@ static void handle_request(MessageSocket::ResponseCallback *callback_out,
   *callback_out = callback;
 }
 
-class RpcChannel {
+// One end of a duplex rpc channel.
+class HalfRpcChannel {
 public:
-  RpcChannel(MessageSocket::RequestCallback handler);
-  bool process_next_instruction();
-  MessageSocket *operator->() { return &sock_; }
+  HalfRpcChannel(InStream *in, OutStream *out);
+  InputSocket *input() { return &insock_; }
+  MessageSocket *socket() { return &socket_; }
+  bool init(MessageSocket::RequestCallback handler);
+  bool process_messages();
 private:
-  ByteBufferStream bytes_;
-  OutputSocket outsock_;
   InputSocket insock_;
-  MessageSocket sock_;
+  OutputSocket outsock_;
+  MessageSocket socket_;
 };
 
-RpcChannel::RpcChannel(MessageSocket::RequestCallback handler)
-  : bytes_(1024)
-  , outsock_(&bytes_)
-  , insock_(&bytes_) {
+HalfRpcChannel::HalfRpcChannel(InStream *in, OutStream *out)
+  : insock_(in)
+  , outsock_(out) { }
+
+bool HalfRpcChannel::init(MessageSocket::RequestCallback handler) {
   outsock_.init();
   insock_.set_stream_factory(PushInputStream::new_instance);
-  ASSERT_TRUE(insock_.init());
+  if (!insock_.init())
+    return false;
   PushInputStream *root = static_cast<PushInputStream*>(insock_.root_stream());
-  sock_.init(root, &outsock_, handler);
+  return socket_.init(root, &outsock_, handler);
 }
 
-bool RpcChannel::process_next_instruction() {
-  return insock_.process_next_instruction();
+bool HalfRpcChannel::process_messages() {
+  return insock_.process_all_instructions();
+}
+
+// An rpc channel that uses the same buffer for requests and responses.
+class SharedRpcChannel {
+public:
+  SharedRpcChannel(MessageSocket::RequestCallback handler);
+  bool process_next_instruction();
+  MessageSocket *operator->() { return channel()->socket(); }
+  HalfRpcChannel *channel() { return &channel_; }
+  bool close() { return bytes_.close(); }
+private:
+  ByteBufferStream bytes_;
+  HalfRpcChannel channel_;
+};
+
+SharedRpcChannel::SharedRpcChannel(MessageSocket::RequestCallback handler)
+  : bytes_(1024)
+  , channel_(&bytes_, &bytes_) {
+  ASSERT_TRUE(channel_.init(handler));
+}
+
+bool SharedRpcChannel::process_next_instruction() {
+  return channel()->input()->process_next_instruction(NULL);
 }
 
 TEST(rpc, roundtrip) {
   MessageSocket::ResponseCallback on_response;
-  RpcChannel channel(new_callback(handle_request, &on_response));
+  SharedRpcChannel channel(new_callback(handle_request, &on_response));
   OutgoingRequest request("test_subject", "test_selector");
   request.set_arguments("test_arguments");
   IncomingResponse incoming = channel->send_request(&request);
@@ -290,7 +374,7 @@ void EchoService::ping(ResponseCallback callback) {
 
 TEST(rpc, service) {
   EchoService echo;
-  RpcChannel channel(echo.handler());
+  SharedRpcChannel channel(echo.handler());
   Variant args[1] = {43};
   OutgoingRequest req0(Variant::null(), "echo", 1, args);
   IncomingResponse inc0 = channel->send_request(&req0);
@@ -303,4 +387,31 @@ TEST(rpc, service) {
   ASSERT_EQ(43, inc0->peek_value(Variant::null()).integer_value());
   ASSERT_TRUE(inc1->peek_value(10).is_null());
   ASSERT_TRUE(Variant::string("pong") == inc2->peek_value(10));
+}
+
+static void *run_client(ByteBufferStream *down, ByteBufferStream *up) {
+  EchoService echo;
+  HalfRpcChannel client(down, up);
+  ASSERT_TRUE(client.init(echo.handler()));
+  ASSERT_TRUE(client.process_messages());
+  ASSERT_TRUE(up->close());
+  return NULL;
+}
+
+TEST(rpc, async_service) {
+  ByteBufferStream down(1024);
+  ByteBufferStream up(1024);
+  HalfRpcChannel server(&up, &down);
+  NativeThread client(new_callback(run_client, &down, &up));
+  ASSERT_TRUE(client.start());
+  ASSERT_TRUE(server.init(empty_callback()));
+
+  Variant arg = 54;
+  OutgoingRequest req(Variant::null(), "echo", 1, &arg);
+  IncomingResponse inc = server.socket()->send_request(&req);
+  ASSERT_TRUE(down.close());
+  ASSERT_TRUE(server.process_messages());
+  ASSERT_TRUE(client.join() == NULL);
+  ASSERT_TRUE(inc->is_fulfilled());
+  ASSERT_EQ(54, inc->peek_value(Variant::null()).integer_value());
 }

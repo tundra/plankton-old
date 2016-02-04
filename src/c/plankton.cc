@@ -1420,7 +1420,8 @@ static const byte_t kRawRootId[1] = {BinaryImplUtils::boNull};
 
 bool InputSocket::init() {
   byte_t header[8];
-  read_blob(header, 8);
+  bool at_eof = false;
+  read_blob(header, 8, &at_eof);
   for (size_t i = 0; i < 8; i++) {
     if (header[i] != kHeader[i])
       return false;
@@ -1433,21 +1434,22 @@ bool InputSocket::init() {
   return true;
 }
 
-bool InputSocket::process_next_instruction() {
-  byte_t opcode = read_byte();
+bool InputSocket::process_next_instruction(ProcessInstrStatus *status_out) {
+  bool at_eof = false;
+  byte_t opcode = read_byte(&at_eof);
   switch (opcode) {
     case kSetDefaultStringEncoding: {
-      read_uint64();
-      read_padding();
-      return true;
+      read_uint64(&at_eof);
+      read_padding(&at_eof);
+      return !at_eof;
     }
     case kSendValue: {
       size_t stream_id_size = 0;
-      byte_t *stream_id_data = read_value(&stream_id_size);
+      byte_t *stream_id_data = read_value(&stream_id_size, &at_eof);
       StreamId id(stream_id_data, stream_id_size, true);
       size_t value_size = 0;
-      byte_t *value_data = read_value(&value_size);
-      read_padding();
+      byte_t *value_data = read_value(&value_size, &at_eof);
+      read_padding(&at_eof);
       InputStream *dest = get_stream(id);
       if (dest == NULL) {
         delete value_data;
@@ -1455,17 +1457,33 @@ bool InputSocket::process_next_instruction() {
         dest->receive_block(new MessageData(value_data, value_size));
       }
       id.dispose();
-      return true;
+      return !at_eof;
     }
-    default:
+    default: {
+      if (!(opcode == 0 && at_eof) && (status_out != NULL))
+        // When we reach the end a 0 is returned so we allow that case without
+        // reporting an error, otherwise we report if asked to.
+        *status_out = ProcessInstrStatus(true);
       return false;
+    }
   }
 }
 
-byte_t *InputSocket::read_value(size_t *size_out) {
-  uint32_t size = read_uint32();
+bool InputSocket::process_all_instructions() {
+  bool keep_going = true;
+  while (keep_going) {
+    ProcessInstrStatus status;
+    keep_going = process_next_instruction(&status);
+    if (status.is_error())
+      return false;
+  }
+  return true;
+}
+
+byte_t *InputSocket::read_value(size_t *size_out, bool *at_eof_out) {
+  uint32_t size = read_uint32(at_eof_out);
   byte_t *data = new byte_t[size];
-  read_blob(data, size);
+  read_blob(data, size, at_eof_out);
   *size_out = size;
   return data;
 }
@@ -1483,24 +1501,26 @@ InputStream *InputSocket::get_stream(StreamId id) {
   return (i == streams_.end()) ? NULL : i->second;
 }
 
-void InputSocket::read_blob(byte_t *dest, size_t size) {
+void InputSocket::read_blob(byte_t *dest, size_t size, bool *at_eof_out) {
   cursor_ += size;
   tclib::ReadIop iop(src_, dest, size);
   iop.execute();
+  if (iop.at_eof())
+    *at_eof_out = true;
 }
 
-byte_t InputSocket::read_byte() {
+byte_t InputSocket::read_byte(bool *at_eof_out) {
   byte_t value = 0;
-  read_blob(&value, 1);
+  read_blob(&value, 1, at_eof_out);
   return value;
 }
 
-uint64_t InputSocket::read_uint64() {
-  uint8_t next = read_byte();
+uint64_t InputSocket::read_uint64(bool *at_eof_out) {
+  uint8_t next = read_byte(at_eof_out);
   uint64_t result = (next & 0x7F);
   uint64_t offset = 7;
   while (next >= 0x80) {
-    next = read_byte();
+    next = read_byte(at_eof_out);
     uint64_t payload = ((next & 0x7F) + 1);
     result = result + (payload << offset);
     offset += 7;
@@ -1508,13 +1528,13 @@ uint64_t InputSocket::read_uint64() {
   return result;
 }
 
-uint32_t InputSocket::read_uint32() {
-  uint64_t full = read_uint64();
+uint32_t InputSocket::read_uint32(bool *at_eof_out) {
+  uint64_t full = read_uint64(at_eof_out);
   CHECK_TRUE("uint32 too wide", full <= 0xFFFFFFFF);
   return static_cast<uint32_t>(full);
 }
 
-void InputSocket::read_padding() {
+void InputSocket::read_padding(bool *at_eof_out) {
   while ((cursor_ % 8) != 0)
-    read_byte();
+    read_byte(at_eof_out);
 }

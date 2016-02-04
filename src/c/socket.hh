@@ -223,6 +223,19 @@ class InputSocket {
 public:
   typedef tclib::callback_t<InputStream*(InputStreamConfig*)> InputStreamFactory;
 
+  // The outcome of processing an instruction.
+  class ProcessInstrStatus {
+  public:
+    ProcessInstrStatus() : is_error_(false) { }
+    ProcessInstrStatus(bool is_error) : is_error_(is_error) { }
+
+    // Did an error occur while processing this instruction?
+    bool is_error() { return is_error_; }
+
+  private:
+    bool is_error_;
+  };
+
   // Create a new input socket that fetches data from the given source.
   InputSocket(tclib::InStream *src);
 
@@ -241,11 +254,16 @@ public:
   // Read the stream header. Returns true iff the header is valid.
   bool init();
 
-  // Reads and processes the next instruction from the file. This will either
+  // Reads and processes the next instruction from the input. This will either
   // cause the internal state of the socket to be updated or a value to be
   // delivered to a stream. Returns true iff an instruction was processed, false
-  // if input was in valid or if there is no more input to fecth.
-  bool process_next_instruction();
+  // if the end of the input was reached. If the out-argument is non-null the
+  // status of processing the instruction is stored there.
+  bool process_next_instruction(ProcessInstrStatus *status_out);
+
+  // Keeps processing instructions until the end of the input is reached.
+  // Returns true if all input was valid.
+  bool process_all_instructions();
 
   // Returns the root stream for this socket. This stream was produced by this
   // socket's stream factory.
@@ -254,22 +272,22 @@ public:
 private:
   // Reads the requested number of bytes from the source, storing them in the
   // given array.
-  void read_blob(byte_t *dest, size_t size);
+  void read_blob(byte_t *dest, size_t size, bool *at_eof_out);
 
   // Reads and returns a single byte from the source.
-  byte_t read_byte();
+  byte_t read_byte(bool *at_eof_out);
 
   // Reads a varint encoded unsigned 64-bit value.
-  uint64_t read_uint64();
+  uint64_t read_uint64(bool *at_eof_out);
 
   // Reads a varint encoded unsigned 32-bit value.
-  uint32_t read_uint32();
+  uint32_t read_uint32(bool *at_eof_out);
 
   // Reads data until the number of bytes read in total is a multiple of 8.
-  void read_padding();
+  void read_padding(bool *at_eof_out);
 
   // Reads the next block of data.
-  byte_t *read_value(size_t *size_out);
+  byte_t *read_value(size_t *size_out, bool *at_eof_out);
 
   // The default stream factory function.
   static InputStream *new_default_stream(InputStreamConfig *config);
