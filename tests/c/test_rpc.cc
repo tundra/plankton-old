@@ -362,7 +362,7 @@ static void *run_client(ByteBufferStream *down, ByteBufferStream *up) {
   EchoService echo;
   StreamServiceConnector client(down, up);
   ASSERT_TRUE(client.init(echo.handler()));
-  ASSERT_TRUE(client.process_messages());
+  ASSERT_TRUE(client.process_all_messages());
   ASSERT_TRUE(up->close());
   return NULL;
 }
@@ -379,7 +379,7 @@ TEST(rpc, async_service) {
   OutgoingRequest req(Variant::null(), "echo", 1, &arg);
   IncomingResponse inc = server.socket()->send_request(&req);
   ASSERT_TRUE(down.close());
-  ASSERT_TRUE(server.process_messages());
+  ASSERT_TRUE(server.process_all_messages());
   ASSERT_TRUE(client.join() == NULL);
   ASSERT_TRUE(inc->is_fulfilled());
   ASSERT_EQ(54, inc->peek_value(Variant::null()).integer_value());
