@@ -323,8 +323,8 @@ TEST(rpc, roundtrip) {
 
 class EchoService : public plankton::rpc::Service {
 public:
-  void echo(Variant value, ResponseCallback response);
-  void ping(ResponseCallback response);
+  void echo(RequestArguments args, ResponseCallback response);
+  void ping(RequestArguments args, ResponseCallback response);
   EchoService();
 };
 
@@ -333,11 +333,11 @@ EchoService::EchoService() {
   register_method("ping", tclib::new_callback(&EchoService::ping, this));
 }
 
-void EchoService::echo(Variant value, ResponseCallback callback) {
-  callback(OutgoingResponse::success(value));
+void EchoService::echo(RequestArguments args, ResponseCallback callback) {
+  callback(OutgoingResponse::success(args[0]));
 }
 
-void EchoService::ping(ResponseCallback callback) {
+void EchoService::ping(RequestArguments args, ResponseCallback callback) {
   callback(OutgoingResponse::success("pong"));
 }
 
