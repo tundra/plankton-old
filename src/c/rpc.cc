@@ -291,16 +291,16 @@ internal::OutgoingResponseData::OutgoingResponseData(bool is_success,
   : is_success_(is_success)
   , payload_(payload) { }
 
+Variant RequestArguments::operator[](int32_t index) {
+  return args_.map_get(Variant::integer(index));
+}
+
 Service::Service() {
   handler_ = new_callback(&Service::on_request, this);
 }
 
-void Service::register_method(Variant selector, MethodZero handler) {
-  methods_.set(selector, tclib::new_callback(method_zero_trampoline, handler));
-}
-
-void Service::register_method(Variant selector, MethodOne handler) {
-  methods_.set(selector, tclib::new_callback(method_one_trampoline, handler));
+void Service::register_method(Variant selector, Method handler) {
+  methods_.set(selector, tclib::new_callback(method_trampoline, handler));
 }
 
 void Service::on_request(IncomingRequest* request, ResponseCallback response) {
@@ -312,14 +312,10 @@ void Service::on_request(IncomingRequest* request, ResponseCallback response) {
   }
 }
 
-void Service::method_zero_trampoline(MethodZero delegate, Variant args,
+void Service::method_trampoline(Method delegate, Variant raw_args,
     ResponseCallback callback) {
-  delegate(callback);
-}
-
-void Service::method_one_trampoline(MethodOne delegate, Variant args,
-    ResponseCallback callback) {
-  delegate(args.map_get(Variant::integer(0)), callback);
+  RequestArguments args(raw_args);
+  delegate(args, callback);
 }
 
 StreamServiceConnector::StreamServiceConnector(InStream *in, OutStream *out)

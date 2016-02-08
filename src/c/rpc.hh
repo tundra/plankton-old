@@ -240,20 +240,28 @@ private:
   PendingMessageMap pending_messages_;
 };
 
+// Utility for fetching individual request arguments.
+class RequestArguments {
+public:
+  // Returns the index'th positional argument to a request.
+  Variant operator[](int32_t index);
+
+private:
+  friend class Service;
+  RequestArguments(Variant args) : args_(args) { }
+  Variant args_;
+};
+
 class Service {
 public:
   typedef tclib::callback_t<void(OutgoingResponse)> ResponseCallback;
   typedef tclib::callback_t<void(Variant, ResponseCallback)> GenericMethod;
-  typedef tclib::callback_t<void(ResponseCallback)> MethodZero;
-  typedef tclib::callback_t<void(Variant, ResponseCallback)> MethodOne;
+  typedef tclib::callback_t<void(RequestArguments, ResponseCallback)> Method;
 
   Service();
 
   // Adds a method to the set understood by this service.
-  void register_method(Variant selector, MethodZero handler);
-
-  // Adds a method to the set understood by this service.
-  void register_method(Variant selector, MethodOne handler);
+  void register_method(Variant selector, Method handler);
 
   // Returns the callback to pass to a message socket that will dispatch
   // messages to this service.
@@ -263,9 +271,7 @@ private:
   // General handler for incoming requests.
   void on_request(IncomingRequest* request, ResponseCallback response);
 
-  static void method_zero_trampoline(MethodZero delegate, Variant args,
-      ResponseCallback callback);
-  static void method_one_trampoline(MethodOne delegate, Variant args,
+  static void method_trampoline(Method delegate, Variant args,
       ResponseCallback callback);
 
   Arena arena_;
