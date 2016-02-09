@@ -14,8 +14,13 @@ void TypeRegistry::register_type(AbstractSeedType *type) {
 }
 
 AbstractSeedType *TypeRegistry::resolve_type(Variant header) {
-  AbstractSeedType **type = types_[header];
-  if (type != NULL)
-    return *type;
-  return (parent_ == NULL) ? NULL : parent_->resolve_type(header);
+  AbstractSeedType **type_ref = types_[header];
+  if (type_ref != NULL)
+    return *type_ref;
+  for (size_t i = 0; i < fallbacks_.size(); i++) {
+    AbstractSeedType *type = fallbacks_[i]->resolve_type(header);
+    if (type != NULL)
+      return type;
+  }
+  return NULL;
 }

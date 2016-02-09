@@ -209,6 +209,7 @@ public:
   // Sets the type registry to use when decoding values on this stream.
   void set_type_registry(TypeRegistry *value) { type_registry_ = value; }
 
+  // Returns the type registry this stream uses.
   TypeRegistry *type_registry() { return type_registry_; }
 
   virtual void receive_block(MessageData *message);

@@ -176,7 +176,7 @@ bool MessageSocket::init(PushInputStream *in, OutputSocket *out,
   in_ = in;
   out_ = out;
   handler_ = handler;
-  types_.set_parent(in->type_registry());
+  types_.add_fallback(in->type_registry());
   types_.register_type(RequestMessage::seed_type());
   types_.register_type(ResponseMessage::seed_type());
   in_->set_type_registry(&types_);

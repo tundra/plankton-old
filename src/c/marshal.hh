@@ -148,17 +148,19 @@ public:
 // A simple registry based on a mapping from headers to types.
 class TypeRegistry : public AbstractTypeRegistry {
 public:
-  TypeRegistry() : parent_(NULL) { }
-
   // Adds the given type as the mapping for its header to this registry.
   void register_type(AbstractSeedType *type);
 
-  void set_parent(TypeRegistry *parent) { parent_ = parent; }
+  // Adds another type registry that will be called to resolve any types that
+  // this registry itself doesn't know about. If multiple fallbacks are added
+  // they will be called in the order they were added and the first non-null
+  // type returned will be the result.
+  void add_fallback(TypeRegistry *fallback) { fallbacks_.push_back(fallback); }
 
   virtual AbstractSeedType *resolve_type(Variant header);
 private:
   VariantMap<AbstractSeedType*> types_;
-  TypeRegistry *parent_;
+  std::vector<TypeRegistry*> fallbacks_;
 };
 
 } // namespace plankton
