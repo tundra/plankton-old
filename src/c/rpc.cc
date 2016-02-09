@@ -176,6 +176,7 @@ bool MessageSocket::init(PushInputStream *in, OutputSocket *out,
   in_ = in;
   out_ = out;
   handler_ = handler;
+  types_.set_parent(in->type_registry());
   types_.register_type(RequestMessage::seed_type());
   types_.register_type(ResponseMessage::seed_type());
   in_->set_type_registry(&types_);
@@ -291,7 +292,7 @@ internal::OutgoingResponseData::OutgoingResponseData(bool is_success,
   : is_success_(is_success)
   , payload_(payload) { }
 
-Variant RequestArguments::operator[](int32_t index) {
+Variant RequestData::operator[](int32_t index) {
   return args_.map_get(Variant::integer(index));
 }
 
@@ -308,19 +309,23 @@ void Service::on_request(IncomingRequest* request, ResponseCallback response) {
   if (method == NULL) {
     response(OutgoingResponse::failure(Variant::null()));
   } else {
-    (*method)(request->arguments(), response);
+    (*method)(request->arguments(), request, response);
   }
 }
 
-void Service::method_trampoline(Method delegate, Variant raw_args,
+void Service::method_trampoline(Method delegate, Variant raw_args, IncomingRequest *req,
     ResponseCallback callback) {
-  RequestArguments args(raw_args);
-  delegate(args, callback);
+  RequestData data(raw_args, req);
+  delegate(data, callback);
 }
 
 StreamServiceConnector::StreamServiceConnector(InStream *in, OutStream *out)
   : insock_(in)
   , outsock_(out) { }
+
+void StreamServiceConnector::set_default_type_registry(TypeRegistry *value) {
+  insock_.set_default_type_registry(value);
+}
 
 bool StreamServiceConnector::init(MessageSocket::RequestCallback handler) {
   outsock_.init();

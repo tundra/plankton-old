@@ -5,6 +5,7 @@
 
 #include "marshal-inl.hh"
 #include "plankton-inl.hh"
+#include "utils/log.hh"
 
 using namespace plankton;
 
@@ -14,5 +15,7 @@ void TypeRegistry::register_type(AbstractSeedType *type) {
 
 AbstractSeedType *TypeRegistry::resolve_type(Variant header) {
   AbstractSeedType **type = types_[header];
-  return (type == NULL) ? NULL : *type;
+  if (type != NULL)
+    return *type;
+  return (parent_ == NULL) ? NULL : parent_->resolve_type(header);
 }

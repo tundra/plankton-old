@@ -77,6 +77,8 @@ public:
   void set_arguments(Variant value) { arguments_ = value; }
   Variant arguments() { return arguments_; }
 
+  Factory *factory() { return &arena_; }
+
 private:
   Variant subject_;
   Variant selector_;
@@ -91,6 +93,11 @@ public:
   Variant subject() { return outgoing_->subject(); }
   Variant selector() { return outgoing_->selector(); }
   Variant arguments() { return outgoing_->arguments(); }
+
+  // Returns a factory that can be used for constructing values that can be
+  // returned as the result of this request.
+  Factory *factory() { return outgoing_->factory(); }
+
 private:
   OutgoingRequest *outgoing_;
 };
@@ -241,22 +248,29 @@ private:
 };
 
 // Utility for fetching individual request arguments.
-class RequestArguments {
+class RequestData {
 public:
   // Returns the index'th positional argument to a request.
   Variant operator[](int32_t index);
 
+  // Returns a factory that can be used to allocate the result of a request
+  // callback. The factory is only guaranteed to stick around for the duration
+  // of the callback so you can return values allocated using it but not keep
+  // them for later.
+  Factory *factory() { return request_->factory(); }
+
 private:
   friend class Service;
-  RequestArguments(Variant args) : args_(args) { }
+  RequestData(Variant args, IncomingRequest *request) : args_(args), request_(request) { }
   Variant args_;
+  IncomingRequest *request_;
 };
 
 class Service {
 public:
   typedef tclib::callback_t<void(OutgoingResponse)> ResponseCallback;
-  typedef tclib::callback_t<void(Variant, ResponseCallback)> GenericMethod;
-  typedef tclib::callback_t<void(RequestArguments, ResponseCallback)> Method;
+  typedef tclib::callback_t<void(Variant, IncomingRequest*, ResponseCallback)> GenericMethod;
+  typedef tclib::callback_t<void(RequestData&, ResponseCallback)> Method;
 
   Service();
 
@@ -271,7 +285,7 @@ private:
   // General handler for incoming requests.
   void on_request(IncomingRequest* request, ResponseCallback response);
 
-  static void method_trampoline(Method delegate, Variant args,
+  static void method_trampoline(Method delegate, Variant args, IncomingRequest *req,
       ResponseCallback callback);
 
   Arena arena_;
@@ -296,6 +310,8 @@ public:
 
   // The underlying message socket.
   MessageSocket *socket() { return &socket_; }
+
+  void set_default_type_registry(TypeRegistry *value);
 
   // Keep running and processing messages as long as they come in on the input
   // stream.

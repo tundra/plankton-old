@@ -148,12 +148,17 @@ public:
 // A simple registry based on a mapping from headers to types.
 class TypeRegistry : public AbstractTypeRegistry {
 public:
+  TypeRegistry() : parent_(NULL) { }
+
   // Adds the given type as the mapping for its header to this registry.
   void register_type(AbstractSeedType *type);
+
+  void set_parent(TypeRegistry *parent) { parent_ = parent; }
 
   virtual AbstractSeedType *resolve_type(Variant header);
 private:
   VariantMap<AbstractSeedType*> types_;
+  TypeRegistry *parent_;
 };
 
 } // namespace plankton
