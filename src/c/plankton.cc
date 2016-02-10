@@ -8,6 +8,7 @@
 #include "plankton-binary.hh"
 #include "plankton-inl.hh"
 #include "socket.hh"
+#include "utils/alloc.hh"
 
 using namespace plankton;
 
@@ -183,10 +184,10 @@ ArenaData::~ArenaData() {
     adopted_[i]->unmark_adopted();
   // Free memory.
   for (size_t i = 0; i < blocks_.size(); i++) {
-    block_t *block = &blocks_[i];
+    blob_t *blob = &blocks_[i];
     // For good measure, zap the memory before freeing it.
-    memset(block->memory, 0xCD, block->size);
-    delete[] block->memory;
+    blob_fill(*blob, 0xCD);
+    allocator_default_free(*blob);
   }
 }
 
@@ -212,8 +213,8 @@ VariantOwner *ArenaData::resolve_adopted() {
 }
 
 void *ArenaData::alloc_raw(size_t bytes) {
-  uint8_t *memory = new uint8_t[bytes];
-  block_t block = {memory, bytes};
+  blob_t block = allocator_default_malloc(bytes);
+  uint8_t *memory = static_cast<uint8_t*>(block.start);
   blocks_.push_back(block);
   return memory;
 }

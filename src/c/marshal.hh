@@ -86,6 +86,16 @@ private:
   encode_instance_t encode_;
 };
 
+template <typename T>
+class DefaultSeedType : public SeedType<T> {
+public:
+  DefaultSeedType(Variant header,
+      typename SeedType<T>::new_instance_t new_instance = tclib::new_callback(T::new_instance),
+      typename SeedType<T>::complete_instance_t complete_instance = tclib::new_callback(&T::init),
+      typename SeedType<T>::encode_instance_t encode = tclib::new_callback(&T::to_seed))
+    : SeedType<T>(header, new_instance, complete_instance, encode) { }
+};
+
 // A mapping from variants to values. This is different from a variant map in
 // that the values can be of any type. A variant map also does not keep track
 // of insertion order.

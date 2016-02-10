@@ -732,18 +732,12 @@ protected:
 private:
   friend class Arena;
 
-  // A block of memory allocated within this arena.
-  struct block_t {
-    uint8_t *memory;
-    size_t size;
-  };
-
   // Allocates and returns a block of memory that holds at least the given
   // number of bytes.
   void *alloc_raw(size_t bytes);
 
   // The raw pages of memory allocated for this arena.
-  std::vector<block_t> blocks_;
+  std::vector<blob_t> blocks_;
 
   // Other arenas this one has adopted.
   std::vector<VariantOwner*> adopted_;
