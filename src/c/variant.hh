@@ -187,15 +187,15 @@ public:
   // Returns this native variant viewed under the given type, but only if this
   // is a native that has that type. If not, NULL is returned.
   template <typename T>
-  inline T *native_as(ConcreteSeedType<T> *type);
+  inline T *native_as(ConcreteSeedType<T> *type) const;
 
   // Returns the type of this native object, or NULL if this is not native.
-  AbstractSeedType *native_type();
+  AbstractSeedType *native_type() const;
 
   // Returns a raw pointer to the native object. The only really safe way to
   // get access to the value under its type is using ::as so be careful with
   // this one. If this is not a native return NULL.
-  void *native_object();
+  void *native_object() const;
 
   // Returns the number of mappings in this map, if this is a map, otherwise
   // 0.

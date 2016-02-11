@@ -632,13 +632,13 @@ uint32_t pton_map_size(pton_variant_t variant) {
   return pton_is_map(variant) ? variant.payload_.as_arena_map_->size() : 0;
 }
 
-AbstractSeedType *Variant::native_type() {
+AbstractSeedType *Variant::native_type() const {
   return is_native()
        ? payload()->as_arena_native_->type_
        : NULL;
 }
 
-void *Variant::native_object() {
+void *Variant::native_object() const {
   return is_native()
        ? payload()->as_arena_native_->object_
        : NULL;

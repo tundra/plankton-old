@@ -18,7 +18,7 @@ static inline T *native_cast(Variant variant,
 }
 
 template <typename T>
-inline T *Variant::native_as(ConcreteSeedType<T> *type) {
+inline T *Variant::native_as(ConcreteSeedType<T> *type = default_seed_type<T>::get()) const {
   return type->cast(native_type(), native_object());
 }
 
