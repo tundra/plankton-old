@@ -1245,13 +1245,14 @@ OutputSocket::OutputSocket(tclib::OutStream *dest)
 
 static const byte_t kHeader[8] = {'p', 't', 0xF6, 'n', 0, 0, 0, 0};
 
-void OutputSocket::init() {
+bool OutputSocket::init() {
   write_blob(const_cast<byte_t*>(kHeader), 8);
   write_byte(kSetDefaultStringEncoding);
   write_uint64(default_encoding_);
   write_padding();
   dest_->flush();
   has_been_inited_ = true;
+  return true;
 }
 
 bool OutputSocket::set_default_string_encoding(pton_charset_t value) {

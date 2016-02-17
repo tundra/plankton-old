@@ -74,12 +74,19 @@ OutgoingRequest::OutgoingRequest(Variant subject, Variant selector, size_t argc,
     Variant *argv)
   : subject_(subject)
   , selector_(selector) {
-  if (argc == 0)
-    return;
-  arguments_ = arena_.new_map();
-  for (size_t i = 0; i < argc; i++)
-    arguments_.map_set(i, argv[i]);
+  set_arguments(argc, argv);
 }
+
+void OutgoingRequest::set_arguments(size_t argc, Variant *argv) {
+  if (argc == 0) {
+    arguments_ = Variant::null();
+  } else {
+    arguments_ = arena_.new_map();
+    for (size_t i = 0; i < argc; i++)
+      arguments_.map_set(i, argv[i]);
+  }
+}
+
 
 namespace plankton {
 namespace rpc {

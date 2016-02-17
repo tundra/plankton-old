@@ -165,7 +165,7 @@ public:
   // this registry itself doesn't know about. If multiple fallbacks are added
   // they will be called in the order they were added and the first non-null
   // type returned will be the result.
-  void add_fallback(TypeRegistry *fallback) { fallbacks_.push_back(fallback); }
+  void add_fallback(TypeRegistry *fallback);
 
   virtual AbstractSeedType *resolve_type(Variant header);
 private:

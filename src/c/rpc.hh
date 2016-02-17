@@ -77,6 +77,8 @@ public:
   void set_arguments(Variant value) { arguments_ = value; }
   Variant arguments() { return arguments_; }
 
+  void set_arguments(size_t argc, Variant *argv);
+
   Factory *factory() { return &arena_; }
 
 private:
@@ -307,6 +309,8 @@ public:
 
   // The underlying input socket.
   InputSocket *input() { return &insock_; }
+
+  OutputSocket *output() { return &outsock_; }
 
   // The underlying message socket.
   MessageSocket *socket() { return &socket_; }

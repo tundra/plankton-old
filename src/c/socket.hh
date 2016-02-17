@@ -18,13 +18,15 @@ namespace plankton {
 static const byte_t kSetDefaultStringEncoding = 1;
 static const byte_t kSendValue = 2;
 
-class OutputSocket {
+class OutputSocket : public tclib::DefaultDestructable {
 public:
   // Create a new output socket that writes to the given stream.
   OutputSocket(tclib::OutStream *dest);
+  virtual ~OutputSocket() { }
+  virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
   // Write the stream header.
-  void init();
+  bool init();
 
   // Sets the default encoding charset to use when encoding strings. This must
   // be done before init is called. The default encoding is utf-8.
@@ -135,7 +137,6 @@ private:
 class InputStream {
 public:
   InputStream(InputStreamConfig *config) : id_(config->id()) { }
-
   virtual ~InputStream() { }
 
   // Called by the socket when a new value with this stream as its destination
@@ -224,7 +225,7 @@ private:
   TypeRegistry *type_registry_;
 };
 
-class InputSocket {
+class InputSocket : public tclib::DefaultDestructable {
 public:
   typedef tclib::callback_t<InputStream*(InputStreamConfig*)> InputStreamFactory;
 
@@ -244,17 +245,19 @@ public:
   // Create a new input socket that fetches data from the given source.
   InputSocket(tclib::InStream *src);
 
+  // Free all the data associated with this socket, including all the streams.
+  // Once this method is called it is no longer safe to use any of the streams
+  // returned from this socket.
+  virtual ~InputSocket();
+
+  virtual void default_destroy() { tclib::default_delete_concrete(this); }
+
   // Sets the factory used to create input streams. If you want to set the
   // stream factory you have to do it before calling init(). Returns true if
   // setting succeeded, false if not.
   bool set_stream_factory(InputStreamFactory factory);
 
   void set_default_type_registry(TypeRegistry *value) { default_type_registry_ = value; }
-
-  // Free all the data associated with this socket, including all the streams.
-  // Once this method is called it is no longer safe to use any of the streams
-  // returned from this socket.
-  ~InputSocket();
 
   // Read the stream header. Returns true iff the header is valid.
   bool init();
