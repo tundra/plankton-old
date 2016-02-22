@@ -1348,6 +1348,7 @@ InputSocket::InputSocket(tclib::InStream *src)
   , has_been_inited_(false)
   , cursor_(0)
   , default_type_registry_(NULL) {
+  CHECK_FALSE("NULL socket source", src == NULL);
   stream_factory_ = tclib::new_callback(new_default_stream);
 }
 
@@ -1478,6 +1479,7 @@ bool InputSocket::process_next_instruction(ProcessInstrStatus *status_out) {
 }
 
 bool InputSocket::process_all_instructions() {
+  CHECK_TRUE("input socket not inited", has_been_inited_);
   bool keep_going = true;
   while (keep_going) {
     ProcessInstrStatus status;
