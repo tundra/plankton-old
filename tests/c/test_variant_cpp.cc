@@ -94,7 +94,7 @@ TEST(variant_cpp, blob) {
 
 TEST(variant_cpp, size) {
   // TODO: fix this such that msvc also gets to use compact variants.
-  ONLY_MSVC(return);
+  ONLY_MSVC(SKIP_TEST("gcc only"));
   ASSERT_TRUE(sizeof(Variant) <= (2 * sizeof(int64_t)));
 }
 
