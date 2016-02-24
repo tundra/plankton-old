@@ -335,7 +335,8 @@ void StreamServiceConnector::set_default_type_registry(TypeRegistry *value) {
 }
 
 bool StreamServiceConnector::init(MessageSocket::RequestCallback handler) {
-  outsock_.init();
+  if (!outsock_.init())
+    return false;
   insock_.set_stream_factory(PushInputStream::new_instance);
   if (!insock_.init())
     return false;

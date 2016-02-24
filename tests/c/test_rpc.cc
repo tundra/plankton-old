@@ -171,9 +171,9 @@ public:
   static const uint32_t kSliceCount = 16;
   static const uint32_t kStepCount = 1600;
 private:
-  void *run_producer();
-  void *run_distributer();
-  void *run_validator();
+  opaque_t run_producer();
+  opaque_t run_distributer();
+  opaque_t run_validator();
   byte_t get_value(size_t step) { return static_cast<byte_t>((index_ << 4) + (step & 0xF)); }
   size_t get_origin(byte_t value) { return value >> 4; }
   size_t get_step(byte_t value) { return value & 0xF; }
@@ -205,22 +205,22 @@ void Slice::start() {
 }
 
 void Slice::join() {
-  validator_.join();
-  distributer_.join();
-  producer_.join();
+  ASSERT_TRUE(validator_.join(NULL));
+  ASSERT_TRUE(distributer_.join(NULL));
+  ASSERT_TRUE(producer_.join(NULL));
 }
 
-void *Slice::run_producer() {
+opaque_t Slice::run_producer() {
   lets_go_->acquire();
   for (size_t i = 0; i < kStepCount; i++) {
     byte_t value = get_value(i);
     WriteIop iop(nexus_, &value, 1);
     ASSERT_TRUE(iop.execute());
   }
-  return NULL;
+  return o0();
 }
 
-void *Slice::run_distributer() {
+opaque_t Slice::run_distributer() {
   for (size_t i = 0; i < kStepCount; i++) {
     byte_t value = 0;
     ReadIop read_iop(nexus_, &value, 1);
@@ -229,10 +229,10 @@ void *Slice::run_distributer() {
     WriteIop write_iop(&slices_[origin]->stream_, &value, 1);
     ASSERT_TRUE(write_iop.execute());
   }
-  return NULL;
+  return o0();
 }
 
-void *Slice::run_validator() {
+opaque_t Slice::run_validator() {
   size_t counts[kSliceCount];
   for (size_t i = 0; i < kSliceCount; i++)
     counts[i] = 0;
@@ -247,7 +247,7 @@ void *Slice::run_validator() {
   }
   for (size_t i = 0; i < kSliceCount; i++)
     ASSERT_EQ(kStepCount / kSliceCount, counts[i]);
-  return NULL;
+  return o0();
 }
 
 TEST(rpc, byte_buffer_concurrent) {
@@ -358,13 +358,13 @@ TEST(rpc, service) {
   ASSERT_TRUE(Variant::string("pong") == inc2->peek_value(10));
 }
 
-static void *run_client(ByteBufferStream *down, ByteBufferStream *up) {
+static opaque_t run_client(ByteBufferStream *down, ByteBufferStream *up) {
   EchoService echo;
   StreamServiceConnector client(down, up);
   ASSERT_TRUE(client.init(echo.handler()));
   ASSERT_TRUE(client.process_all_messages());
   ASSERT_TRUE(up->close());
-  return NULL;
+  return o0();
 }
 
 TEST(rpc, async_service) {
@@ -380,7 +380,7 @@ TEST(rpc, async_service) {
   IncomingResponse inc = server.socket()->send_request(&req);
   ASSERT_TRUE(down.close());
   ASSERT_TRUE(server.process_all_messages());
-  ASSERT_TRUE(client.join() == NULL);
+  ASSERT_TRUE(client.join(NULL));
   ASSERT_TRUE(inc->is_fulfilled());
   ASSERT_EQ(54, inc->peek_value(Variant::null()).integer_value());
 }
