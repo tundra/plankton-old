@@ -11,6 +11,7 @@
 #include "marshal.hh"
 #include "plankton.hh"
 #include "utils/callback.hh"
+#include "utils/fatbool.hh"
 #include "variant.hh"
 
 namespace plankton {
@@ -26,7 +27,7 @@ public:
   virtual void default_destroy() { tclib::default_delete_concrete(this); }
 
   // Write the stream header.
-  bool init();
+  fat_bool_t init();
 
   // Sets the default encoding charset to use when encoding strings. This must
   // be done before init is called. The default encoding is utf-8.
@@ -260,18 +261,18 @@ public:
   void set_default_type_registry(TypeRegistry *value) { default_type_registry_ = value; }
 
   // Read the stream header. Returns true iff the header is valid.
-  bool init();
+  fat_bool_t init();
 
   // Reads and processes the next instruction from the input. This will either
   // cause the internal state of the socket to be updated or a value to be
   // delivered to a stream. Returns true iff an instruction was processed, false
   // if the end of the input was reached. If the out-argument is non-null the
   // status of processing the instruction is stored there.
-  bool process_next_instruction(ProcessInstrStatus *status_out);
+  fat_bool_t process_next_instruction(ProcessInstrStatus *status_out);
 
   // Keeps processing instructions until the end of the input is reached.
   // Returns true if all input was valid.
-  bool process_all_instructions();
+  fat_bool_t process_all_instructions();
 
   // Returns the root stream for this socket. This stream was produced by this
   // socket's stream factory.

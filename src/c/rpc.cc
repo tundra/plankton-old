@@ -178,7 +178,7 @@ MessageSocket::MessageSocket()
   , out_(NULL)
   , next_serial_(1) { }
 
-bool MessageSocket::init(PushInputStream *in, OutputSocket *out,
+fat_bool_t MessageSocket::init(PushInputStream *in, OutputSocket *out,
     RequestCallback handler) {
   in_ = in;
   out_ = out;
@@ -189,8 +189,8 @@ bool MessageSocket::init(PushInputStream *in, OutputSocket *out,
   in_->set_type_registry(&types_);
   in_->add_action(tclib::new_callback(&MessageSocket::on_incoming_message, this));
   if (!out_guard_.initialize())
-    return false;
-  return true;
+    return F_FALSE;
+  return F_TRUE;
 }
 
 void MessageSocket::on_incoming_message(ParsedMessage *message) {
@@ -334,12 +334,10 @@ void StreamServiceConnector::set_default_type_registry(TypeRegistry *value) {
   insock_.set_default_type_registry(value);
 }
 
-bool StreamServiceConnector::init(MessageSocket::RequestCallback handler) {
-  if (!outsock_.init())
-    return false;
+fat_bool_t StreamServiceConnector::init(MessageSocket::RequestCallback handler) {
+  F_TRY(outsock_.init());
   insock_.set_stream_factory(PushInputStream::new_instance);
-  if (!insock_.init())
-    return false;
+  F_TRY(insock_.init());
   PushInputStream *root = static_cast<PushInputStream*>(insock_.root_stream());
   return socket_.init(root, &outsock_, handler);
 }

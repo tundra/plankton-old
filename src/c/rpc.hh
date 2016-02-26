@@ -11,6 +11,7 @@
 #include "marshal.hh"
 #include "plankton-inl.hh"
 #include "socket.hh"
+#include "utils/fatbool.hh"
 #include "utils/refcount.hh"
 
 // Basic rpc mechanism. This lies above the raw socket support but below the
@@ -222,7 +223,7 @@ public:
   MessageSocket(PushInputStream *in, OutputSocket *out, RequestCallback handler);
 
   // Initialize an empty socket.
-  bool init(PushInputStream *in, OutputSocket *out, RequestCallback handler);
+  fat_bool_t init(PushInputStream *in, OutputSocket *out, RequestCallback handler);
 
   // Writes a request to the outgoing socket and returns a promise for a
   // response received on the incoming socket.
@@ -305,7 +306,7 @@ public:
 
   // Initializes the components of this connector, setting the given handler
   // up as the one to handle incoming requests.
-  bool init(MessageSocket::RequestCallback handler);
+  fat_bool_t init(MessageSocket::RequestCallback handler);
 
   // The underlying input socket.
   InputSocket *input() { return &insock_; }
@@ -319,7 +320,7 @@ public:
 
   // Keep running and processing messages as long as they come in on the input
   // stream.
-  bool process_all_messages() { return insock_.process_all_instructions(); }
+  fat_bool_t process_all_messages() { return insock_.process_all_instructions(); }
 
 private:
   InputSocket insock_;

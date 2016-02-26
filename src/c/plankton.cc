@@ -1245,14 +1245,14 @@ OutputSocket::OutputSocket(tclib::OutStream *dest)
 
 static const byte_t kHeader[8] = {'p', 't', 0xF6, 'n', 0, 0, 0, 0};
 
-bool OutputSocket::init() {
+fat_bool_t OutputSocket::init() {
   write_blob(const_cast<byte_t*>(kHeader), 8);
   write_byte(kSetDefaultStringEncoding);
   write_uint64(default_encoding_);
   write_padding();
   dest_->flush();
   has_been_inited_ = true;
-  return true;
+  return F_TRUE;
 }
 
 bool OutputSocket::set_default_string_encoding(pton_charset_t value) {
@@ -1427,30 +1427,30 @@ void PushInputStream::add_action(MessageAction action) {
 // The raw underlying data of the root id.
 static const byte_t kRawRootId[1] = {BinaryImplUtils::boNull};
 
-bool InputSocket::init() {
+fat_bool_t InputSocket::init() {
   byte_t header[8];
   bool at_eof = false;
   read_blob(header, 8, &at_eof);
   for (size_t i = 0; i < 8; i++) {
     if (header[i] != kHeader[i])
-      return false;
+      return F_FALSE;
   }
   StreamId id = root_id();
   InputStreamConfig config(id, default_type_registry_);
   InputStream *root_stream = stream_factory_(&config);
   streams_[id] = root_stream;
   has_been_inited_ = true;
-  return true;
+  return F_TRUE;
 }
 
-bool InputSocket::process_next_instruction(ProcessInstrStatus *status_out) {
+fat_bool_t InputSocket::process_next_instruction(ProcessInstrStatus *status_out) {
   bool at_eof = false;
   byte_t opcode = read_byte(&at_eof);
   switch (opcode) {
     case kSetDefaultStringEncoding: {
       read_uint64(&at_eof);
       read_padding(&at_eof);
-      return !at_eof;
+      return F_BOOL(!at_eof);
     }
     case kSendValue: {
       size_t stream_id_size = 0;
@@ -1466,28 +1466,28 @@ bool InputSocket::process_next_instruction(ProcessInstrStatus *status_out) {
         dest->receive_block(new MessageData(value_data, value_size));
       }
       id.dispose();
-      return !at_eof;
+      return F_BOOL(!at_eof);
     }
     default: {
       if (!(opcode == 0 && at_eof) && (status_out != NULL))
         // When we reach the end a 0 is returned so we allow that case without
         // reporting an error, otherwise we report if asked to.
         *status_out = ProcessInstrStatus(true);
-      return false;
+      return F_FALSE;
     }
   }
 }
 
-bool InputSocket::process_all_instructions() {
+fat_bool_t InputSocket::process_all_instructions() {
   CHECK_TRUE("input socket not inited", has_been_inited_);
-  bool keep_going = true;
-  while (keep_going) {
+  fat_bool_t last_result = F_TRUE;
+  while (last_result) {
     ProcessInstrStatus status;
-    keep_going = process_next_instruction(&status);
+    last_result = process_next_instruction(&status);
     if (status.is_error())
-      return false;
+      return last_result;
   }
-  return true;
+  return F_TRUE;
 }
 
 byte_t *InputSocket::read_value(size_t *size_out, bool *at_eof_out) {
