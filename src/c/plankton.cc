@@ -84,7 +84,7 @@ public:
 
   bool set(pton_sink_t **key_out, pton_sink_t **value_out);
 
-  Variant get(Variant key) const;
+  Variant get(Variant key, Variant defawlt = Variant()) const;
 
   bool has(Variant key) const;
 
@@ -460,7 +460,7 @@ bool pton_variants_equal(pton_variant_t a, pton_variant_t b) {
   }
 }
 
-bool Variant::operator==(Variant that) {
+bool Variant::operator==(const Variant &that) const {
   return pton_variants_equal(value_, that.value_);
 }
 
@@ -659,12 +659,17 @@ bool Variant::map_set(Variant key, Variant value) {
   return pton_map_set(value_, key.value_, value.value_);
 }
 
-pton_variant_t pton_map_get(pton_variant_t variant, pton_variant_t key) {
+pton_variant_t pton_map_get_with_default(pton_variant_t variant,
+    pton_variant_t key, pton_variant_t defawlt) {
   pton_check_binary_version(variant);
   pton_check_binary_version(key);
   return pton_is_map(variant)
-      ? variant.payload_.as_arena_map_->get(key).to_c()
-      : pton_null();
+      ? variant.payload_.as_arena_map_->get(key, defawlt).to_c()
+      : defawlt;
+}
+
+pton_variant_t pton_map_get(pton_variant_t variant, pton_variant_t key) {
+  return pton_map_get_with_default(variant, key, pton_null());
 }
 
 bool pton_map_has(pton_variant_t variant, pton_variant_t key) {
@@ -691,8 +696,8 @@ bool Variant::map_set(Sink *key_out, Sink *value_out) {
   }
 }
 
-Variant Variant::map_get(Variant key) const {
-  return pton_map_get(value_, key.value_);
+Variant Variant::map_get(Variant key, Variant defawlt) const {
+  return pton_map_get_with_default(value_, key.value_, defawlt.value_);
 }
 
 Variant Variant::map_has(Variant key) const {
@@ -922,13 +927,13 @@ bool pton_arena_map_t::set(pton_sink_t **key_out, pton_sink_t **value_out) {
   return true;
 }
 
-Variant pton_arena_map_t::get(Variant key) const {
+Variant pton_arena_map_t::get(Variant key, Variant defawlt) const {
   for (size_t i = 0; i < size_; i++) {
     entry_t *entry = &elms_[i];
     if (entry->key == key)
       return entry->value;
   }
-  return Variant::null();
+  return defawlt;
 }
 
 bool pton_arena_map_t::has(Variant key) const {

@@ -233,6 +233,11 @@ bool pton_map_set_sinks(pton_variant_t variant, pton_sink_t **key_out,
 // key, otherwise null.
 pton_variant_t pton_map_get(pton_variant_t variant, pton_variant_t key);
 
+// Returns the mapping for the given key in the given map if this contains the
+// key, otherwise the specified default value.
+pton_variant_t pton_map_get_with_default(pton_variant_t variant,
+    pton_variant_t key, pton_variant_t defawlt);
+
 // Returns true if the given value is a map that contains a mapping for the
 // given key, otherwise false.
 bool pton_map_has(pton_variant_t variant, pton_variant_t key);

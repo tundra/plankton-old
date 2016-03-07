@@ -299,31 +299,38 @@ internal::OutgoingResponseData::OutgoingResponseData(bool is_success,
   : is_success_(is_success)
   , payload_(payload) { }
 
-Variant RequestData::operator[](int32_t index) {
-  return args_.map_get(Variant::integer(index));
+Variant RequestData::argument(int32_t index, Variant defawlt) {
+  return args_.map_get(Variant::integer(index), defawlt);
 }
 
-Service::Service() {
+Service::Service()
+  : fallback_(default_fallback) {
   handler_ = new_callback(&Service::on_request, this);
 }
 
 void Service::register_method(Variant selector, Method handler) {
-  methods_.set(selector, tclib::new_callback(method_trampoline, handler));
+  methods_.set(selector, handler);
+}
+
+void Service::set_fallback(Method fallback) {
+  fallback_ = fallback;
 }
 
 void Service::on_request(IncomingRequest* request, ResponseCallback response) {
-  GenericMethod *method = methods_[request->selector()];
+  RequestData data(request->arguments(), request);
+  Method *method = methods_[request->selector()];
   if (method == NULL) {
-    response(OutgoingResponse::failure(Variant::null()));
+    (fallback_)(&data, response);
   } else {
-    (*method)(request->arguments(), request, response);
+    method->operator()(&data, response);
   }
 }
 
-void Service::method_trampoline(Method delegate, Variant raw_args, IncomingRequest *req,
-    ResponseCallback callback) {
-  RequestData data(raw_args, req);
-  delegate(data, callback);
+void Service::default_fallback(RequestData *data, ResponseCallback response) {
+  TextWriter writer;
+  writer.write(data->selector());
+  WARN("Unhandled message %s", *writer);
+  response(OutgoingResponse::failure(Variant::null()));
 }
 
 StreamServiceConnector::StreamServiceConnector(InStream *in, OutStream *out)

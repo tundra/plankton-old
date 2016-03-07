@@ -112,6 +112,9 @@ public:
   // to be valid.
   T *operator[](Variant key);
 
+  // Returns the number of mappings in this map.
+  size_t size() { return strings_.size() + generic_.size(); }
+
 private:
   // Controls how strings are hashed in the string map.
   struct StringHasher {

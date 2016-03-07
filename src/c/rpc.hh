@@ -254,13 +254,16 @@ private:
 class RequestData {
 public:
   // Returns the index'th positional argument to a request.
-  Variant operator[](int32_t index);
+  Variant argument(int32_t index, Variant defawlt = Variant::null());
 
   // Returns a factory that can be used to allocate the result of a request
   // callback. The factory is only guaranteed to stick around for the duration
   // of the callback so you can return values allocated using it but not keep
   // them for later.
   Factory *factory() { return request_->factory(); }
+
+  // Returns this request's selector.
+  Variant selector() { return request_->selector(); }
 
 private:
   friend class Service;
@@ -272,13 +275,17 @@ private:
 class Service {
 public:
   typedef tclib::callback_t<void(OutgoingResponse)> ResponseCallback;
-  typedef tclib::callback_t<void(Variant, IncomingRequest*, ResponseCallback)> GenericMethod;
-  typedef tclib::callback_t<void(RequestData&, ResponseCallback)> Method;
+  typedef tclib::callback_t<void(RequestData*, ResponseCallback)> Method;
 
   Service();
 
   // Adds a method to the set understood by this service.
   void register_method(Variant selector, Method handler);
+
+  // Sets the fallback method to call for requests with selectors with no
+  // registered handler. The default behavior is to log a warning and fail with
+  // the null value.
+  void set_fallback(Method fallback);
 
   // Returns the callback to pass to a message socket that will dispatch
   // messages to this service.
@@ -286,13 +293,14 @@ public:
 
 private:
   // General handler for incoming requests.
-  void on_request(IncomingRequest* request, ResponseCallback response);
+  void on_request(IncomingRequest *request, ResponseCallback response);
 
-  static void method_trampoline(Method delegate, Variant args, IncomingRequest *req,
-      ResponseCallback callback);
+  // The fallback to use if none have been set explicitly.
+  static void default_fallback(RequestData *data, ResponseCallback callback);
 
   Arena arena_;
-  VariantMap<GenericMethod> methods_;
+  VariantMap<Method> methods_;
+  Method fallback_;
   MessageSocket::RequestCallback handler_;
 };
 

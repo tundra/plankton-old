@@ -323,22 +323,31 @@ TEST(rpc, roundtrip) {
 
 class EchoService : public plankton::rpc::Service {
 public:
-  void echo(RequestData &data, ResponseCallback response);
-  void ping(RequestData &data, ResponseCallback response);
+  void echo(RequestData *data, ResponseCallback response);
+  void ping(RequestData *data, ResponseCallback response);
+  void fallback(RequestData *data, ResponseCallback response);
   EchoService();
+  size_t fallback_count;
 };
 
-EchoService::EchoService() {
+EchoService::EchoService()
+  : fallback_count(0) {
   register_method("echo", tclib::new_callback(&EchoService::echo, this));
   register_method("ping", tclib::new_callback(&EchoService::ping, this));
+  set_fallback(tclib::new_callback(&EchoService::fallback, this));
 }
 
-void EchoService::echo(RequestData &data, ResponseCallback callback) {
-  callback(OutgoingResponse::success(data[0]));
+void EchoService::echo(RequestData *data, ResponseCallback callback) {
+  callback(OutgoingResponse::success(data->argument(0)));
 }
 
-void EchoService::ping(RequestData &data, ResponseCallback callback) {
+void EchoService::ping(RequestData *data, ResponseCallback callback) {
   callback(OutgoingResponse::success("pong"));
+}
+
+void EchoService::fallback(RequestData *data, ResponseCallback callback) {
+  fallback_count++;
+  callback(OutgoingResponse::success("you sunk my battleship"));
 }
 
 TEST(rpc, service) {
@@ -351,11 +360,15 @@ TEST(rpc, service) {
   IncomingResponse inc1 = channel->send_request(&req1);
   OutgoingRequest req2(Variant::null(), "ping");
   IncomingResponse inc2 = channel->send_request(&req2);
-  while (!inc2->is_settled())
+  OutgoingRequest req3(Variant::null(), "foobeliboo");
+  IncomingResponse inc3 = channel->send_request(&req3);
+  while (!inc3->is_settled())
     channel.process_next_instruction();
   ASSERT_EQ(43, inc0->peek_value(Variant::null()).integer_value());
   ASSERT_TRUE(inc1->peek_value(10).is_null());
   ASSERT_TRUE(Variant::string("pong") == inc2->peek_value(10));
+  ASSERT_EQ(1, echo.fallback_count);
+  ASSERT_TRUE(Variant::string("you sunk my battleship") == inc3->peek_value(Variant::null()));
 }
 
 static opaque_t run_client(ByteBufferStream *down, ByteBufferStream *up) {

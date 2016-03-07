@@ -6,6 +6,10 @@
 #include "plankton-binary.hh"
 #include "marshal-inl.hh"
 
+BEGIN_C_INCLUDES
+#include "utils/strbuf.h"
+END_C_INCLUDES
+
 using namespace plankton;
 
 class Point {
@@ -312,4 +316,29 @@ TEST(marshal, destruct) {
     ASSERT_EQ(1, count);
   }
   ASSERT_EQ(0, count);
+}
+
+#define kStringCount 1024
+
+TEST(marshal, key_overlap_regress) {
+  VariantMap<size_t> map;
+  utf8_t strings[kStringCount];
+  for (size_t i = 0; i < kStringCount; i++) {
+    string_buffer_t buf;
+    ASSERT_TRUE(string_buffer_init(&buf));
+    string_buffer_printf(&buf, "my-string-%i", i);
+    utf8_t str = string_default_dup(string_buffer_flush(&buf));
+    string_buffer_dispose(&buf);
+    strings[i] = str;
+    map.set(str.chars, i);
+    ASSERT_EQ(i + 1, map.size());
+  }
+  for (size_t i = 0; i < kStringCount; i++) {
+    Variant str = strings[i].chars;
+    size_t *value = map[str];
+    ASSERT_TRUE(value != NULL);
+    ASSERT_EQ(i, *value);
+  }
+  for (size_t i = 0; i < kStringCount; i++)
+    string_default_delete(strings[i]);
 }

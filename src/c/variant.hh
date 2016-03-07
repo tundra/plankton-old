@@ -209,7 +209,7 @@ public:
 
   // Returns the mapping for the given key in this map if this contains the
   // key, otherwise null.
-  Variant map_get(Variant key) const;
+  Variant map_get(Variant key, Variant defawlt = Variant()) const;
 
   // Returns true if this is a map that contains a mapping for the given key,
   // otherwise false.
@@ -277,7 +277,7 @@ public:
   // identical to themselves, and structured values are identical if they were
   // created by the same new_... call. So two arrays with the same values are
   // not necessarily considered identical.
-  bool operator==(Variant that);
+  bool operator==(const Variant &that) const;
 
   // Returns true iff this value is locally immutable. Note that even if this
   // returns true it doesn't mean that nothing about this value can change -- it
