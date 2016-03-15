@@ -418,7 +418,8 @@ typedef enum pton_instr_opcode_t {
   PTON_OPCODE_NULL,
   PTON_OPCODE_BOOL,
   PTON_OPCODE_BEGIN_SEED,
-  PTON_OPCODE_REFERENCE
+  PTON_OPCODE_REFERENCE,
+  PTON_OPCODE_BLOB
 } pton_instr_opcode_t;
 
 // Describes an individual binary plankton code instruction.
@@ -438,6 +439,10 @@ typedef struct {
       uint32_t length;
       const uint8_t *contents;
     } default_string_data;
+    struct {
+      uint32_t length;
+      const uint8_t *contents;
+    } blob_data;
     struct {
       pton_charset_t encoding;
       uint32_t length;

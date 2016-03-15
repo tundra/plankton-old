@@ -6,6 +6,7 @@
 #include "marshal-inl.hh"
 #include "plankton-binary.hh"
 #include "utils-inl.hh"
+#include "utils/log.hh"
 
 using namespace plankton;
 
@@ -401,6 +402,9 @@ private:
   // Convert default-encoding string data into a string variant.
   bool decode_default_string(pton_instr_t *instr, Variant *result_out);
 
+  // Convert a binary blob into a blob variant.
+  bool decode_blob(pton_instr_t *instr, Variant *result_out);
+
   // Convert a custom-encoding string data into a string variant.
   bool decode_string_with_encoding(pton_instr_t *instr, Variant *result_out);
 
@@ -498,6 +502,18 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
       cursor_ += length;
       break;
     }
+    case BinaryImplUtils::boBlob: {
+      uint32_t length = 0;
+      if (!decode_uint32(&length))
+        return false;
+      if (!has_data(length))
+        return false;
+      instr_out->opcode = PTON_OPCODE_BLOB;
+      instr_out->payload.blob_data.length = length;
+      instr_out->payload.blob_data.contents = data_ + cursor_;
+      cursor_ += length;
+      break;
+    }
     case BinaryImplUtils::boArray:
       if (!decode_uint32(&instr_out->payload.array_length))
         return false;
@@ -567,8 +583,7 @@ bool InstrDecoder::decode(pton_instr_t *instr_out) {
       break;
     }
     default:
-      fprintf(stderr, "Unknown instruction %i\n", opcode);
-      fflush(stderr);
+      WARN("Unknown instruction %i", opcode);
       return false;
   }
   instr_out->size = cursor_;
@@ -656,6 +671,8 @@ bool BinaryReaderImpl::decode(Variant *result_out) {
       return decode_default_string(&instr, result_out);
     case PTON_OPCODE_STRING_WITH_ENCODING:
       return decode_string_with_encoding(&instr, result_out);
+    case PTON_OPCODE_BLOB:
+      return decode_blob(&instr, result_out);
     case PTON_OPCODE_BEGIN_ARRAY:
       return decode_array(instr.payload.array_length, result_out);
     case PTON_OPCODE_BEGIN_MAP:
@@ -683,6 +700,13 @@ bool BinaryReaderImpl::decode_default_string(pton_instr_t *instr, Variant *resul
   String result = reader_->factory_->new_string(size);
   memcpy(result.mutable_chars(), chars, size);
   result.ensure_frozen();
+  return succeed(result, result_out);
+}
+
+bool BinaryReaderImpl::decode_blob(pton_instr_t *instr, Variant *result_out) {
+  const uint8_t *data = instr->payload.blob_data.contents;
+  uint32_t size = instr->payload.blob_data.length;
+  Blob result = reader_->factory_->new_blob(data, size);
   return succeed(result, result_out);
 }
 
@@ -795,6 +819,7 @@ bool BinaryReader::validate(const void *raw_data, size_t size) {
       case PTON_OPCODE_NULL:
       case PTON_OPCODE_REFERENCE:
       case PTON_OPCODE_STRING_WITH_ENCODING:
+      case PTON_OPCODE_BLOB:
         break;
       case PTON_OPCODE_BEGIN_ARRAY:
         remaining_instrs += instr.payload.array_length;

@@ -278,6 +278,7 @@ public:
   typedef tclib::callback_t<void(RequestData*, ResponseCallback)> Method;
 
   Service();
+  virtual ~Service() { }
 
   // Adds a method to the set understood by this service.
   void register_method(Variant selector, Method handler);
@@ -291,10 +292,11 @@ public:
   // messages to this service.
   MessageSocket::RequestCallback handler() { return handler_; }
 
-private:
+protected:
   // General handler for incoming requests.
-  void on_request(IncomingRequest *request, ResponseCallback response);
+  virtual void on_request(IncomingRequest *request, ResponseCallback response);
 
+private:
   // The fallback to use if none have been set explicitly.
   static void default_fallback(RequestData *data, ResponseCallback callback);
 
