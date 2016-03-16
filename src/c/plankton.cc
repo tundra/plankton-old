@@ -362,7 +362,7 @@ Blob Arena::new_blob(uint32_t size) {
   pton_arena_blob_t *data = alloc_value<pton_arena_blob_t>();
   uint8_t *bytes = alloc_values<uint8_t>(size);
   memset(bytes, 0, size);
-  Variant result(header_t::PTON_REPR_ARNA_BLOB, new (data) pton_arena_blob_t(data, size, false));
+  Variant result(header_t::PTON_REPR_ARNA_BLOB, new (data) pton_arena_blob_t(bytes, size, false));
   return Blob(result);
 }
 

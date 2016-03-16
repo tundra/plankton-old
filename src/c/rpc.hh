@@ -170,6 +170,52 @@ private:
 
 };
 
+class MessageSocket;
+
+// A socket observer is a utility that can be attached to a socket and will
+// be notified of messages coming in and out. It's convenient for tracing and
+// debugging.
+class MessageSocketObserver {
+public:
+  MessageSocketObserver();
+  virtual ~MessageSocketObserver();
+
+  // Called whenever the service this observer is attached to receives a
+  // request, before that request has been passed to the implementation of the
+  // service.
+  virtual void on_incoming_request(IncomingRequest *request, uint64_t serial) = 0;
+
+  // Called whenever a request has been processed and a response to return
+  // to the caller has been received by the service framework but before it has
+  // been delivered to the caller.
+  virtual void on_outgoing_response(OutgoingResponse response, uint64_t serial) = 0;
+
+  // Installs this observer on the given socket. An observer can only be
+  // installed on one socket at a time and if multiple observers are installed
+  // they must be uninstalled in the reverse order they were installed.
+  void install(MessageSocket *subject);
+
+  // Uninstalls this observer from the given socket. If multiple observers have
+  // been installed they must be uninstalled in the reverse order they were
+  // installed.
+  void uninstall();
+
+private:
+  friend class MessageSocket;
+
+  // Called by the message socket on requests.
+  void notify_incoming_request(IncomingRequest *request, uint64_t serial);
+
+  // Called by the message socket on responses.
+  void notify_outgoing_response(OutgoingResponse response, uint64_t serial);
+
+  MessageSocket *subject_;
+  MessageSocket *subject() { return subject_; }
+  MessageSocketObserver *next_;
+  MessageSocketObserver *next() { return next_; }
+  bool is_installed_;
+};
+
 // A socket you can send and receive requests through.
 class MessageSocket {
 public:
@@ -248,6 +294,10 @@ private:
   TypeRegistry types_;
   uint64_t next_serial_;
   PendingMessageMap pending_messages_;
+
+  friend class MessageSocketObserver;
+  MessageSocketObserver *observer() { return observer_; }
+  MessageSocketObserver *observer_;
 };
 
 // Utility for fetching individual request arguments.
@@ -292,13 +342,12 @@ public:
   // messages to this service.
   MessageSocket::RequestCallback handler() { return handler_; }
 
-protected:
-  // General handler for incoming requests.
-  virtual void on_request(IncomingRequest *request, ResponseCallback response);
-
 private:
   // The fallback to use if none have been set explicitly.
   static void default_fallback(RequestData *data, ResponseCallback callback);
+
+  // General handler for incoming requests.
+  void on_request(IncomingRequest *request, ResponseCallback response);
 
   Arena arena_;
   VariantMap<Method> methods_;

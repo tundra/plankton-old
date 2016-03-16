@@ -87,6 +87,47 @@ void OutgoingRequest::set_arguments(size_t argc, Variant *argv) {
   }
 }
 
+MessageSocketObserver::MessageSocketObserver()
+  : subject_(NULL)
+  , next_(NULL)
+  , is_installed_(false) {
+}
+
+MessageSocketObserver::~MessageSocketObserver() {
+  if (is_installed_)
+    uninstall();
+}
+
+void MessageSocketObserver::install(MessageSocket *subject) {
+  CHECK_FALSE("already installed", is_installed_);
+  subject_ = subject;
+  next_ = subject->observer();
+  subject->observer_ = this;
+  is_installed_ = true;
+}
+
+void MessageSocketObserver::uninstall() {
+  CHECK_TRUE("not installed", is_installed_);
+  CHECK_PTREQ("observer out of order", subject()->observer(), this);
+  subject()->observer_ = next();
+  next_ = NULL;
+  is_installed_ = false;
+}
+
+void MessageSocketObserver::notify_incoming_request(IncomingRequest *request,
+    uint64_t serial) {
+  on_incoming_request(request, serial);
+  if (next() != NULL)
+    next()->notify_incoming_request(request, serial);
+}
+
+void MessageSocketObserver::notify_outgoing_response(OutgoingResponse response,
+    uint64_t serial) {
+  on_outgoing_response(response, serial);
+  if (next() != NULL)
+    next()->notify_outgoing_response(response, serial);
+}
+
 
 namespace plankton {
 namespace rpc {
@@ -176,7 +217,8 @@ MessageSocket::MessageSocket(PushInputStream *in, OutputSocket *out,
 MessageSocket::MessageSocket()
   : in_(NULL)
   , out_(NULL)
-  , next_serial_(1) { }
+  , next_serial_(1)
+  , observer_(NULL) { }
 
 fat_bool_t MessageSocket::init(PushInputStream *in, OutputSocket *out,
     RequestCallback handler) {
@@ -214,6 +256,8 @@ void MessageSocket::on_incoming_message(ParsedMessage *message) {
 void MessageSocket::on_incoming_request(RequestMessage *message) {
   IncomingRequest request(&message->request());
   uint64_t serial = message->serial();
+  if (observer() != NULL)
+    observer()->notify_incoming_request(&request, serial);
   ResponseCallback callback = new_callback(&MessageSocket::on_outgoing_response,
       this, serial);
   (handler_)(&request, callback);
@@ -243,6 +287,8 @@ void MessageSocket::on_incoming_response(VariantOwner *owner, ResponseMessage *m
 }
 
 void MessageSocket::on_outgoing_response(uint64_t serial, OutgoingResponse response) {
+  if (observer() != NULL)
+    observer()->notify_outgoing_response(response, serial);
   ResponseMessage message(response, serial);
   Arena arena;
   Native value = arena.new_native(&message);
