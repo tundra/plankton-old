@@ -1,12 +1,11 @@
 //- Copyright 2015 the Neutrino authors (see AUTHORS).
 //- Licensed under the Apache License, Version 2.0 (see LICENSE).
 
+#include "bytestream.hh"
+
 #include "async/promise-inl.hh"
-#include "io/file.hh"
 #include "marshal-inl.hh"
 #include "rpc.hh"
-#include "sync/mutex.hh"
-#include "sync/semaphore.hh"
 #include "sync/thread.hh"
 #include "test/asserts.hh"
 #include "test/unittest.hh"
@@ -15,106 +14,9 @@ using namespace plankton;
 using namespace plankton::rpc;
 using namespace tclib;
 
-// A bounded concurrent io stream that allows any number of concurrent readers
-// and writers. It doesn't necessarily scale super well but it is simple and
-// the concurrency control is (famous last words) solid.
-class ByteBufferStream : public tclib::InStream, public tclib::OutStream {
-public:
-  class Entry {
-  public:
-    Entry() : is_eof(false), value(0) { }
-    Entry(bool _is_eof, byte_t _value) : is_eof(_is_eof), value(_value) { }
-    bool is_eof;
-    byte_t value;
-  };
-  ByteBufferStream(uint32_t capacity);
-  ~ByteBufferStream();
-  virtual void default_destroy() { default_delete_concrete(this); }
-  virtual bool read_sync(read_iop_state_t *op);
-  virtual bool write_sync(write_iop_state_t *op);
-  virtual bool flush();
-  virtual bool close();
-  void write_entry(Entry entry);
-
-private:
-  size_t capacity_;
-  size_t next_read_cursor_;
-  size_t next_write_cursor_;
-  tclib::NativeSemaphore readable_;
-  tclib::NativeSemaphore writable_;
-  tclib::NativeMutex buffer_mutex_;
-  Entry *buffer_;
-};
-
-ByteBufferStream::ByteBufferStream(uint32_t capacity)
-  : capacity_(capacity)
-  , next_read_cursor_(0)
-  , next_write_cursor_(0)
-  , readable_(0)
-  , writable_(capacity)
-  , buffer_(new Entry[capacity]) {
-  ASSERT_TRUE(readable_.initialize());
-  ASSERT_TRUE(writable_.initialize());
-  ASSERT_TRUE(buffer_mutex_.initialize());
-}
-
-ByteBufferStream::~ByteBufferStream() {
-  delete[] buffer_;
-}
-
-bool ByteBufferStream::read_sync(read_iop_state_t *op) {
-  byte_t *dest = static_cast<byte_t*>(op->dest_);
-  size_t size = op->dest_size_;
-  size_t offset = 0;
-  bool at_eof = false;
-  for (; offset < size; offset++) {
-    readable_.acquire();
-    buffer_mutex_.lock();
-    Entry entry = buffer_[next_read_cursor_];
-    if (entry.is_eof) {
-      readable_.release();
-      buffer_mutex_.unlock();
-      at_eof = true;
-      break;
-    } else {
-      dest[offset] = entry.value;
-      next_read_cursor_ = (next_read_cursor_ + 1) % capacity_;
-      buffer_mutex_.unlock();
-      writable_.release();
-    }
-  }
-  read_iop_state_deliver(op, offset, at_eof);
-  return true;
-}
-
-bool ByteBufferStream::write_sync(write_iop_state_t *op) {
-  const byte_t *src = static_cast<const byte_t*>(op->src);
-  for (size_t i = 0; i < op->src_size; i++)
-    write_entry(Entry(false, src[i]));
-  write_iop_state_deliver(op, op->src_size);
-  return true;
-}
-
-void ByteBufferStream::write_entry(Entry entry) {
-  writable_.acquire();
-  buffer_mutex_.lock();
-  buffer_[next_write_cursor_] = entry;
-  next_write_cursor_ = (next_write_cursor_ + 1) % capacity_;
-  buffer_mutex_.unlock();
-  readable_.release();
-}
-
-bool ByteBufferStream::flush() {
-  return true;
-}
-
-bool ByteBufferStream::close() {
-  write_entry(Entry(true, 0));
-  return true;
-}
-
 TEST(rpc, byte_buffer_simple) {
   ByteBufferStream stream(374);
+  ASSERT_TRUE(stream.initialize());
   for (size_t io = 0; io < 374; io++) {
     size_t offset = io * 7;
     for (size_t ii = 0; ii < 373; ii++) {
@@ -143,6 +45,7 @@ TEST(rpc, byte_buffer_delayed_eof) {
   // Check that if we close the stream before the contents have all been read
   // those contents are still available to be read before the stream eofs.
   ByteBufferStream stream(374);
+  ASSERT_TRUE(stream.initialize());
   byte_t buf[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
   WriteIop write(&stream, buf, 10);
   ASSERT_TRUE(write.execute());
@@ -193,6 +96,7 @@ Slice::Slice(ByteBufferStream *nexus, NativeSemaphore *lets_go, Slice **slices, 
   , stream_(57 + index)
   , slices_(slices)
   , index_(index) {
+  ASSERT_TRUE(stream_.initialize());
   producer_ = new_callback(&Slice::run_producer, this);
   distributer_ = new_callback(&Slice::run_distributer, this);
   validator_ = new_callback(&Slice::run_validator, this);
@@ -259,6 +163,7 @@ TEST(rpc, byte_buffer_concurrent) {
   // values out and checking that they all came from producer i and that the
   // payload is as expected. That's it. A lot going on.
   ByteBufferStream nexus(41);
+  ASSERT_TRUE(nexus.initialize());
   Slice *slices[Slice::kSliceCount];
   NativeSemaphore lets_go(0);
   ASSERT_TRUE(lets_go.initialize());
@@ -298,6 +203,7 @@ private:
 SharedRpcChannel::SharedRpcChannel(MessageSocket::RequestCallback handler)
   : bytes_(1024)
   , channel_(&bytes_, &bytes_) {
+  ASSERT_TRUE(bytes_.initialize());
   ASSERT_TRUE(channel_.init(handler));
 }
 
@@ -382,7 +288,9 @@ static opaque_t run_client(ByteBufferStream *down, ByteBufferStream *up) {
 
 TEST(rpc, async_service) {
   ByteBufferStream down(1024);
+  ASSERT_TRUE(down.initialize());
   ByteBufferStream up(1024);
+  ASSERT_TRUE(up.initialize());
   StreamServiceConnector server(&up, &down);
   NativeThread client(new_callback(run_client, &down, &up));
   ASSERT_TRUE(client.start());

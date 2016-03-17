@@ -3,7 +3,7 @@
 
 import re
 
-filenames = [
+testfiles = [
   "test_arena_c.cc",
   "test_arena_cpp.cc",
   "test_binary.cc",
@@ -16,6 +16,10 @@ filenames = [
   "test_variant_cpp.cc",
 ]
 
+libfiles = [
+  "bytestream.cc"
+]
+
 # Compile a single test file, ensuring that the include paths are hooked up
 # right.
 def compile_test_file(source):
@@ -24,7 +28,7 @@ def compile_test_file(source):
   source.add_include(get_dep("tclib").get_child("src", "c"))
   return source.get_object()
 
-test_library = get_group("library")
+objects = get_group("objects")
 
 tests_yaml = get_external("tests", "generic", "tests.yaml")
 tests_yaml_path = tests_yaml.get_input_file().get_path()
@@ -33,20 +37,28 @@ tests_yaml_path = tests_yaml.get_input_file().get_path()
 DISABLE_YAML_TEST = True
 
 # Compile the test source files.
-for filename in filenames:
+for filename in testfiles:
   source_file = c.get_source_file(filename)
   object_file = compile_test_file(source_file)
   if filename == "test_generic.cc":
     if not DISABLE_YAML_TEST:
       object_file.add_library_requirement(posix="yaml")
       object_file.add_dependency(tests_yaml)
-      test_library.add_member(object_file)
+      objects.add_member(object_file)
   else:
-    test_library.add_member(object_file)
+    objects.add_member(object_file)
+ 
+library = get_group("library")
+
+for filename in libfiles:
+  source_file = c.get_source_file(filename)
+  object_file = compile_test_file(source_file)
+  library.add_member(object_file)
 
 # Compile the test main executable.
 test_main = c.get_executable("main")
-test_main.add_object(test_library)
+test_main.add_object(objects)
+test_main.add_object(library)
 test_main.add_object(get_dep_external("tclib", "src", "c", "test", "library"))
 test_main.add_object(get_dep_external("tclib", "src", "c", "test", "log-fail"))
 test_main.add_object(get_dep_external("tclib", "src", "c", "io", "library"))
@@ -59,10 +71,12 @@ all.add_dependency(test_main)
 run_tests = get_group("run-tests")
 
 # Add targets to run the test cases.
-for filename in filenames:
+for filename in testfiles:
   test_case = test.get_exec_test_case(filename)
   test_case.set_runner(test_main)
-  stripped_test_case_name = re.match(r"test_(\w+).c", filename).group(1)
-  test_case.add_env("YAML_PATH", tests_yaml_path)
-  test_case.set_arguments(stripped_test_case_name)
-  run_tests.add_member(test_case)
+  stripped_test_case_match = re.match(r"test_(\w+).c", filename)
+  if not stripped_test_case_match is None:
+    stripped_test_case_name = stripped_test_case_match.group(1)
+    test_case.add_env("YAML_PATH", tests_yaml_path)
+    test_case.set_arguments(stripped_test_case_name)
+    run_tests.add_member(test_case)
