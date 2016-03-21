@@ -40,6 +40,7 @@ template <typename T> class ConcreteSeedType;
 // If the type has a static seed_type() method it will automatically be used
 // to provide the default type.
 template <typename T> struct default_seed_type {
+public:
   // If you're getting an error here that type T doesn't have a seed_type()
   // member then it is likely because code somewhere is trying to create a
   // native plankton object for that type in a way that expects a default type
@@ -187,7 +188,7 @@ public:
   // Returns this native variant viewed under the given type, but only if this
   // is a native that has that type. If not, NULL is returned.
   template <typename T>
-  inline T *native_as(ConcreteSeedType<T> *type) const;
+  inline T *native_as(ConcreteSeedType<T> *type = get_default_seed_type<T>()) const;
 
   // Returns the type of this native object, or NULL if this is not native.
   AbstractSeedType *native_type() const;
@@ -333,6 +334,13 @@ protected:
 
 private:
   friend class Arena;
+
+  // On windows default_seed_type<T>::get() can't be used as a default argument
+  // for some reason but wrapping it in a simple call makes the problem go away.
+  template <typename T>
+  static ConcreteSeedType<T> *get_default_seed_type() {
+    return default_seed_type<T>::get();
+  }
 
   Variant(repr_tag_t tag, pton_arena_value_t *arena_value);
 };
@@ -538,7 +546,7 @@ public:
   // Returns this native variant viewed under the given type, but only if this
   // is a native that has that type. If not, NULL is returned.
   template <typename T>
-  T *as(ConcreteSeedType<T> *type) { return native_as(type); }
+  T *as(ConcreteSeedType<T> *type = default_seed_type<T>::get()) { return native_as(type); }
 };
 
 // Abstract type of something that can own values. This will almost always be an

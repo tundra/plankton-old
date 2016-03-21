@@ -58,7 +58,7 @@ TEST(marshal, seed_type) {
   obj.set_field("y", 18);
   Native value = Point::seed_type()->get_initial_instance(obj.header(), &arena);
   Point::seed_type()->get_complete_instance(value, obj, &arena);
-  Point *p = value.as(Point::seed_type());
+  Point *p = value.as<Point>();
   ASSERT_TRUE(p != NULL);
   ASSERT_EQ(10, p->x());
   ASSERT_EQ(18, p->y());
@@ -66,7 +66,7 @@ TEST(marshal, seed_type) {
 
 TEST(marshal, registry) {
   TypeRegistry registry;
-  registry.register_type(Point::seed_type());
+  registry.register_type<Point>();
   ASSERT_TRUE(registry.resolve_type("binary.Point") == Point::seed_type());
   char other[13] = "binary.Point";
   ASSERT_TRUE(registry.resolve_type(other) == Point::seed_type());
@@ -82,11 +82,11 @@ TEST(marshal, simple_auto_object) {
   BinaryWriter out;
   out.write(obj);
   TypeRegistry registry;
-  registry.register_type(Point::seed_type());
+  registry.register_type<Point>();
   BinaryReader in(&arena);
   in.set_type_registry(&registry);
   Native value = in.parse(*out, out.size());
-  Point *pnt = value.as(Point::seed_type());
+  Point *pnt = value.as<Point>();
   ASSERT_FALSE(pnt == NULL);
   ASSERT_EQ(11, pnt->x());
   ASSERT_EQ(12, pnt->y());
@@ -114,8 +114,8 @@ Rect *Rect::new_instance(Variant header, Factory* factory) {
 }
 
 void Rect::init(Seed payload, Factory* factory) {
-  top_left_ = payload.get_field("top_left").native_as(Point::seed_type());
-  bottom_right_ = payload.get_field("bottom_right").native_as(Point::seed_type());
+  top_left_ = payload.get_field("top_left").native_as<Point>();
+  bottom_right_ = payload.get_field("bottom_right").native_as<Point>();
 }
 
 Variant Rect::to_seed(Factory *factory) {
@@ -147,13 +147,13 @@ TEST(marshal, complex_auto_object) {
   BinaryWriter out;
   out.write(obj);
   TypeRegistry registry;
-  registry.register_type(Point::seed_type());
-  registry.register_type(Rect::seed_type());
+  registry.register_type<Point>();
+  registry.register_type<Rect>();
   BinaryReader in(&arena);
   in.set_type_registry(&registry);
   Native value = in.parse(*out, out.size());
-  ASSERT_TRUE(value.as(Point::seed_type()) == NULL);
-  Rect *rect = value.as(Rect::seed_type());
+  ASSERT_TRUE(value.as<Point>() == NULL);
+  Rect *rect = value.as<Rect>();
   ASSERT_EQ(13, rect->top_left()->x());
   ASSERT_EQ(14, rect->top_left()->y());
   ASSERT_EQ(15, rect->bottom_right()->x());
@@ -172,13 +172,13 @@ TEST(marshal, invalid_auto_object) {
   BinaryWriter out;
   out.write(obj);
   TypeRegistry registry;
-  registry.register_type(Point::seed_type());
-  registry.register_type(Rect::seed_type());
+  registry.register_type<Point>();
+  registry.register_type<Rect>();
   BinaryReader in(&arena);
   in.set_type_registry(&registry);
   Native value = in.parse(*out, out.size());
-  ASSERT_TRUE(value.as(Point::seed_type()) == NULL);
-  Rect *rect = value.as(Rect::seed_type());
+  ASSERT_TRUE(value.as<Point>() == NULL);
+  Rect *rect = value.as<Rect>();
   ASSERT_EQ(13, rect->top_left()->x());
   ASSERT_EQ(14, rect->top_left()->y());
   ASSERT_PTREQ(NULL, rect->bottom_right());
@@ -191,13 +191,13 @@ TEST(marshal, simple_encode) {
   BinaryWriter out;
   out.write(n);
   TypeRegistry registry;
-  registry.register_type(Point::seed_type());
-  registry.register_type(Rect::seed_type());
+  registry.register_type<Point>();
+  registry.register_type<Rect>();
   BinaryReader in(&arena);
   in.set_type_registry(&registry);
   Native value = in.parse(*out, out.size());
   ASSERT_TRUE(value.is_native());
-  Point *p2 = value.as(Point::seed_type());
+  Point *p2 = value.as<Point>();
   ASSERT_EQ(15, p2->x());
   ASSERT_EQ(16, p2->y());
 }
@@ -211,13 +211,13 @@ TEST(marshal, complex_encode) {
   BinaryWriter out;
   out.write(n);
   TypeRegistry registry;
-  registry.register_type(Point::seed_type());
-  registry.register_type(Rect::seed_type());
+  registry.register_type<Point>();
+  registry.register_type<Rect>();
   BinaryReader in(&arena);
   in.set_type_registry(&registry);
   Native value = in.parse(*out, out.size());
   ASSERT_TRUE(value.is_native());
-  Rect *r2 = value.as(Rect::seed_type());
+  Rect *r2 = value.as<Rect>();
   ASSERT_EQ(17, r2->top_left()->x());
   ASSERT_EQ(18, r2->top_left()->y());
   ASSERT_EQ(19, r2->bottom_right()->x());
@@ -232,13 +232,13 @@ TEST(marshal, partial_encode) {
   BinaryWriter out;
   out.write(n);
   TypeRegistry registry;
-  registry.register_type(Point::seed_type());
-  registry.register_type(Rect::seed_type());
+  registry.register_type<Point>();
+  registry.register_type<Rect>();
   BinaryReader in(&arena);
   in.set_type_registry(&registry);
   Native value = in.parse(*out, out.size());
   ASSERT_TRUE(value.is_native());
-  Rect *r2 = value.as(Rect::seed_type());
+  Rect *r2 = value.as<Rect>();
   ASSERT_EQ(17, r2->top_left()->x());
   ASSERT_EQ(18, r2->top_left()->y());
   ASSERT_PTREQ(NULL, r2->bottom_right());

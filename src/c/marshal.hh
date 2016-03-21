@@ -161,7 +161,14 @@ public:
 // A simple registry based on a mapping from headers to types.
 class TypeRegistry : public AbstractTypeRegistry {
 public:
-  // Adds the given type as the mapping for its header to this registry.
+  // Register the given seed type. The difference between this and the
+  // non-template version is in that this uses the default seed type machinery
+  // to extract the type object so if that's in place you only need to specify
+  // the type parameter which is less verbose.
+  template <typename T>
+  void register_type(AbstractSeedType *type = default_seed_type<T>::get()) { register_type(type); }
+
+  // Register the given seed type.
   void register_type(AbstractSeedType *type);
 
   // Adds another type registry that will be called to resolve any types that
