@@ -53,7 +53,7 @@ public:
   // Given an object pointer and its type, returns the type viewed as the type
   // represented by this type object. If the object doesn't have this type
   // NULL is returned.
-  inline T *cast(AbstractSeedType *type, void *object);
+  inline T *cast(AbstractSeedType *type, void *object, void *if_not_native=NULL);
 };
 
 // An seed type describes a type that can be constructed in two steps: first

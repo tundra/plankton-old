@@ -19,12 +19,18 @@ static inline T *native_cast(Variant variant,
 
 template <typename T>
 inline T *Variant::native_as(ConcreteSeedType<T> *type) const {
-  return type->cast(native_type(), native_object());
+  return native_as_or_else<T>(NULL, type);
 }
 
 template <typename T>
-T *ConcreteSeedType<T>::cast(AbstractSeedType *type, void *object) {
-  return (this == type) ? static_cast<T*>(object) : NULL;
+inline T *Variant::native_as_or_else(T *if_not_native, ConcreteSeedType<T> *type) const {
+  return type->cast(native_type(), native_object(), if_not_native);
+}
+
+
+template <typename T>
+T *ConcreteSeedType<T>::cast(AbstractSeedType *type, void *object, void *if_not_native) {
+  return (this == type) ? static_cast<T*>(object) : static_cast<T*>(if_not_native);
 }
 
 template <typename T>

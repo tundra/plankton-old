@@ -190,6 +190,11 @@ public:
   template <typename T>
   inline T *native_as(ConcreteSeedType<T> *type = get_default_seed_type<T>()) const;
 
+  // Returns this native variant viewed under the given type, but only if this
+  // is a native that has that type. If not, NULL is returned.
+  template <typename T>
+  inline T *native_as_or_else(T *if_not_native, ConcreteSeedType<T> *type = get_default_seed_type<T>()) const;
+
   // Returns the type of this native object, or NULL if this is not native.
   AbstractSeedType *native_type() const;
 
