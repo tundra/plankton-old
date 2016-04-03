@@ -216,6 +216,17 @@ private:
   bool is_installed_;
 };
 
+// A message socket observer that simply logs requests coming in and responses
+// going out.
+class TracingMessageSocketObserver : public MessageSocketObserver {
+public:
+  TracingMessageSocketObserver(const char *prefix = "") : prefix_(prefix) { }
+  virtual void on_incoming_request(IncomingRequest *request, uint64_t serial);
+  virtual void on_outgoing_response(OutgoingResponse response, uint64_t serial);
+private:
+  const char *prefix_;
+};
+
 // A socket you can send and receive requests through.
 class MessageSocket {
 public:
