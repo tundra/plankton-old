@@ -348,15 +348,15 @@ protected:
 protected:
   Variant(repr_tag_t tag, pton_arena_value_t *arena_value);
 
-private:
-  friend class Arena;
-
   // On windows default_seed_type<T>::get() can't be used as a default argument
   // for some reason but wrapping it in a simple call makes the problem go away.
   template <typename T>
   static ConcreteSeedType<T> *get_default_seed_type() {
     return default_seed_type<T>::get();
   }
+
+private:
+  friend class Arena;
 };
 
 // A native variant is a native-type variant that can be stack-allocated such
@@ -367,7 +367,7 @@ private:
 class NativeVariant : public Variant {
 public:
   template <typename T>
-  NativeVariant(T *object, ConcreteSeedType<T> *type = default_seed_type<T>::get());
+  NativeVariant(T *object, ConcreteSeedType<T> *type = Variant::get_default_seed_type<T>());
 private:
   pton_native_info_t info_;
 };
