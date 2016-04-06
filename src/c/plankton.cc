@@ -633,15 +633,27 @@ uint32_t pton_map_size(pton_variant_t variant) {
 }
 
 AbstractSeedType *Variant::native_type() const {
-  return is_native()
-       ? payload()->as_arena_native_->type_
-       : NULL;
+  pton_check_binary_version(value_);
+  switch (value_.header_.repr_tag_) {
+    case header_t::PTON_REPR_EXTN_NATIVE:
+      return value_.payload_.as_external_native_->type_;
+    case header_t::PTON_REPR_ARNA_NATIVE:
+      return value_.payload_.as_arena_native_->type_;
+    default:
+      return NULL;
+  }
 }
 
 void *Variant::native_object() const {
-  return is_native()
-       ? payload()->as_arena_native_->object_
-       : NULL;
+  pton_check_binary_version(value_);
+  switch (value_.header_.repr_tag_) {
+    case header_t::PTON_REPR_EXTN_NATIVE:
+      return value_.payload_.as_external_native_->object_;
+    case header_t::PTON_REPR_ARNA_NATIVE:
+      return value_.payload_.as_arena_native_->object_;
+    default:
+      return NULL;
+  }
 }
 
 uint32_t Variant::map_size() const {

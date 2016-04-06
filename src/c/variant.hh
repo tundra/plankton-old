@@ -25,12 +25,20 @@ public:
 };
 
 namespace plankton {
+class AbstractSeedType;
+}
+
+struct pton_native_info_t {
+  void *object_;
+  plankton::AbstractSeedType *type_;
+};
+
+namespace plankton {
 
 class Variant;
 class Sink;
 class disposable_t;
 class Map_Iterator;
-class AbstractSeedType;
 template <typename T> class ConcreteSeedType;
 
 } // namespace plankton
@@ -337,6 +345,9 @@ protected:
 
   const pton_variant_t::pton_variant_payload_t *payload() const { return &value_.payload_; }
 
+protected:
+  Variant(repr_tag_t tag, pton_arena_value_t *arena_value);
+
 private:
   friend class Arena;
 
@@ -346,9 +357,28 @@ private:
   static ConcreteSeedType<T> *get_default_seed_type() {
     return default_seed_type<T>::get();
   }
-
-  Variant(repr_tag_t tag, pton_arena_value_t *arena_value);
 };
+
+// A native variant is a native-type variant that can be stack-allocated such
+// that you don't need to do factory-allocation to represent a native. The value
+// is only valid as long as the instance exists but you can pass it by value as
+// a variant as long as you leave the original instance on the stack as long as
+// you need the values to be valid.
+class NativeVariant : public Variant {
+public:
+  template <typename T>
+  NativeVariant(T *object, ConcreteSeedType<T> *type = default_seed_type<T>::get());
+private:
+  pton_native_info_t info_;
+};
+
+template <typename T>
+NativeVariant::NativeVariant(T *object, ConcreteSeedType<T> *type)
+  : Variant(header_t::PTON_REPR_EXTN_NATIVE, NULL) {
+  Variant::value_.payload_.as_external_native_ = &info_;
+  info_.object_ = object;
+  info_.type_ = type;
+}
 
 // A variant that represents an array. An array can be either an actual array
 // or null, to make conversion more convenient. If you want to be sure you're

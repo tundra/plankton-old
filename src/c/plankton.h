@@ -22,6 +22,7 @@ typedef struct pton_sink_t pton_sink_t;
 typedef struct pton_command_line_t pton_command_line_t;
 typedef struct pton_command_line_reader_t pton_command_line_reader_t;
 typedef struct pton_syntax_error_t pton_syntax_error_t;
+typedef struct pton_native_info_t pton_native_info_t;
 
 // The different types of variants. The values are the corresponding
 // representation tags downshifted by 4.
@@ -72,7 +73,8 @@ typedef struct {
         PTON_REPR_ARNA_MAP = 0x70,
         PTON_REPR_INLN_ID = 0x80,
         PTON_REPR_ARNA_SEED = 0x90,
-        PTON_REPR_ARNA_NATIVE = 0xA0
+        PTON_REPR_ARNA_NATIVE = 0xA0,
+        PTON_REPR_EXTN_NATIVE = 0xA1
     } repr_tag_ UNLESS_MSVC(: 8);
     // A tag used to identify the version of plankton that produced this value.
     // All variants returned from a binary plankton implementation will have the
@@ -103,6 +105,7 @@ typedef struct {
     pton_arena_blob_t *as_arena_blob_;
     const void *as_external_blob_data_;
     const char *as_external_string_chars_;
+    pton_native_info_t *as_external_native_;
   } payload_;
 
 } pton_variant_t;

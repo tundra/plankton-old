@@ -70,7 +70,7 @@ bool Variant::is_null() const {
 }
 
 bool Variant::is_native() const {
-  return repr_tag() == header_t::PTON_REPR_ARNA_NATIVE;
+  return type() == PTON_NATIVE;
 }
 
 Arena::Arena()

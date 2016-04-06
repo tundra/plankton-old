@@ -342,3 +342,13 @@ TEST(marshal, key_overlap_regress) {
   for (size_t i = 0; i < kStringCount; i++)
     string_default_delete(strings[i]);
 }
+
+TEST(marshal, native_info) {
+  Point point(45, 53);
+  NativeVariant info(&point);
+  Variant var = info;
+  ASSERT_EQ(PTON_NATIVE, var.type());
+  ASSERT_TRUE(var.is_native());
+  ASSERT_PTREQ(&point, var.native_object());
+  ASSERT_PTREQ(point.seed_type(), var.native_type());
+}
