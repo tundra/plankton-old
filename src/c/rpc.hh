@@ -79,6 +79,7 @@ public:
   Variant arguments() { return arguments_; }
 
   void set_arguments(size_t argc, Variant *argv);
+  void set_argument(Variant key, Variant value);
 
   Factory *factory() { return &arena_; }
 
@@ -316,6 +317,8 @@ class RequestData {
 public:
   // Returns the index'th positional argument to a request.
   Variant argument(int32_t index, Variant defawlt = Variant::null());
+
+  Variant argument(Variant key, Variant defawlt = Variant::null());
 
   // Returns a factory that can be used to allocate the result of a request
   // callback. The factory is only guaranteed to stick around for the duration

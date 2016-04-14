@@ -73,18 +73,20 @@ Variant RequestMessage::to_seed(Factory *factory) {
 OutgoingRequest::OutgoingRequest(Variant subject, Variant selector, size_t argc,
     Variant *argv)
   : subject_(subject)
-  , selector_(selector) {
+  , selector_(selector)
+  , arguments_(Variant::null()) {
   set_arguments(argc, argv);
 }
 
 void OutgoingRequest::set_arguments(size_t argc, Variant *argv) {
-  if (argc == 0) {
-    arguments_ = Variant::null();
-  } else {
+  for (size_t i = 0; i < argc; i++)
+    set_argument(i, argv[i]);
+}
+
+void OutgoingRequest::set_argument(Variant key, Variant value) {
+  if (arguments_.is_null())
     arguments_ = arena_.new_map();
-    for (size_t i = 0; i < argc; i++)
-      arguments_.map_set(i, argv[i]);
-  }
+  arguments_.map_set(key, value);
 }
 
 MessageSocketObserver::MessageSocketObserver()
@@ -362,7 +364,11 @@ internal::OutgoingResponseData::OutgoingResponseData(bool is_success,
   , payload_(payload) { }
 
 Variant RequestData::argument(int32_t index, Variant defawlt) {
-  return args_.map_get(Variant::integer(index), defawlt);
+  return argument(Variant::integer(index), defawlt);
+}
+
+Variant RequestData::argument(Variant key, Variant defawlt) {
+  return args_.map_get(key, defawlt);
 }
 
 Service::Service()
