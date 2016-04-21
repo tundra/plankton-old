@@ -176,6 +176,10 @@ bool pton_is_id(pton_variant_t variant);
 // In other words, true iff the value is the boolean true value.
 bool pton_bool_value(pton_variant_t variant);
 
+// Returns the value of the given boolean if it is a boolean, otherwise the
+// given value.
+bool pton_bool_value_with_default(pton_variant_t variant, bool if_not_bool);
+
 // Returns the integer value of this variant if it is an integer, otherwise
 // 0.
 int64_t pton_int64_value(pton_variant_t variant);

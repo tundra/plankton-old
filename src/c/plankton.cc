@@ -1181,8 +1181,18 @@ bool pton_is_id(pton_variant_t variant) {
 }
 
 bool pton_bool_value(pton_variant_t variant) {
+  return pton_bool_value_with_default(variant, false);
+}
+
+bool pton_bool_value_with_default(pton_variant_t variant, bool if_not_bool) {
   pton_check_binary_version(variant);
-  return variant.header_.repr_tag_ == header_t::PTON_REPR_TRUE;
+  if (variant.header_.repr_tag_ == header_t::PTON_REPR_TRUE) {
+    return true;
+  } else if (variant.header_.repr_tag_ == header_t::PTON_REPR_FALSE) {
+    return false;
+  } else {
+    return if_not_bool;
+  }
 }
 
 int64_t pton_int64_value(pton_variant_t variant) {

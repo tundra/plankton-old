@@ -275,7 +275,7 @@ public:
   // null. Think of this as an accessor for the value of something you know is
   // a boolean, whereas the bool() operator tests whether the variant is a
   // nontrivial value.
-  inline bool bool_value() const;
+  inline bool bool_value(bool is_not_bool = false) const;
 
   // Returns true if this is a truthy value, that is, not the null value. This
   // is useful in various conversion which return a truthy value on success and

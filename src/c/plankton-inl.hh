@@ -30,8 +30,8 @@ int64_t Variant::integer_value() const {
   return pton_int64_value(value_);
 }
 
-bool Variant::bool_value() const {
-  return pton_bool_value(value_);
+bool Variant::bool_value(bool if_not_bool) const {
+  return pton_bool_value_with_default(value_, if_not_bool);
 }
 
 Variant::operator bool() const {
