@@ -221,11 +221,14 @@ private:
 // going out.
 class TracingMessageSocketObserver : public MessageSocketObserver {
 public:
-  TracingMessageSocketObserver(const char *prefix = "") : prefix_(prefix) { }
+  TracingMessageSocketObserver(const char *prefix = "", tclib::OutStream *out = NULL);
   virtual void on_incoming_request(IncomingRequest *request, uint64_t serial);
   virtual void on_outgoing_response(OutgoingResponse response, uint64_t serial);
+  void set_out(tclib::OutStream *out) { out_ = out; }
 private:
   const char *prefix_;
+  tclib::OutStream *out_;
+  tclib::OutStream *out() { return out_; }
 };
 
 // A socket you can send and receive requests through.

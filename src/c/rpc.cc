@@ -130,21 +130,30 @@ void MessageSocketObserver::notify_outgoing_response(OutgoingResponse response,
     next()->notify_outgoing_response(response, serial);
 }
 
+TracingMessageSocketObserver::TracingMessageSocketObserver(const char *prefix, OutStream *out)
+  : prefix_(prefix)
+  , out_(out) {
+  if (out == NULL)
+    out_ = FileSystem::native()->std_out();
+}
+
 void TracingMessageSocketObserver::on_incoming_request(rpc::IncomingRequest *request,
       uint64_t serial) {
   TextWriter selw;
   selw.write(request->selector());
   TextWriter argw;
   argw.write(request->arguments());
-  INFO("%s <%i| %s %s", prefix_, static_cast<uint32_t>(serial), *selw, *argw);
+  out()->printf("%s <%i| %s %s\n", prefix_, static_cast<uint32_t>(serial),
+      *selw, *argw);
 }
 
 void TracingMessageSocketObserver::on_outgoing_response(rpc::OutgoingResponse response,
       uint64_t serial) {
   TextWriter payw;
   payw.write(response.payload());
-  INFO("%s %s%i> %s", prefix_, (response.is_success() ? "|" : "!"),
-      static_cast<uint32_t>(serial), *payw);
+  const char *indicator = response.is_success() ? "|" : "!";
+  out()->printf("%s %s%i> %s\n", prefix_, indicator, static_cast<uint32_t>(serial),
+      *payw);
 }
 
 namespace plankton {
