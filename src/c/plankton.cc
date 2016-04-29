@@ -254,10 +254,14 @@ ArenaData *Arena::data() {
 }
 
 Native Arena::new_raw_native(void *object, AbstractSeedType *type) {
-  pton_arena_native_t *data = alloc_value<pton_arena_native_t>();
-  Variant result(header_t::PTON_REPR_ARNA_NATIVE,
-      new (data) pton_arena_native_t(type, object));
-  return result;
+  if (object == NULL) {
+    return Variant::null();
+  } else {
+    pton_arena_native_t *data = alloc_value<pton_arena_native_t>();
+    Variant result(header_t::PTON_REPR_ARNA_NATIVE,
+        new (data) pton_arena_native_t(type, object));
+    return result;
+  }
 }
 
 Array Arena::new_array() {

@@ -364,6 +364,9 @@ private:
 // is only valid as long as the instance exists but you can pass it by value as
 // a variant as long as you leave the original instance on the stack as long as
 // you need the values to be valid.
+//
+// Note: if the object being wrapped is NULL then the variant is the null value
+//   rather than a native with a null object.
 class NativeVariant : public Variant {
 public:
   template <typename T>
@@ -375,9 +378,15 @@ private:
 template <typename T>
 NativeVariant::NativeVariant(T *object, ConcreteSeedType<T> *type)
   : Variant(header_t::PTON_REPR_EXTN_NATIVE, NULL) {
-  Variant::value_.payload_.as_external_native_ = &info_;
-  info_.object_ = object;
-  info_.type_ = type;
+  if (object == NULL) {
+    // If the object is null we immediately zap the state we wrote in the init
+    // list.
+    value_ = pton_null();
+  } else {
+    info_.object_ = object;
+    info_.type_ = type;
+    value_.payload_.as_external_native_ = &info_;
+  }
 }
 
 // A variant that represents an array. An array can be either an actual array

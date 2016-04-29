@@ -351,4 +351,12 @@ TEST(marshal, native_info) {
   ASSERT_TRUE(var.is_native());
   ASSERT_PTREQ(&point, var.native_object());
   ASSERT_PTREQ(point.seed_type(), var.native_type());
+
+  NativeVariant empty(static_cast<Point*>(NULL));
+  var = empty;
+  ASSERT_EQ(PTON_NULL, var.type());
+  ASSERT_TRUE(var.is_null());
+  ASSERT_FALSE(var.is_native());
+  ASSERT_PTREQ(NULL, var.native_object());
+  ASSERT_PTREQ(NULL, var.native_type());
 }
