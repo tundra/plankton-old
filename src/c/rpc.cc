@@ -145,6 +145,7 @@ void TracingMessageSocketObserver::on_incoming_request(rpc::IncomingRequest *req
   argw.write(request->arguments());
   out()->printf("%s <%i| %s %s\n", prefix_, static_cast<uint32_t>(serial),
       *selw, *argw);
+  out()->flush();
 }
 
 void TracingMessageSocketObserver::on_outgoing_response(rpc::OutgoingResponse response,
@@ -154,6 +155,7 @@ void TracingMessageSocketObserver::on_outgoing_response(rpc::OutgoingResponse re
   const char *indicator = response.is_success() ? "|" : "!";
   out()->printf("%s %s%i> %s\n", prefix_, indicator, static_cast<uint32_t>(serial),
       *payw);
+  out()->flush();
 }
 
 namespace plankton {
