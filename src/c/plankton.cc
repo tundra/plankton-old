@@ -1200,9 +1200,14 @@ bool pton_bool_value_with_default(pton_variant_t variant, bool if_not_bool) {
 }
 
 int64_t pton_int64_value(pton_variant_t variant) {
-  pton_check_binary_version(variant);
-  return pton_is_integer(variant) ? variant.payload_.as_int64_ : 0;
+  return pton_int64_value_with_default(variant, 0);
 }
+
+int64_t pton_int64_value_with_default(pton_variant_t variant, int64_t if_not_int) {
+  pton_check_binary_version(variant);
+  return pton_is_integer(variant) ? variant.payload_.as_int64_ : if_not_int;
+}
+
 
 pton_variant_t pton_null() {
   pton_variant_t result = VARIANT_INIT(header_t::PTON_REPR_NULL, 0);

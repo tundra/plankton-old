@@ -26,8 +26,8 @@ Variant Variant::string(const char *string, uint32_t length) {
   return Variant(string, length);
 }
 
-int64_t Variant::integer_value() const {
-  return pton_int64_value(value_);
+int64_t Variant::integer_value(int64_t if_not_int) const {
+  return pton_int64_value_with_default(value_, if_not_int);
 }
 
 bool Variant::bool_value(bool if_not_bool) const {

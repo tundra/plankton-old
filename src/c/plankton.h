@@ -184,6 +184,10 @@ bool pton_bool_value_with_default(pton_variant_t variant, bool if_not_bool);
 // 0.
 int64_t pton_int64_value(pton_variant_t variant);
 
+// Returns the integer value of this variant if it is an integer, otherwise the
+// given default value.
+int64_t pton_int64_value_with_default(pton_variant_t variant, int64_t if_not_int);
+
 // Returns the given value's type.
 pton_type_t pton_type(pton_variant_t variant);
 

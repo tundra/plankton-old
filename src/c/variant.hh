@@ -155,7 +155,7 @@ public:
 
   // Returns the integer value of this variant if it is an integer, otherwise
   // 0.
-  inline int64_t integer_value() const;
+  inline int64_t integer_value(int64_t if_not_int = 0) const;
 
   // Returns the length of this string if it is a string, otherwise 0.
   uint32_t string_length() const;
